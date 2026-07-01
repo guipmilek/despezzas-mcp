@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.despezzas-session.json
+*.log
+.DS_Store
+__pycache__/

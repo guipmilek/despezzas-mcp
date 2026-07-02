@@ -144,7 +144,7 @@ Depois de criar o Blueprint, preencha estes placeholders de secrets no Render:
 ```dotenv
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
-DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
+DESPEZZAS_FIREBASE_API_KEY=<chave-publica-firebase-do-despezzas>
 MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_PUBLIC_BASE_URL=https://seu-servico.onrender.com
 ```
@@ -167,7 +167,7 @@ MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
 MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
-DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
+DESPEZZAS_FIREBASE_API_KEY=<chave-publica-firebase-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 ```
 
@@ -204,7 +204,7 @@ MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
-DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
+DESPEZZAS_FIREBASE_API_KEY=<chave-publica-firebase-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 MCP_PUBLIC_BASE_URL=https://seu-projeto.vercel.app
 ```
@@ -277,7 +277,7 @@ MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
-DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
+DESPEZZAS_FIREBASE_API_KEY=<chave-publica-firebase-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 MCP_PUBLIC_BASE_URL=https://seu-app-sua-org.koyeb.app
 ```
@@ -302,7 +302,7 @@ MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
 MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
-DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
+DESPEZZAS_FIREBASE_API_KEY=<chave-publica-firebase-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 MCP_PUBLIC_BASE_URL=https://sua-url-cloud-run
 ```

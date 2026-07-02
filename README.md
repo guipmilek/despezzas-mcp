@@ -206,7 +206,7 @@ npm run smoke:readonly
 | `DESPEZZAS_TOKEN` | Opcional | Token bearer manual copiado de uma sessão web. |
 | `DESPEZZAS_EMAIL` | Opcional | Login por email/senha. |
 | `DESPEZZAS_PASSWORD` | Opcional | Login por email/senha. |
-| `DESPEZZAS_FIREBASE_API_KEY` | Para email/senha | Troca de token customizado e refresh Firebase. |
+| `DESPEZZAS_FIREBASE_API_KEY` | Para email/senha | Chave pública do Firebase Web usada para troca e refresh de token. Veja como obtê-la no [.env.example](.env.example). |
 | `DESPEZZAS_SESSION_FILE` | Opcional | Caminho de sessão persistida; use `none` para desativar. |
 | `MCP_TRANSPORT` | Opcional | `stdio` ou `http`; padrão `stdio`. |
 | `HOST` / `PORT` | Opcional | Bind do servidor HTTP; padrão `127.0.0.1:8787`. |
@@ -220,7 +220,7 @@ npm run smoke:readonly
 Opções preferenciais:
 
 1. Execute em modo HTTP e abra `http://127.0.0.1:8787/login`.
-2. Defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_FIREBASE_API_KEY` no `.env`.
+2. Defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_FIREBASE_API_KEY` (chave pública — veja [.env.example](.env.example)) no `.env`.
 3. Defina `DESPEZZAS_TOKEN` manualmente a partir do DevTools do navegador.
 
 A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: email, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha continuam pertencendo ao app/site oficial do Despezzas.
@@ -228,7 +228,7 @@ A página `/login` usa a identidade visual do Despezzas, acompanha os temas clar
 O fluxo de login espelha o frontend do Despezzas:
 
 1. `POST https://api.despezzas.com/v2/auth` com email/senha.
-2. Usa o `firebase_token` retornado com Firebase `accounts:signInWithCustomToken` usando `DESPEZZAS_FIREBASE_API_KEY`.
+2. Usa o `firebase_token` retornado com Firebase `accounts:signInWithCustomToken` usando `DESPEZZAS_FIREBASE_API_KEY` (a chave pública do Firebase Web do Despezzas).
 3. Usa o `idToken` do Firebase como `Authorization: Bearer ...` em `api.despezzas.com`.
 4. Salva o refresh token do Firebase em `%USERPROFILE%\.despezzas-mcp\session.json` por padrão.
 

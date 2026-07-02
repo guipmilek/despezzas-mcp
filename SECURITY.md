@@ -3,7 +3,7 @@
 Este MCP pode ler e alterar dados financeiros pessoais. Trate-o como infraestrutura sensível.
 
 - Nunca faça commit de `.env` ou tokens bearer.
-- Nunca faça commit de `DESPEZZAS_FIREBASE_API_KEY`; configure essa chave por variável de ambiente quando usar login por email/senha.
+- `DESPEZZAS_FIREBASE_API_KEY` é uma chave pública do Firebase Web — o próprio frontend do Despezzas a expõe. Mesmo sendo pública, mantenha-a no `.env` ou como secret do Wrangler, nunca hardcoded no código. Para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey`.
 - Considere senhas do Despezzas expostas se forem coladas em chats, logs, histórico de shell, screenshots ou arquivos versionados. Troque a senha depois de qualquer exposição acidental.
 - Prefira repositórios privados no GitHub, a menos que você queira intencionalmente tornar o código público.
 - Use `MCP_HTTP_BEARER_TOKEN` ao rodar o modo HTTP fora do localhost.

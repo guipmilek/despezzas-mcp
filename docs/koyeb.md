@@ -41,9 +41,11 @@ MCP_OWNER_AUTH_CODE=<codigo-de-proprietario-digitado>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
-DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
+DESPEZZAS_FIREBASE_API_KEY=<chave-publica-firebase-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 ```
+
+> **Dica:** `DESPEZZAS_FIREBASE_API_KEY` é uma chave pública do Firebase Web — o próprio frontend do Despezzas a expõe. Para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey`.
 
 Depois que o Koyeb fornecer o domínio público, defina:
 

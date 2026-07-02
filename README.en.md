@@ -206,7 +206,7 @@ npm run smoke:readonly
 | `DESPEZZAS_TOKEN` | Optional | Manual bearer token copied from a web session. |
 | `DESPEZZAS_EMAIL` | Optional | Email/password login. |
 | `DESPEZZAS_PASSWORD` | Optional | Email/password login. |
-| `DESPEZZAS_FIREBASE_API_KEY` | For email/password | Firebase custom token exchange and refresh. |
+| `DESPEZZAS_FIREBASE_API_KEY` | For email/password | Public Firebase Web key used for token exchange and refresh. See how to obtain it in [.env.example](.env.example). |
 | `DESPEZZAS_SESSION_FILE` | Optional | Persisted session path; use `none` to disable. |
 | `MCP_TRANSPORT` | Optional | `stdio` or `http`; default `stdio`. |
 | `HOST` / `PORT` | Optional | HTTP server bind; default `127.0.0.1:8787`. |
@@ -220,7 +220,7 @@ npm run smoke:readonly
 Preferred options:
 
 1. Run HTTP mode and open `http://127.0.0.1:8787/login`.
-2. Set `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, and `DESPEZZAS_FIREBASE_API_KEY` in `.env`.
+2. Set `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, and `DESPEZZAS_FIREBASE_API_KEY` (public key — see [.env.example](.env.example)) in `.env`.
 3. Set `DESPEZZAS_TOKEN` manually from browser DevTools.
 
 The `/login` page uses the Despezzas visual identity, follows the system light/dark theme, and contains only the fields this MCP needs: email, password, and, when configured, owner access code. Account creation and password recovery still belong in the official Despezzas app/site.
@@ -228,7 +228,7 @@ The `/login` page uses the Despezzas visual identity, follows the system light/d
 The login flow mirrors the Despezzas frontend:
 
 1. `POST https://api.despezzas.com/v2/auth` with email/password.
-2. Uses the returned `firebase_token` with Firebase `accounts:signInWithCustomToken` using `DESPEZZAS_FIREBASE_API_KEY`.
+2. Uses the returned `firebase_token` with Firebase `accounts:signInWithCustomToken` using `DESPEZZAS_FIREBASE_API_KEY` (the Despezzas Firebase Web public key).
 3. Uses the Firebase `idToken` as `Authorization: Bearer ...` on `api.despezzas.com`.
 4. Saves the Firebase refresh token to `%USERPROFILE%\.despezzas-mcp\session.json` by default.
 

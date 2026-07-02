@@ -7,15 +7,22 @@ interface LoginPageOptions {
   email?: string;
   action?: string;
   hidden?: Record<string, string | undefined>;
+  ownerCodeRequired?: boolean;
+  credentialsOptional?: boolean;
 }
 
 export function renderLoginPage(options: LoginPageOptions = {}): string {
   const email = escapeHtml(options.email ?? "");
   const action = escapeHtml(options.action ?? "/login");
+  const credentialRequired = options.credentialsOptional ? "" : " required";
   const hidden = Object.entries(options.hidden ?? {})
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value ?? "")}" />`)
     .join("");
+  const ownerCode = options.ownerCodeRequired
+    ? `<label for="owner_code">Codigo de acesso MCP</label>
+        <input id="owner_code" name="owner_code" type="password" placeholder="Insira o codigo de acesso" autocomplete="one-time-code" required />`
+    : "";
   const error = options.error ? `<p class="alert alert-error">${escapeHtml(options.error)}</p>` : "";
   const success = options.success ? `<p class="alert alert-success">${escapeHtml(options.success)}</p>` : "";
   const authDetails = options.status
@@ -154,10 +161,11 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
       ${success}
       <form method="post" action="${action}" autocomplete="on">
         ${hidden}
+        ${ownerCode}
         <label for="email">E-mail</label>
-        <input id="email" name="email" type="email" value="${email}" placeholder="Insira seu e-mail" autocomplete="username" required />
+        <input id="email" name="email" type="email" value="${email}" placeholder="Insira seu e-mail" autocomplete="username"${credentialRequired} />
         <label for="password">Senha</label>
-        <input id="password" name="password" type="password" placeholder="Insira sua senha" autocomplete="current-password" required />
+        <input id="password" name="password" type="password" placeholder="Insira sua senha" autocomplete="current-password"${credentialRequired} />
         <button type="submit">Entrar</button>
       </form>
       ${authDetails}

@@ -53,6 +53,18 @@ Add it to Cloudflare:
 npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
 ```
 
+Create an owner access code. This is the code you type on the MCP login screen when ChatGPT connects, so only you can authorize ChatGPT to use the Despezzas account stored in the Worker secrets:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"
+```
+
+Add it to Cloudflare:
+
+```powershell
+npx wrangler secret put MCP_OWNER_AUTH_CODE
+```
+
 Add Despezzas credentials as secrets:
 
 ```powershell
@@ -133,5 +145,6 @@ npm run deploy:cloudflare
 
 - `DESPEZZAS_SESSION_FILE=none` is set in `wrangler.jsonc`; Workers do not provide a normal persistent filesystem.
 - For reliability, keep `DESPEZZAS_EMAIL` and `DESPEZZAS_PASSWORD` configured as secrets so the Worker can re-login after isolate restarts.
-- The `/login` page still works, but without durable storage it should be treated as a test/manual authorization path.
+- `MCP_OWNER_AUTH_CODE` gates `/login` and ChatGPT OAuth authorization. Without it, the Worker refuses to authorize ChatGPT because the public URL would otherwise be able to use the account credentials stored in Worker secrets.
+- The `/login` page still works, but on Cloudflare it is an owner-only test/manual authorization path.
 - If a future version needs durable per-user sessions, migrate `src/cloudflare.ts` to Cloudflare `McpAgent` plus Durable Objects or store sessions in KV/D1 with encryption.

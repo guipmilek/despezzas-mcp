@@ -15,6 +15,7 @@ export interface Config {
   httpBearerToken: string | undefined;
   oauthAccessTokenTtlSeconds: number;
   oauthTokenSecret: string | undefined;
+  ownerAuthCode: string | undefined;
 }
 
 function normalizeTransport(value: string | undefined): McpTransport {
@@ -41,6 +42,7 @@ export const config: Config = {
   httpBearerToken: process.env.MCP_HTTP_BEARER_TOKEN,
   oauthAccessTokenTtlSeconds: normalizePositiveInt(process.env.MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS, 3600),
   oauthTokenSecret: process.env.MCP_OAUTH_TOKEN_SECRET,
+  ownerAuthCode: process.env.MCP_OWNER_AUTH_CODE,
 };
 
 function normalizeSessionFile(value: string | undefined): string | undefined {

@@ -37,6 +37,7 @@ MCP_TRANSPORT=http
 HOST=0.0.0.0
 PORT=8787
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<your-email>
 DESPEZZAS_PASSWORD=<your-password>
@@ -66,4 +67,3 @@ In ChatGPT Apps / Custom Tool:
 - Authentication: `OAuth`
 
 Expect the first request after idle time to be slower because the Free Instance scales down to zero.
-

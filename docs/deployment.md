@@ -10,6 +10,7 @@ Use these settings on every remote provider:
 MCP_TRANSPORT=http
 HOST=0.0.0.0
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 ```
 
@@ -82,6 +83,7 @@ Set secrets:
 
 ```powershell
 npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
+npx wrangler secret put MCP_OWNER_AUTH_CODE
 npx wrangler secret put DESPEZZAS_EMAIL
 npx wrangler secret put DESPEZZAS_PASSWORD
 ```
@@ -118,6 +120,7 @@ After creating the Blueprint, fill these Render secret placeholders:
 ```dotenv
 DESPEZZAS_EMAIL=<your-email>
 DESPEZZAS_PASSWORD=<your-password>
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 MCP_PUBLIC_BASE_URL=https://your-service.onrender.com
 ```
 
@@ -136,6 +139,7 @@ Set variables:
 MCP_TRANSPORT=http
 HOST=0.0.0.0
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 DESPEZZAS_EMAIL=<your-email>
 DESPEZZAS_PASSWORD=<your-password>
 DESPEZZAS_SESSION_FILE=none
@@ -170,6 +174,7 @@ Set variables:
 
 ```dotenv
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<your-email>
 DESPEZZAS_PASSWORD=<your-password>
@@ -241,6 +246,7 @@ MCP_TRANSPORT=http
 HOST=0.0.0.0
 PORT=8787
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<your-email>
 DESPEZZAS_PASSWORD=<your-password>
@@ -265,6 +271,7 @@ Use the Dockerfile. Cloud Run is stateless by default, so use env credentials an
 MCP_TRANSPORT=http
 HOST=0.0.0.0
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 DESPEZZAS_EMAIL=<your-email>
 DESPEZZAS_PASSWORD=<your-password>
 DESPEZZAS_SESSION_FILE=none

@@ -13,6 +13,7 @@ interface Env {
   MCP_HTTP_BEARER_TOKEN?: string;
   MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS?: string;
   MCP_OAUTH_TOKEN_SECRET?: string;
+  MCP_OWNER_AUTH_CODE?: string;
   MCP_PUBLIC_BASE_URL?: string;
 }
 
@@ -49,6 +50,9 @@ app.get("/health", async (c) => {
       process.env.MCP_OAUTH_TOKEN_SECRET
         ? "MCP_OAUTH_TOKEN_SECRET is configured."
         : "Set MCP_OAUTH_TOKEN_SECRET as a Wrangler secret before connecting ChatGPT.",
+      process.env.MCP_OWNER_AUTH_CODE
+        ? "MCP_OWNER_AUTH_CODE is configured."
+        : "Set MCP_OWNER_AUTH_CODE as a Wrangler secret so only you can authorize ChatGPT.",
     ],
   });
 });
@@ -102,6 +106,7 @@ app.get("/oauth/authorize", async (c) => {
   const { authManager } = await import("./auth.js");
   const { config } = await import("./config.js");
   const { mcpResource, validateAuthorizeParams } = await import("./oauth.js");
+  const { ownerAuthCodeConfigured } = await import("./ownerAuth.js");
   const { renderLoginPage } = await import("./loginPage.js");
 
   try {
@@ -110,8 +115,11 @@ app.get("/oauth/authorize", async (c) => {
     return c.html(
       renderLoginPage({
         status: await authManager.getStatus(),
-        email: String(query.login_hint ?? config.email ?? ""),
+        error: ownerAuthCodeConfigured() ? undefined : "Configure MCP_OWNER_AUTH_CODE before authorizing ChatGPT.",
+        email: String(query.login_hint ?? ""),
         action: "/oauth/authorize",
+        ownerCodeRequired: true,
+        credentialsOptional: Boolean(config.email && config.password),
         hidden: {
           client_id: params.clientId,
           redirect_uri: params.redirectUri,
@@ -133,9 +141,11 @@ app.post("/oauth/authorize", async (c) => {
   const body = await formBody(c.req.raw);
   const { config } = await import("./config.js");
   const { completeAuthorization, mcpResource } = await import("./oauth.js");
+  const { requireOwnerAuthCode } = await import("./ownerAuth.js");
   const { renderLoginPage } = await import("./loginPage.js");
 
   try {
+    requireOwnerAuthCode(body.owner_code);
     const redirect = await completeAuthorization({
       email: body.email || config.email || "",
       password: body.password || config.password || "",
@@ -155,6 +165,8 @@ app.post("/oauth/authorize", async (c) => {
         error: message,
         email: body.email ?? "",
         action: "/oauth/authorize",
+        ownerCodeRequired: true,
+        credentialsOptional: Boolean(config.email && config.password),
         hidden: {
           client_id: body.client_id,
           redirect_uri: body.redirect_uri,
@@ -183,17 +195,28 @@ app.post("/oauth/token", async (c) => {
 app.get("/login", async (c) => {
   const { authManager } = await import("./auth.js");
   const { config } = await import("./config.js");
+  const { ownerAuthCodeConfigured } = await import("./ownerAuth.js");
   const { renderLoginPage } = await import("./loginPage.js");
-  return c.html(renderLoginPage({ status: await authManager.getStatus(), email: String(c.req.query("email") ?? config.email ?? "") }));
+  return c.html(
+    renderLoginPage({
+      status: await authManager.getStatus(),
+      error: ownerAuthCodeConfigured() ? undefined : "Configure MCP_OWNER_AUTH_CODE before using this public login page.",
+      email: String(c.req.query("email") ?? ""),
+      ownerCodeRequired: true,
+      credentialsOptional: Boolean(config.email && config.password),
+    }),
+  );
 });
 
 app.post("/login", async (c) => {
   const body = await formBody(c.req.raw);
   const { authManager } = await import("./auth.js");
   const { config } = await import("./config.js");
+  const { requireOwnerAuthCode } = await import("./ownerAuth.js");
   const { renderLoginPage, renderLoginSuccessPage } = await import("./loginPage.js");
 
   try {
+    requireOwnerAuthCode(body.owner_code);
     await authManager.loginWithPassword(body.email || config.email || "", body.password || config.password || "");
     return c.html(renderLoginSuccessPage(await authManager.getStatus()));
   } catch (error) {
@@ -203,6 +226,8 @@ app.post("/login", async (c) => {
         status: await authManager.getStatus(),
         email: body.email ?? "",
         error: message,
+        ownerCodeRequired: true,
+        credentialsOptional: Boolean(config.email && config.password),
       }),
       401,
     );

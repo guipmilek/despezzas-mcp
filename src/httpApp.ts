@@ -16,6 +16,7 @@ import {
   validateAuthorizeParams,
   wwwAuthenticate,
 } from "./oauth.js";
+import { ownerAuthCodeConfigured, requireOwnerAuthCode } from "./ownerAuth.js";
 import { createServer } from "./server.js";
 
 export function createHttpApp() {
@@ -80,6 +81,7 @@ export function createHttpApp() {
           status: await authManager.getStatus(),
           email: String(req.query.login_hint ?? config.email ?? ""),
           action: "/oauth/authorize",
+          ownerCodeRequired: ownerAuthCodeConfigured(),
           hidden: {
             client_id: params.clientId,
             redirect_uri: params.redirectUri,
@@ -99,6 +101,10 @@ export function createHttpApp() {
 
   app.post("/oauth/authorize", async (req, res) => {
     try {
+      if (ownerAuthCodeConfigured()) {
+        requireOwnerAuthCode(typeof req.body.owner_code === "string" ? req.body.owner_code : undefined);
+      }
+
       const redirect = await completeAuthorization({
         email: String(req.body.email ?? ""),
         password: String(req.body.password ?? ""),
@@ -118,6 +124,7 @@ export function createHttpApp() {
           error: message,
           email: String(req.body.email ?? ""),
           action: "/oauth/authorize",
+          ownerCodeRequired: ownerAuthCodeConfigured(),
           hidden: {
             client_id: String(req.body.client_id ?? ""),
             redirect_uri: String(req.body.redirect_uri ?? ""),
@@ -143,7 +150,13 @@ export function createHttpApp() {
 
   app.get("/login", async (req, res) => {
     const status = await authManager.getStatus();
-    res.type("html").send(renderLoginPage({ status, email: String(req.query.email ?? config.email ?? "") }));
+    res.type("html").send(
+      renderLoginPage({
+        status,
+        email: String(req.query.email ?? config.email ?? ""),
+        ownerCodeRequired: ownerAuthCodeConfigured(),
+      }),
+    );
   });
 
   app.post("/login", async (req, res) => {
@@ -151,6 +164,10 @@ export function createHttpApp() {
     const password = typeof req.body.password === "string" ? req.body.password : "";
 
     try {
+      if (ownerAuthCodeConfigured()) {
+        requireOwnerAuthCode(typeof req.body.owner_code === "string" ? req.body.owner_code : undefined);
+      }
+
       await authManager.loginWithPassword(email, password);
       res.type("html").send(renderLoginSuccessPage(await authManager.getStatus()));
     } catch (error) {
@@ -160,6 +177,7 @@ export function createHttpApp() {
           status: await authManager.getStatus(),
           email,
           error: message,
+          ownerCodeRequired: ownerAuthCodeConfigured(),
         }),
       );
     }

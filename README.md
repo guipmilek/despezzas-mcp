@@ -24,11 +24,11 @@
 
 <p align="center">
   <img
-    src="https://img.shields.io/github/languages/count/guipmilek/despezzas-mcp?style=flat-square&amp;color=%2304D361&amp;labelColor=202024"
+    src="https://img.shields.io/badge/languages-4-04D361?style=flat-square&amp;labelColor=202024"
     alt="Repository language count"
   />
   <img
-    src="https://img.shields.io/github/repo-size/guipmilek/despezzas-mcp?cacheSeconds=3600&amp;labelColor=202024"
+    src="https://img.shields.io/badge/repo%20size-207%20KiB-007ec6?style=flat-square&amp;labelColor=202024"
     alt="Repository size"
   />
   <img

@@ -64,8 +64,10 @@ apenas um token de sessão seguro.
 Quando o ChatGPT redirecionar para a tela de login do Despezzas MCP, os usuários devem:
 
 1. Informar **email e senha do Despezzas** (os mesmos usados em despezzas.com ou no app Despezzas).
-2. Clicar em **Entrar** para autorizar.
+2. Clicar em **Entrar e autorizar**.
 3. Voltar ao ChatGPT - a conexão estará ativa e restrita apenas à conta deles.
+
+A tela de autorização usa a identidade visual do Despezzas e acompanha tema claro/escuro, mas foi adaptada para a finalidade deste MCP: não mostra botão de voltar, "lembrar de mim", criação de conta ou recuperação de senha. Esses fluxos continuam no app/site oficial do Despezzas.
 
 Não é necessário código de proprietário nem segredo compartilhado; este deploy roda em **modo multiusuário**, então a sessão de cada pessoa é armazenada de forma criptografada e independente no Cloudflare KV.
 
@@ -83,5 +85,5 @@ Não é necessário código de proprietário nem segredo compartilhado; este dep
 
 - [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/health` retorna `"ok": true` e `"authMode": "multi-user"`.
 - [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/.well-known/oauth-protected-resource` responde corretamente.
-- [ ] O login via `/login` com uma conta real do Despezzas funciona e mostra a página de sucesso.
+- [ ] O login via `/login` com uma conta real do Despezzas funciona e mostra a página de sucesso do MCP.
 - [ ] Uma conexão de teste no ChatGPT consegue chamar uma ferramenta somente leitura (por exemplo, listar contas) depois do OAuth.

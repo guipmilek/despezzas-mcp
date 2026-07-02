@@ -146,7 +146,7 @@ Invoke-RestMethod https://despezzas-mcp.<sua-conta>.workers.dev/health
 
 Se o deploy falhar com `You need to register a workers.dev subdomain before publishing to workers.dev`, conclua o onboarding de Workers na Cloudflare e rode `npm run deploy:cloudflare` novamente.
 
-Abra a página de login se quiser testar diretamente a tela de autenticação do Despezzas:
+Abra a página de login se quiser testar diretamente a tela de autorização MCP do Despezzas:
 
 ```text
 https://despezzas-mcp.<sua-conta>.workers.dev/login
@@ -160,7 +160,7 @@ Em ChatGPT Apps / Custom Tool:
 - URL do servidor: `https://despezzas-mcp.<sua-conta>.workers.dev/mcp`
 - Autenticação: `OAuth`
 
-No modo multiusuário, cada usuário verá o formulário de login do Despezzas durante o OAuth e deve informar as próprias credenciais do Despezzas. O token de acesso OAuth do ChatGPT fica vinculado à sessão criptografada desse usuário no KV.
+No modo multiusuário, cada usuário verá o formulário de autorização do Despezzas MCP durante o OAuth e deve informar as próprias credenciais do Despezzas. A tela usa a identidade visual do Despezzas, acompanha tema claro/escuro e contém apenas os campos necessários para autorizar o MCP. O token de acesso OAuth do ChatGPT fica vinculado à sessão criptografada desse usuário no KV.
 
 O Worker expõe os endpoints de descoberta esperados pelo ChatGPT:
 
@@ -194,7 +194,7 @@ npm run deploy:cloudflare
 - O modo multiusuário exige KV `DESPEZZAS_SESSIONS` e `SESSION_ENCRYPTION_KEY`.
 - O modo conta única exige `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `MCP_OWNER_AUTH_CODE`.
 - `MCP_OWNER_AUTH_CODE` é ignorado quando o armazenamento KV multiusuário está configurado.
-- A página `/login` é principalmente um caminho de teste/autorização manual. Usuários do ChatGPT devem conectar pelo OAuth do ChatGPT.
+- A página `/login` é principalmente um caminho de teste/autorização manual. Ela não oferece criação de conta, recuperação de senha ou "lembrar de mim"; esses fluxos continuam no app/site oficial do Despezzas. Usuários do ChatGPT devem conectar pelo OAuth do ChatGPT.
 - Uma versão futura poderia migrar de KV para `McpAgent` com Durable Objects se precisarmos de estado por sessão mais rico.
 
 ## Nota de Confiança

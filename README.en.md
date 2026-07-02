@@ -33,7 +33,7 @@
   <a href="https://github.com/guipmilek/despezzas-mcp/commits/main" title="View repository commits"><img src="https://img.shields.io/badge/last%20commit-today-4b0?style=flat-square&amp;labelColor=202024" alt="Last commit" /></a>
   <a href="./LICENSE" title="View project license"><img src="https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square&amp;labelColor=202024" alt="Project license" /></a>
   <img
-    src="https://img.shields.io/badge/Node.js-%3E%3D20-233056?style=flat-square&amp;logo=node.js&amp;labelColor=202024"
+    src="https://img.shields.io/badge/Node.js-%3E%3D20-233056?style=flat-square&amp;logo=node.js&amp;logoColor=white&amp;labelColor=202024"
     alt="Node.js >= 20"
   />
 </p>
@@ -153,28 +153,28 @@ Main tools used in this project:
 
 <p>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-white?style=for-the-badge&amp;logo=TypeScript" alt="TypeScript" /></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-233056?style=for-the-badge&amp;logo=node.js" alt="Node.js" /></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-233056?style=for-the-badge&amp;logo=node.js&amp;logoColor=white" alt="Node.js" /></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/Model_Context_Protocol-202024?style=for-the-badge" alt="Model Context Protocol" /></a>
-  <a href="https://expressjs.com/"><img src="https://img.shields.io/badge/Express-111111?style=for-the-badge&amp;logo=express" alt="Express" /></a>
+  <a href="https://expressjs.com/"><img src="https://img.shields.io/badge/Express-111111?style=for-the-badge&amp;logo=express&amp;logoColor=white" alt="Express" /></a>
   <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-e36002?style=for-the-badge" alt="Hono" /></a>
-  <a href="https://github.com/colinhacks/zod"><img src="https://img.shields.io/badge/Zod-3068b7?style=for-the-badge&amp;logo=zod" alt="Zod" /></a>
+  <a href="https://github.com/colinhacks/zod"><img src="https://img.shields.io/badge/Zod-3068b7?style=for-the-badge&amp;logo=zod&amp;logoColor=white" alt="Zod" /></a>
 </p>
 
 ### Deploy
 
 <p>
-  <a href="https://workers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare_Workers-f38020?style=for-the-badge&amp;logo=cloudflare" alt="Cloudflare Workers" /></a>
+  <a href="https://workers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare_Workers-f38020?style=for-the-badge&amp;logo=cloudflare&amp;logoColor=202024" alt="Cloudflare Workers" /></a>
   <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-white?style=for-the-badge&amp;logo=docker" alt="Docker" /></a>
-  <a href="https://vercel.com/"><img src="https://img.shields.io/badge/Vercel-0a0a0a?style=for-the-badge&amp;logo=vercel" alt="Vercel" /></a>
-  <a href="https://render.com/"><img src="https://img.shields.io/badge/Render-111111?style=for-the-badge&amp;logo=render" alt="Render" /></a>
+  <a href="https://vercel.com/"><img src="https://img.shields.io/badge/Vercel-0a0a0a?style=for-the-badge&amp;logo=vercel&amp;logoColor=white" alt="Vercel" /></a>
+  <a href="https://render.com/"><img src="https://img.shields.io/badge/Render-111111?style=for-the-badge&amp;logo=render&amp;logoColor=white" alt="Render" /></a>
 </p>
 
 ### Tooling
 
 <p>
   <a href="https://git-scm.com/"><img src="https://img.shields.io/badge/Git-f1f1e9?style=for-the-badge&amp;logo=git" alt="Git" /></a>
-  <a href="https://www.npmjs.com/"><img src="https://img.shields.io/badge/npm-cb3837?style=for-the-badge&amp;logo=npm" alt="npm" /></a>
-  <a href="https://developers.cloudflare.com/workers/wrangler/"><img src="https://img.shields.io/badge/Wrangler-f38020?style=for-the-badge&amp;logo=cloudflare" alt="Wrangler" /></a>
+  <a href="https://www.npmjs.com/"><img src="https://img.shields.io/badge/npm-cb3837?style=for-the-badge&amp;logo=npm&amp;logoColor=white" alt="npm" /></a>
+  <a href="https://developers.cloudflare.com/workers/wrangler/"><img src="https://img.shields.io/badge/Wrangler-f38020?style=for-the-badge&amp;logo=cloudflare&amp;logoColor=202024" alt="Wrangler" /></a>
 </p>
 
 _* See [<kbd>package.json</kbd>](./package.json) for the full dependency list._

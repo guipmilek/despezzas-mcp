@@ -11,13 +11,12 @@
   "version_metadata": {
     "binding": "VERSION_METADATA"
   },
-  // Para modo multiusuario, crie seu proprio KV e descomente este bloco.
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "DESPEZZAS_SESSIONS",
-  //     "id": "replace-with-your-kv-namespace-id"
-  //   }
-  // ],
+  "kv_namespaces": [
+    {
+      "binding": "DESPEZZAS_SESSIONS",
+      "id": "2211d888425e4a63a9223fc5bc10bc46"
+    }
+  ],
   "vars": {
     "MCP_TRANSPORT": "http",
     "HOST": "0.0.0.0",

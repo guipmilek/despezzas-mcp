@@ -321,8 +321,24 @@ app.all("/mcp", async (c) => {
   try {
     await server.connect(transport);
     const response = await transport.handleRequest(c.req.raw);
-    c.executionCtx.waitUntil(closeMcp(server, transport));
-    return response;
+
+    if (!response.body) {
+      c.executionCtx.waitUntil(closeMcp(server, transport));
+      return response;
+    }
+
+    // The MCP SDK's SSE response streams the JSON-RPC result asynchronously
+    // after handleRequest() returns; the body is not fully written yet at
+    // this point. Closing the transport/server here (even via waitUntil)
+    // races with that write and truncates the response to an empty body.
+    // Tee the stream: one branch goes to the client, the other is drained
+    // in the background so we only close once the response is fully sent.
+    const [clientStream, monitorStream] = response.body.tee();
+    c.executionCtx.waitUntil(drainThenClose(monitorStream, server, transport));
+    return new Response(clientStream, {
+      status: response.status,
+      headers: response.headers,
+    });
   } catch (error) {
     console.error("Error handling Cloudflare MCP request:", error);
     c.executionCtx.waitUntil(closeMcp(server, transport));
@@ -409,6 +425,28 @@ async function closeMcp(
   transport: { close(): Promise<void> },
 ) {
   await Promise.allSettled([transport.close(), server.close()]);
+}
+
+async function drainThenClose(
+  stream: ReadableStream<Uint8Array>,
+  server: { close(): Promise<void> },
+  transport: { close(): Promise<void> },
+) {
+  const reader = stream.getReader();
+  try {
+    // Consume the tee'd copy of the SSE stream so the transport can finish
+    // writing the JSON-RPC response before we close it below. The other
+    // branch of the tee (returned to the client) is unaffected by this.
+    while (!(await reader.read()).done) {
+      // no-op: draining only
+    }
+  } catch (error) {
+    console.error("Error draining Cloudflare MCP stream before close:", error);
+  } finally {
+    reader.releaseLock();
+  }
+
+  await closeMcp(server, transport);
 }
 
 function bearerToken(request: Request): string | undefined {

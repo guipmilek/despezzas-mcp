@@ -25,6 +25,7 @@ Do not commit Despezzas credentials. Add them only in the provider secrets UI.
 ## Current Repo Support
 
 - Native Node deploys can use `npm ci --include=dev && npm run build`, then `node dist/index.js`.
+- `wrangler.jsonc` and `src/cloudflare.ts` are included for Cloudflare Workers.
 - `render.yaml` is included for Render Blueprints.
 - `railway.json` is included for Railway.
 - `vercel.json` plus `api/index.js` is included for Vercel Functions.
@@ -36,20 +37,20 @@ Do not commit Despezzas credentials. Add them only in the provider secrets UI.
 
 ## Best Free Choices For This MCP
 
-1. Oracle Cloud Always Free VM
+1. Cloudflare Workers Free
+   Best first choice for this repo now. It gives HTTPS, no container sleep, a generous free request tier for personal use, and official remote MCP guidance for Streamable HTTP. This repo uses `src/cloudflare.ts` with the raw web-standard MCP transport, so no Durable Object is required for the current stateless tools. See [cloudflare-workers.md](cloudflare-workers.md).
+
+2. Koyeb Free Instance
+   Best free container fallback. It runs the included Dockerfile from GitHub and gives a public HTTPS domain. The catch is scale-to-zero after 1 hour idle and no persistent volumes on the Free Instance, so use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD` and `DESPEZZAS_SESSION_FILE=none`. See [koyeb.md](koyeb.md).
+
+3. Oracle Cloud Always Free VM
    Best "actually free and stable" option if you are comfortable managing a small VM. It gives persistent disk and an always-on process, so the MCP login/session model behaves most naturally. Tradeoff: more ops work, SSH, firewall, Docker/systemd, and TLS setup.
 
-2. Google Cloud Run
-   Best managed container option with official MCP hosting guidance and a generous request-based free tier. It scales to zero, gives HTTPS, and is low maintenance. Use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD`, `DESPEZZAS_SESSION_FILE=none`, and `MCP_OAUTH_TOKEN_SECRET` because instances are stateless.
-
-3. Vercel Hobby
+4. Vercel Hobby
    Good free Git-based option with Vercel's MCP-specific guidance for Functions, OAuth metadata, and MCP hosts. This repo uses an Express function adapter instead of the `mcp-handler` example because the server already exists in `@modelcontextprotocol/sdk`.
 
-4. Prefect Horizon
-   Best MCP-native gateway option if you want managed hosting, auth, access control, registry, Inspector, and ChatMCP testing. Horizon expects a Python FastMCP entrypoint, so this repo includes a proxy that forwards to a Node backend already deployed on Cloud Run, Vercel, Render, or similar.
-
-5. Koyeb Free Instance
-   Good managed container/Git option. It has an automatic free-instance sleep behavior after idle time, but cold starts are intended to be quick. Use the Dockerfile or Node buildpack.
+5. Prefect Horizon
+   Best MCP-native gateway option if you want managed hosting, auth, access control, registry, Inspector, and ChatMCP testing. Horizon expects a Python FastMCP entrypoint, so this repo includes a proxy that forwards to a Node backend already deployed on Koyeb, Vercel, Render, Cloudflare, or similar.
 
 6. Render Free Web Service
    Easiest GitHub-to-URL path and good for MVP testing. The catch is that free web services spin down after 15 minutes and lose local filesystem changes on restarts/spin-downs. Use the included `render.yaml`, set Despezzas credentials as secrets, and keep `DESPEZZAS_SESSION_FILE=none`.
@@ -60,9 +61,44 @@ Do not commit Despezzas credentials. Add them only in the provider secrets UI.
 8. Northflank Developer Sandbox
    Solid container platform for experimentation. The free sandbox is explicitly for testing/hobby exploration, not production. Good fallback if you like its dashboard.
 
-Community discussion also points to Cloudflare Workers, AWS, Supabase, Zapier, and purpose-built MCP platforms. Those are worth watching, but this repo is not currently adapted for Cloudflare Workers' runtime or low-code MCP builders.
+Google Cloud Run remains technically supported through the Dockerfile, but we are not using it as the current path.
+
+Community discussion also points to AWS, Supabase, Zapier, and purpose-built MCP platforms. Those are worth watching, but this repo is not currently adapted for low-code MCP builders.
 
 Avoid Netlify/static hosts for this repo as-is. The current server is an Express MCP service with OAuth routes and cannot be served as static files.
+
+## Cloudflare Workers
+
+Cloudflare is the preferred deploy target for this MCP.
+
+Included support:
+
+- `src/cloudflare.ts`: Hono Worker app with OAuth discovery, login, health, and `/mcp`.
+- `wrangler.jsonc`: Worker config with `nodejs_compat` and safe default vars.
+- `npm run check:cloudflare`: Wrangler bundle dry-run.
+- `npm run deploy:cloudflare`: deploy to Workers.
+
+Set secrets:
+
+```powershell
+npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
+npx wrangler secret put DESPEZZAS_EMAIL
+npx wrangler secret put DESPEZZAS_PASSWORD
+```
+
+Deploy:
+
+```powershell
+npm run check:cloudflare
+npm run deploy:cloudflare
+```
+
+Then connect in ChatGPT:
+
+- Server URL: `https://despezzas-mcp.<your-account>.workers.dev/mcp`
+- Authentication: OAuth
+
+Full guide: [cloudflare-workers.md](cloudflare-workers.md).
 
 ## Render
 
@@ -187,12 +223,25 @@ For this path, Horizon is the public MCP auth layer and the Node backend is the 
 
 ## Koyeb
 
-Use the Dockerfile or native Node buildpack. Required settings are the same:
+Use the Dockerfile from this repository. Koyeb Free is suitable for hobby testing, but it scales down to zero after idle time and does not support volumes, so configure env credentials and disable session persistence.
+
+Recommended Koyeb settings:
+
+- Deployment method: GitHub.
+- Builder: Dockerfile.
+- Dockerfile location: `Dockerfile`.
+- Instance type: Free.
+- Exposed port: `8787`.
+- Health check path: `/health`.
+
+Required variables:
 
 ```dotenv
 MCP_TRANSPORT=http
 HOST=0.0.0.0
+PORT=8787
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<your-email>
 DESPEZZAS_PASSWORD=<your-password>
 DESPEZZAS_SESSION_FILE=none
@@ -200,6 +249,13 @@ MCP_PUBLIC_BASE_URL=https://your-app-your-org.koyeb.app
 ```
 
 Koyeb exposes a public domain through `KOYEB_PUBLIC_DOMAIN`, so you can also set `MCP_PUBLIC_BASE_URL` to `https://{{ KOYEB_PUBLIC_DOMAIN }}` if using Koyeb variable interpolation.
+
+Then connect in ChatGPT:
+
+- Server URL: `https://your-app-your-org.koyeb.app/mcp`
+- Authentication: OAuth
+
+Full guide: [koyeb.md](koyeb.md).
 
 ## Cloud Run
 
@@ -239,6 +295,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ## Sources
 
 - OpenAI Apps SDK deployment docs: https://developers.openai.com/apps-sdk/deploy
+- Cloudflare remote MCP server guide: https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/
+- Cloudflare Workers pricing and free limits: https://developers.cloudflare.com/workers/platform/pricing/
 - Render free service limits: https://render.com/docs/free
 - Render Node/Express deployment docs: https://render.com/docs/deploy-node-express-app
 - Render Blueprint docs: https://render.com/docs/blueprint-spec
@@ -246,6 +304,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 - Railway pricing/docs: https://docs.railway.com/pricing
 - Railway public networking docs: https://docs.railway.com/networking/public-networking
 - Koyeb Express deployment docs: https://www.koyeb.com/docs/deploy/express
+- Koyeb Free Instance reference: https://www.koyeb.com/docs/reference/instances
+- Koyeb GitHub deployment docs: https://www.koyeb.com/docs/build-and-deploy/deploy-with-git
 - Koyeb scale-to-zero docs: https://www.koyeb.com/docs/run-and-scale/scale-to-zero
 - Google Cloud Run pricing/free tier: https://cloud.google.com/run/pricing
 - Oracle Always Free resources: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm

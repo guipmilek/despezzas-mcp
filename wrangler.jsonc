@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "despezzas-mcp",
+  "main": "src/cloudflare.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "MCP_TRANSPORT": "http",
+    "HOST": "0.0.0.0",
+    "PORT": "8787",
+    "DESPEZZAS_SESSION_FILE": "none",
+    "MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS": "3600"
+  }
+}

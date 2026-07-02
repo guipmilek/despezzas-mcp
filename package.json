@@ -16,7 +16,10 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "dev:cloudflare": "wrangler dev --local",
     "dev:http": "cross-env MCP_TRANSPORT=http tsx src/index.ts",
+    "check:cloudflare": "wrangler deploy --dry-run",
+    "deploy:cloudflare": "wrangler deploy",
     "inspect:har": "node scripts/inspect-har.mjs",
     "start": "node dist/index.js",
     "start:http": "cross-env MCP_TRANSPORT=http node dist/index.js",
@@ -31,13 +34,16 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "hono": "^4.12.27",
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260701.1",
     "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
     "cross-env": "^10.1.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "wrangler": "^4.106.0"
   }
 }

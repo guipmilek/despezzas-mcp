@@ -1,7 +1,3 @@
-import os from "node:os";
-import path from "node:path";
-import "dotenv/config";
-
 export type McpTransport = "stdio" | "http";
 
 export interface Config {
@@ -56,7 +52,8 @@ function normalizeSessionFile(value: string | undefined): string | undefined {
     return value;
   }
 
-  return path.join(os.homedir(), ".despezzas-mcp", "session.json");
+  const home = process.env.USERPROFILE ?? process.env.HOME;
+  return home ? joinPath(home, ".despezzas-mcp", "session.json") : undefined;
 }
 
 function normalizeAllowedHosts(value: string | undefined, publicBaseUrl: string | undefined): string[] {
@@ -80,4 +77,15 @@ function normalizeAllowedHosts(value: string | undefined, publicBaseUrl: string 
 function normalizePositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function joinPath(...parts: string[]): string {
+  const separator = process.platform === "win32" ? "\\" : "/";
+  return parts
+    .map((part, index) => {
+      const normalized = part.replace(/[\\/]+$/g, "");
+      return index === 0 ? normalized : normalized.replace(/^[\\/]+/g, "");
+    })
+    .filter(Boolean)
+    .join(separator);
 }

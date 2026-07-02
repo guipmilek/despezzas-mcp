@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { DespezzasClient } from "../dist/client.js";
 import { currentMonthRange } from "../dist/dates.js";
 

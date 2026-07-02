@@ -12,7 +12,7 @@ This is an MVP built from observed Despezzas web traffic and frontend bundle ins
 - Auth flow: copied bearer token, env email/password login, or local HTTP login page.
 - Token refresh: saved Firebase refresh sessions are reused and refreshed automatically.
 - Safety gate: every write/destructive tool requires `confirm: true`.
-- Transports: local `stdio` and stateless Streamable HTTP at `/mcp`.
+- Transports: local `stdio`, Node Streamable HTTP at `/mcp`, and Cloudflare Workers Streamable HTTP at `/mcp`.
 - Debugging: HAR inspector and DevTools request monitor for future endpoint captures.
 
 Amounts use Despezzas native integer cents. Example: `12345` means `R$123.45`.
@@ -155,17 +155,20 @@ ChatGPT custom apps/connectors require a remote HTTPS MCP server endpoint. OpenA
 
 ## Remote Deployment
 
-See [docs/deployment.md](docs/deployment.md) for the current free-hosting comparison and provider setup notes.
+Recommended first path: [Cloudflare Workers](docs/cloudflare-workers.md). Backup free container path: [Koyeb Free](docs/koyeb.md).
+
+See [docs/deployment.md](docs/deployment.md) for the broader free-hosting comparison and provider setup notes.
 
 Included deployment files:
 
 - `render.yaml` for Render Blueprints.
 - `railway.json` for Railway.
 - `vercel.json` and `api/index.js` for Vercel Functions.
+- `wrangler.jsonc` and `src/cloudflare.ts` for Cloudflare Workers.
 - `Dockerfile` for Koyeb, Cloud Run, Fly.io, Northflank, Railway Docker deploys, or a VM.
 - `horizon_proxy.py` and `requirements.txt` for Prefect Horizon as a FastMCP proxy in front of a deployed Node backend.
 
-For remote long-running/container hosting, set `MCP_TRANSPORT=http`, `HOST=0.0.0.0`, and a stable `MCP_OAUTH_TOKEN_SECRET`. For Vercel or Cloud Run stateless hosting, set a stable `MCP_OAUTH_TOKEN_SECRET` and use env credentials with `DESPEZZAS_SESSION_FILE=none`. For Horizon, deploy the Node backend elsewhere and point `horizon_proxy.py:mcp` at that backend.
+For Cloudflare Workers, set `MCP_OAUTH_TOKEN_SECRET`, `DESPEZZAS_EMAIL`, and `DESPEZZAS_PASSWORD` as Wrangler secrets and deploy with `npm run deploy:cloudflare`. For remote long-running/container hosting, set `MCP_TRANSPORT=http`, `HOST=0.0.0.0`, and a stable `MCP_OAUTH_TOKEN_SECRET`. For stateless or scale-to-zero hosting, use env credentials with `DESPEZZAS_SESSION_FILE=none`. For Horizon, deploy the Node backend elsewhere and point `horizon_proxy.py:mcp` at that backend.
 
 ## HAR Inspection
 

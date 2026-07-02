@@ -1,5 +1,3 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { config } from "./config.js";
 
 interface DespezzasAuthResponse {
@@ -103,6 +101,7 @@ export class DespezzasAuthManager {
     this.loaded = true;
 
     if (config.sessionFile) {
+      const fs = await import("node:fs/promises");
       await fs.rm(config.sessionFile, { force: true }).catch(() => undefined);
     }
   }
@@ -219,6 +218,7 @@ export class DespezzasAuthManager {
     }
 
     try {
+      const fs = await import("node:fs/promises");
       const raw = await fs.readFile(config.sessionFile, "utf8");
       this.session = JSON.parse(raw) as AuthSession;
     } catch {
@@ -233,9 +233,19 @@ export class DespezzasAuthManager {
       return;
     }
 
-    await fs.mkdir(path.dirname(config.sessionFile), { recursive: true });
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(dirname(config.sessionFile), { recursive: true });
     await fs.writeFile(config.sessionFile, `${JSON.stringify(session, null, 2)}\n`, "utf8");
   }
+}
+
+function dirname(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, "/");
+  const index = normalized.lastIndexOf("/");
+  if (index <= 0) {
+    return ".";
+  }
+  return filePath.slice(0, index);
 }
 
 async function readResponse(response: Response): Promise<unknown> {
@@ -290,4 +300,3 @@ function jwtExpirationMs(token: string): number | undefined {
 }
 
 export const authManager = new DespezzasAuthManager();
-

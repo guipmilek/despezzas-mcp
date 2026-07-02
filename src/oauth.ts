@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import type { Request } from "express";
 import { authManager } from "./auth.js";
 import { config } from "./config.js";
 
@@ -58,6 +57,11 @@ interface AuthorizationCodeClaims {
 }
 
 const tokenSecret = config.oauthTokenSecret ?? randomToken(32);
+
+export interface HttpRequestLike {
+  get(name: string): string | undefined;
+  protocol?: string;
+}
 
 class OAuthStore {
   private readonly clients = new Map<string, RegisteredClient>();
@@ -200,7 +204,7 @@ class OAuthStore {
 
 export const oauthStore = new OAuthStore();
 
-export function publicBaseUrl(req: Request): string {
+export function publicBaseUrl(req: HttpRequestLike): string {
   if (config.publicBaseUrl) {
     return config.publicBaseUrl;
   }
@@ -209,19 +213,19 @@ export function publicBaseUrl(req: Request): string {
   return `${protocol}://${req.get("host")}`;
 }
 
-export function mcpResource(req: Request): string {
+export function mcpResource(req: HttpRequestLike): string {
   return `${publicBaseUrl(req)}/mcp`;
 }
 
-export function resourceMetadataUrl(req: Request): string {
+export function resourceMetadataUrl(req: HttpRequestLike): string {
   return `${publicBaseUrl(req)}/.well-known/oauth-protected-resource`;
 }
 
-export function wwwAuthenticate(req: Request, scopes = SCOPES): string {
+export function wwwAuthenticate(req: HttpRequestLike, scopes = SCOPES): string {
   return `Bearer resource_metadata="${resourceMetadataUrl(req)}", scope="${scopes.join(" ")}"`;
 }
 
-export function protectedResourceMetadata(req: Request) {
+export function protectedResourceMetadata(req: HttpRequestLike) {
   const base = publicBaseUrl(req);
   return {
     resource: mcpResource(req),
@@ -232,7 +236,7 @@ export function protectedResourceMetadata(req: Request) {
   };
 }
 
-export function authorizationServerMetadata(req: Request) {
+export function authorizationServerMetadata(req: HttpRequestLike) {
   const base = publicBaseUrl(req);
   return {
     issuer: base,
@@ -331,7 +335,7 @@ export async function completeAuthorization(input: {
   return redirect.toString();
 }
 
-export function exchangeAuthorizationCode(body: Record<string, unknown>, req: Request) {
+export function exchangeAuthorizationCode(body: Record<string, unknown>, req: HttpRequestLike) {
   const grantType = stringParam(body.grant_type);
   const code = stringParam(body.code);
   const redirectUri = stringParam(body.redirect_uri);

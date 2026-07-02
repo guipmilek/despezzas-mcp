@@ -1,4 +1,4 @@
-# Configuração Rápida do App/Connector no ChatGPT
+# Configuração rápida do app/connector no ChatGPT
 
 Valores passo a passo para o diálogo **Settings -> Apps & Connectors -> New App** do ChatGPT, seguindo cada campo na ordem.
 
@@ -23,7 +23,7 @@ Finanças pessoais para Despezzas: consulte contas, cartões, categorias e gasto
 
 Deixe o seletor em **Server URL** (não Tunnel) - este é um Cloudflare Worker publicado de forma permanente, não um túnel local.
 
-## 5. URL do Servidor MCP
+## 5. URL do servidor MCP
 
 ```
 https://despezzas-mcp.<sua-conta>.workers.dev/mcp
@@ -48,22 +48,22 @@ Marque **"I understand and want to continue"** - isso é obrigatório para qualq
 
 Clique em **Create**. O ChatGPT tentará conectar imediatamente e pode pedir que você conclua o fluxo de login OAuth (veja abaixo) antes de adicionar o app por completo.
 
-## Descrição Longa (opcional, para a listagem do app)
+## Descrição longa (opcional, para a listagem do app)
 
 ```
 Conecte sua conta Despezzas ao ChatGPT. Pergunte sobre seus saldos,
 cartões de crédito, categorias e transações recentes, veja resumos de
 gastos e crie ou atualize transações com uma etapa de confirmação antes
-de qualquer gravação. Cada usuário entra com seu próprio email e senha
+de qualquer gravação. Cada usuário entra com seu próprio e-mail e senha
 do Despezzas durante a configuração - o ChatGPT nunca vê sua senha,
 apenas um token de sessão seguro.
 ```
 
-## O Que Informar aos Usuários Durante o Login OAuth
+## O que informar aos usuários durante o login OAuth
 
 Quando o ChatGPT redirecionar para a tela de login do Despezzas MCP, os usuários devem:
 
-1. Informar **email e senha do Despezzas** (os mesmos usados em despezzas.com ou no app Despezzas).
+1. Informar **e-mail e senha do Despezzas** (os mesmos usados em despezzas.com ou no app Despezzas).
 2. Clicar em **Entrar e autorizar**.
 3. Voltar ao ChatGPT - a conexão estará ativa e restrita apenas à conta deles.
 
@@ -71,7 +71,7 @@ A tela de autorização usa a identidade visual do Despezzas e acompanha tema cl
 
 Não é necessário código de proprietário nem segredo compartilhado; este deploy roda em **modo multiusuário**, então a sessão de cada pessoa é armazenada de forma criptografada e independente no Cloudflare KV.
 
-## Prompts de Exemplo Sugeridos (para a seção "Try asking" da App Store)
+## Prompts de exemplo sugeridos (para a seção "Try asking" da App Store)
 
 ```
 - "Qual é meu saldo atual somando todas as contas?"
@@ -81,7 +81,7 @@ Não é necessário código de proprietário nem segredo compartilhado; este dep
 - "Liste minhas categorias de gastos."
 ```
 
-## Checklist de Verificação Antes de Publicar
+## Checklist de verificação antes de publicar
 
 - [ ] `GET https://despezzas-mcp.<sua-conta>.workers.dev/health` retorna `"ok": true` e `"authMode": "multi-user"`.
 - [ ] `GET https://despezzas-mcp.<sua-conta>.workers.dev/.well-known/oauth-protected-resource` responde corretamente.

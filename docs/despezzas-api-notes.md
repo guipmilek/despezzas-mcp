@@ -2,7 +2,7 @@
 
 Estas notas vêm de um HAR capturado e da inspeção do bundle frontend público.
 
-## URL Base
+## URL base
 
 `https://api.despezzas.com`
 
@@ -15,11 +15,11 @@ O app web envia:
 - `Referer: https://despezzas.com/`
 - `lang: pt-BR`
 
-## Fluxo de Autenticação
+## Fluxo de autenticação
 
 A página de login do Despezzas em `https://despezzas.com/auth/login` chama:
 
-- `POST /v2/auth` com `{ "email": "...", "password": "..." }`
+- `POST /v2/auth` com e-mail/senha em `{ "email": "...", "password": "..." }`
 - A resposta inclui `firebase_token` e `user`
 - O frontend chama o Firebase `accounts:signInWithCustomToken`
 - O Firebase retorna `idToken`, `refreshToken` e `expiresIn`
@@ -42,7 +42,7 @@ Para ChatGPT Apps & Connectors, o servidor MCP também atua como um pequeno serv
 
 O token de acesso OAuth é opaco e autoriza acesso ao `/mcp`. Ele não é um token do Despezzas. A sessão Despezzas no lado do servidor é obtida por `/v2/auth` e pela troca de custom token do Firebase.
 
-## Endpoints de Leitura Capturados
+## Endpoints de leitura capturados
 
 - `GET /v1/profile`
 - `PUT /v1/profile`
@@ -58,7 +58,7 @@ O token de acesso OAuth é opaco e autoriza acesso ao `/mcp`. Ele não é um tok
 - `GET /v1/transactions`
 - `GET /v1/transactions/overview?date=YYYY-MM-DD`
 
-## Endpoints de Transação Descobertos no Frontend
+## Endpoints de transação descobertos no frontend
 
 - `POST /v1/transactions`
 - `PUT /v1/transactions/{id}`
@@ -71,7 +71,7 @@ O token de acesso OAuth é opaco e autoriza acesso ao `/mcp`. Ele não é um tok
 - `GET /v1/export-transactions/count`
 - `GET /v1/export-transactions`
 
-## Endpoints de Acesso a Perfil Descobertos no Frontend
+## Endpoints de acesso a perfil descobertos no frontend
 
 O Despezzas oferece um perfil pessoal/raiz e até 3 tipos de perfis extras (`pj`, `family`, `investments`). O frontend lista o estado de acesso a perfis e troca o perfil ativo por:
 
@@ -96,7 +96,7 @@ Payloads de criação/edição usam:
 
 Os papéis de convite observados no formulário web são `editor` e `viewer`.
 
-## Filtros de Transação
+## Filtros de transação
 
 O frontend envia estes campos diretamente como parâmetros de query:
 
@@ -114,7 +114,7 @@ O frontend envia estes campos diretamente como parâmetros de query:
 - `order_by`: `date`, `title` ou `amount`
 - `order`: `asc` ou `desc`
 
-## Formato do Payload de Transação
+## Formato do payload de transação
 
 O formulário web envia valores positivos em centavos inteiros. Despesa/receita é representada por `is_expense`.
 

@@ -47,26 +47,26 @@
     <h2>📒 Sumário</h2>
   </summary>
 
-- [📍 Visão Geral](#-visão-geral)
+- [📍 Visão geral](#-visão-geral)
 - [Desenvolvimento com IA e agentes](#desenvolvimento-com-ia-e-agentes)
-- [⚡ Início Rápido](#-início-rápido)
+- [⚡ Início rápido](#-início-rápido)
 - [✨ Funcionalidades](#-funcionalidades)
-- [🧰 Catálogo de Ferramentas](#-catálogo-de-ferramentas)
+- [🧰 Catálogo de ferramentas](#-catálogo-de-ferramentas)
 - [🛠 Tecnologias](#-tecnologias)
   - [Servidor MCP](#servidor-mcp)
   - [Deploy](#deploy)
   - [Ferramentas](#ferramentas)
-- [🚀 Primeiros Passos](#-primeiros-passos)
+- [🚀 Primeiros passos](#-primeiros-passos)
   - [📦 Configuração](#-configuração)
   - [✔️ Verificação](#️-verificação)
-- [📋 Variáveis de Ambiente](#-variáveis-de-ambiente)
+- [📋 Variáveis de ambiente](#-variáveis-de-ambiente)
 - [🔐 Autenticação](#-autenticação)
-- [🖥 Configuração MCP Local](#-configuração-mcp-local)
+- [🖥 Configuração MCP local](#-configuração-mcp-local)
 - [🌐 Modo HTTP](#-modo-http)
-- [🤖 Conexão OAuth Com ChatGPT](#-conexão-oauth-com-chatgpt)
-- [☁️ Deploy Remoto](#️-deploy-remoto)
+- [🤖 Conexão OAuth com ChatGPT](#-conexão-oauth-com-chatgpt)
+- [☁️ Deploy remoto](#️-deploy-remoto)
 - [🔎 Inspeção de HAR](#-inspeção-de-har)
-- [📚 MCPs de Referência](#-mcps-de-referência)
+- [📚 MCPs de referência](#-mcps-de-referência)
 - [🗺 Roadmap](#-roadmap)
 - [🤝 Contribuição](#-contribuição)
 - [📄 Licença](#-licença)
@@ -74,7 +74,7 @@
 
 <!-- ===== PROJECT INFOS ===== -->
 
-## 📍 Visão Geral
+## 📍 Visão geral
 
 Servidor MCP para dados financeiros do [Despezzas](https://despezzas.com/). Expõe ferramentas para clientes MCP (como ChatGPT) listarem contas, cartões e categorias, pesquisarem transações, consultarem resumos de gastos e fazerem operações de escrita com proteções.
 
@@ -98,10 +98,10 @@ Para agentes de IA trabalhando neste repositório, use [`llms.txt`](llms.txt) co
 | **API** | Integração não oficial com endpoints do Despezzas |
 | **Runtime** | Node.js `>=20` |
 | **Transportes** | `stdio`, HTTP Node, Cloudflare Workers |
-| **Autenticação** | Bearer token, email/senha, OAuth MCP |
+| **Autenticação** | Bearer token, e-mail/senha, OAuth MCP |
 | **Deploy recomendado** | Cloudflare Workers |
 
-## ⚡ Início Rápido
+## ⚡ Início rápido
 
 ```powershell
 npm install
@@ -120,7 +120,7 @@ Depois configure a autenticação no `.env` com `DESPEZZAS_TOKEN` ou `DESPEZZAS_
 
 ✍️ **Ferramentas de escrita:** trocar/criar/editar/excluir/sair de perfil, criar/editar/excluir conta, cartão de crédito, transação, transferência, duplicar transação e alternar pago.
 
-🔐 **Autenticação:** token bearer copiado, login por email/senha via variáveis de ambiente ou página HTTP de autorização MCP.
+🔐 **Autenticação:** token bearer copiado, login por e-mail/senha via variáveis de ambiente ou página HTTP de autorização MCP.
 
 🔄 **Renovação de token:** sessões Firebase salvas são reutilizadas e renovadas automaticamente.
 
@@ -141,7 +141,7 @@ Para escritas de transação, use primeiro as ferramentas de preparo:
 
 `despezzas_create_transaction` recusa intencionalmente payloads sem destino de conta/cartão, com conta e cartão ao mesmo tempo, ou sem `category_id`, a menos que `allow_uncategorized` seja explicitamente `true`.
 
-## 🧰 Catálogo de Ferramentas
+## 🧰 Catálogo de ferramentas
 
 | Grupo | Exemplos | Escrita? | Observação |
 | --- | --- | --- | --- |
@@ -186,7 +186,7 @@ As principais ferramentas usadas neste projeto:
 
 _* Veja o arquivo [<kbd>package.json</kbd>](./package.json) para a lista completa de dependências._
 
-## 🚀 Primeiros Passos
+## 🚀 Primeiros passos
 
 ### 📦 Configuração
 
@@ -206,14 +206,14 @@ npm run smoke:readonly
 
 `npm test` cobre as proteções locais de payload e os diagnósticos. `npm run smoke:readonly` compila o projeto e chama apenas endpoints somente leitura do Despezzas usando o token/sessão configurado.
 
-## 📋 Variáveis de Ambiente
+## 📋 Variáveis de ambiente
 
 | Variável | Obrigatória? | Uso |
 | --- | --- | --- |
 | `DESPEZZAS_TOKEN` | Opcional | Token bearer manual copiado de uma sessão web. |
-| `DESPEZZAS_EMAIL` | Opcional | Login por email/senha. |
-| `DESPEZZAS_PASSWORD` | Opcional | Login por email/senha. |
-| `DESPEZZAS_FIREBASE_API_KEY` | Para email/senha | Chave pública do Firebase Web usada para troca e refresh de token. Veja como obtê-la no [.env.example](.env.example). |
+| `DESPEZZAS_EMAIL` | Opcional | Login por e-mail/senha. |
+| `DESPEZZAS_PASSWORD` | Opcional | Login por e-mail/senha. |
+| `DESPEZZAS_FIREBASE_API_KEY` | Para e-mail/senha | Chave pública do Firebase Web usada para troca e refresh de token. Veja como obtê-la no [.env.example](.env.example). |
 | `DESPEZZAS_SESSION_FILE` | Opcional | Caminho de sessão persistida; use `none` para desativar. |
 | `MCP_TRANSPORT` | Opcional | `stdio` ou `http`; padrão `stdio`. |
 | `HOST` / `PORT` | Opcional | Bind do servidor HTTP; padrão `127.0.0.1:8787`. |
@@ -230,18 +230,18 @@ Opções preferenciais:
 2. Defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_FIREBASE_API_KEY` (chave pública — veja [.env.example](.env.example)) no `.env`.
 3. Copie o `DESPEZZAS_TOKEN` pelas DevTools do navegador.
 
-A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: email, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha ficam no app oficial do Despezzas.
+A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: e-mail, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha ficam no app oficial do Despezzas.
 
 O fluxo de login espelha o frontend do Despezzas:
 
-1. `POST https://api.despezzas.com/v2/auth` com email/senha.
+1. `POST https://api.despezzas.com/v2/auth` com e-mail/senha.
 2. Usa o `firebase_token` retornado com Firebase `accounts:signInWithCustomToken` usando `DESPEZZAS_FIREBASE_API_KEY` (a chave pública do Firebase Web do Despezzas).
 3. Usa o `idToken` do Firebase como `Authorization: Bearer ...` em `api.despezzas.com`.
 4. Salva o refresh token do Firebase em `%USERPROFILE%\.despezzas-mcp\session.json` por padrão.
 
 | Etapa | Origem | Destino | Resultado |
 | --- | --- | --- | --- |
-| 1 | Usuário | `/login` do MCP | Envia email e senha para autorização local. |
+| 1 | Usuário | `/login` do MCP | Envia e-mail e senha para autorização local. |
 | 2 | MCP | API Despezzas | Troca credenciais por `firebase_token`. |
 | 3 | MCP | Firebase | Troca `firebase_token` por `idToken` e `refreshToken`. |
 | 4 | MCP | Cliente MCP/ChatGPT | Entrega um token OAuth MCP opaco. |
@@ -250,7 +250,7 @@ Defina `DESPEZZAS_SESSION_FILE=none` para desativar a persistência de sessão. 
 
 Não passe sua senha como argumento de ferramenta. Argumentos podem ficar visíveis ao cliente. Use `.env` ou a página `/login`.
 
-## 🖥 Configuração MCP Local
+## 🖥 Configuração MCP local
 
 Para um cliente MCP local via stdio:
 
@@ -296,7 +296,7 @@ Start-Process http://127.0.0.1:8787/login
 
 Se expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso na frente. A página `/login` aceita sua senha do Despezzas para autorizar o MCP.
 
-## 🤖 Conexão OAuth Com ChatGPT
+## 🤖 Conexão OAuth com ChatGPT
 
 Para a tela **New App** em ChatGPT Apps & Connectors:
 
@@ -327,7 +327,7 @@ O servidor expõe os endpoints de descoberta esperados pelo ChatGPT:
 - `GET|POST /oauth/authorize`
 - `POST /oauth/token`
 
-Essa camada OAuth protege a conexão. Durante a autorização, a página de login troca email/senha do Despezzas por uma sessão Despezzas/Firebase no servidor. O botão final é `Entrar e autorizar`, e o ChatGPT recebe apenas um token de acesso MCP opaco.
+Essa camada OAuth protege a conexão. Durante a autorização, a página de login troca e-mail/senha do Despezzas por uma sessão Despezzas/Firebase no servidor. O botão final é `Entrar e autorizar`, e o ChatGPT recebe apenas um token de acesso MCP opaco.
 
 `MCP_HTTP_BEARER_TOKEN` ainda é útil para scripts fora do ChatGPT. Quando omitido, o `/mcp` exige um token OAuth válido.
 
@@ -345,7 +345,7 @@ Apps/conectores personalizados do ChatGPT exigem um endpoint MCP remoto em HTTPS
 
 </details>
 
-## ☁️ Deploy Remoto
+## ☁️ Deploy remoto
 
 Caminho recomendado: [Cloudflare Workers](docs/cloudflare-workers.md). Alternativa em container: [Koyeb Free](docs/koyeb.md).
 
@@ -392,7 +392,7 @@ window.__despezzasMcpMonitor.download()
 
 Ele exporta um relatório JSON mascarado das chamadas `fetch`/XHR para `api.despezzas.com`.
 
-## 📚 MCPs de Referência
+## 📚 MCPs de referência
 
 Este projeto tomou como referência:
 

@@ -1,8 +1,8 @@
-# Deploy Gratuito no Koyeb
+# Deploy gratuito no Koyeb
 
 Koyeb Free é uma alternativa em container para este repositório. Usa o `Dockerfile` que já existe — o servidor Node/Express é publicado sem etapa extra de build.
 
-## O Que Esperar
+## O que esperar
 
 O plano Free é suficiente para testes e uso pessoal:
 
@@ -14,7 +14,7 @@ O plano Free é suficiente para testes e uso pessoal:
 
 Como a instância escala para zero e não tem volume, use credenciais nas variáveis de ambiente com `DESPEZZAS_SESSION_FILE=none`.
 
-## Deploy Pelo GitHub
+## Deploy pelo GitHub
 
 1. Envie este repositório para o GitHub.
 2. No Koyeb, crie um App.
@@ -28,7 +28,7 @@ Como a instância escala para zero e não tem volume, use credenciais nas variá
 10. Rota HTTP: `/`.
 11. Caminho de verificação de saúde: `/health`.
 
-## Variáveis de Ambiente
+## Variáveis de ambiente
 
 Defina estas variáveis no Koyeb:
 

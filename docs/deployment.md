@@ -1,8 +1,8 @@
-# Notas de Deploy
+# Notas de deploy
 
 Este servidor MCP precisa de URL HTTPS pública e acesso de saída para Despezzas e Firebase. Não funciona em hospedagem estática. Roda em Node (serviço tradicional, container ou serverless) ou atrás de um proxy FastMCP no Prefect Horizon — desde que o `MCP_OAUTH_TOKEN_SECRET` seja estável.
 
-## Configurações Obrigatórias de Runtime
+## Configurações obrigatórias de runtime
 
 Use estas configurações em todo provedor remoto:
 
@@ -35,7 +35,7 @@ Para autenticação no Despezzas, escolha uma opção:
 
 Não faça commit de credenciais do Despezzas. Adicione-as apenas como secrets/variáveis de ambiente no provedor.
 
-## Suporte Atual do Repositório
+## Suporte atual do repositório
 
 - Deploys Node nativos podem usar `npm ci --include=dev && npm run build` e depois `node dist/index.js`.
 - `wrangler.jsonc` e `src/cloudflare.ts` estão incluídos para Cloudflare Workers.
@@ -48,7 +48,7 @@ Não faça commit de credenciais do Despezzas. Adicione-as apenas como secrets/v
 - `/mcp` é a URL do servidor MCP para o ChatGPT.
 - Endpoints de descoberta OAuth são expostos em `/.well-known/*`.
 
-## Melhores Opções Gratuitas Para Este MCP
+## Melhores opções gratuitas para este MCP
 
 1. Cloudflare Workers Free
    Melhor escolha. HTTPS, sem hibernação de container, plano gratuito generoso e suporte oficial para MCP remoto via Streamable HTTP. O worker usa o transporte web-standard, sem Durable Objects — as ferramentas atuais são stateless. Veja [cloudflare-workers.md](cloudflare-workers.md).
@@ -319,7 +319,7 @@ gcloud run services proxy despezzas-mcp --region=us-central1 --port=3000
 
 Esse modo protegido por IAM é mais forte para clientes locais, mas não serve para conexão direta do ChatGPT, a menos que o ChatGPT consiga fornecer um ID token emitido pelo Google para seu serviço Cloud Run. Para ChatGPT, use Cloud Run público com OAuth MCP, ou coloque o Prefect Horizon na frente do backend.
 
-## Gerar Secrets
+## Gerar secrets
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"

@@ -88,7 +88,7 @@ export class DespezzasAuthManager {
 
   async loginWithPassword(email: string, password: string): Promise<string> {
     if (!email || !password) {
-      throw new AuthRequiredError("Email e senha são obrigatórios.");
+      throw new AuthRequiredError("E-mail e senha são obrigatórios.");
     }
 
     if (this.loginInFlight) {
@@ -184,7 +184,7 @@ export class DespezzasAuthManager {
 
 export async function createDespezzasSessionFromPassword(email: string, password: string): Promise<AuthSession> {
   if (!email || !password) {
-    throw new AuthRequiredError("Email e senha são obrigatórios.");
+    throw new AuthRequiredError("E-mail e senha são obrigatórios.");
   }
 
   const firebaseApiKey = requireFirebaseApiKey();
@@ -287,7 +287,7 @@ async function exchangeCustomTokenForSession(
 function requireFirebaseApiKey(): string {
   if (!config.firebaseApiKey) {
     throw new AuthRequiredError(
-      "DESPEZZAS_FIREBASE_API_KEY é obrigatório para login por email/senha e renovação de sessão Firebase.",
+      "DESPEZZAS_FIREBASE_API_KEY é obrigatório para login por e-mail/senha e renovação de sessão Firebase.",
     );
   }
 

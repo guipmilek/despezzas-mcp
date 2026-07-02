@@ -1,12 +1,12 @@
 # Contribuindo
 
-Obrigado por considerar uma contribuicao. Este projeto integra um servico financeiro pessoal e usa endpoints nao documentados do Despezzas, entao mudancas devem ser pequenas, revisaveis e cuidadosas com dados sensiveis.
+Obrigado por considerar uma contribuição. Este projeto integra um serviço financeiro pessoal e usa endpoints não documentados do Despezzas, então mudanças devem ser pequenas, revisáveis e cuidadosas com dados sensíveis.
 
 ## Como contribuir
 
-1. Abra uma issue descrevendo bug, melhoria ou endpoint novo antes de mudancas grandes.
+1. Abra uma issue descrevendo bug, melhoria ou endpoint novo antes de mudanças grandes.
 2. Crie um branch a partir de `main`.
-3. Rode as verificacoes locais:
+3. Rode as verificações locais:
 
    ```powershell
    npm ci
@@ -14,16 +14,16 @@ Obrigado por considerar uma contribuicao. Este projeto integra um servico financ
    npm test
    ```
 
-4. Nunca inclua `.env`, tokens, senhas, arquivos de sessao, HARs nao mascarados ou respostas reais da API com dados pessoais.
-5. Para novas ferramentas de escrita, mantenha `confirm: true` obrigatorio e adicione testes cobrindo payloads perigosos ou ambiguos.
+4. Nunca inclua `.env`, tokens, senhas, arquivos de sessão, HARs não mascarados ou respostas reais da API com dados pessoais.
+5. Para novas ferramentas de escrita, mantenha `confirm: true` obrigatório e adicione testes cobrindo payloads perigosos ou ambíguos.
 6. Se mudar arquitetura, comandos, ferramentas MCP ou regras importantes para agentes, atualize `llms.txt`.
 
 ## Uso de IA
 
-Este projeto foi desenvolvido de forma majoritariamente assistida por IA ("vibecoded"), com direcao tecnica, conhecimento de programacao e revisao manual de Guilherme Milek. Contribuicoes geradas ou editadas por IA sao bem-vindas, mas devem ser verificadas pelo autor antes do envio.
+Este projeto foi desenvolvido de forma majoritariamente assistida por IA ("vibecoded"), com direção técnica, conhecimento de programação e revisão manual de Guilherme Milek. Contribuições geradas ou editadas por IA são bem-vindas, mas devem ser verificadas pelo autor antes do envio.
 
-Agentes de IA devem ler `llms.txt` antes de modificar o projeto e devem validar comportamento com codigo-fonte, testes e execucoes locais quando aplicavel.
+Agentes de IA devem ler `llms.txt` antes de modificar o projeto e devem validar comportamento com código-fonte, testes e execuções locais quando aplicável.
 
 ## Capturas de API
 
-Se usar HARs ou logs do DevTools para mapear endpoints, mascare antes de anexar qualquer trecho. O script `npm run inspect:har -- caminho/arquivo.har` ja mascara campos comuns, mas revise manualmente o resultado.
+Se usar HARs ou logs do DevTools para mapear endpoints, mascare antes de anexar qualquer trecho. O script `npm run inspect:har -- caminho/arquivo.har` já mascara campos comuns, mas revise manualmente o resultado.

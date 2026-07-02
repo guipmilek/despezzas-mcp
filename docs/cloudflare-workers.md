@@ -9,7 +9,7 @@ Dois modos de operação:
 - Multiusuário: cada pessoa faz login com a própria conta Despezzas. A sessão Firebase é criptografada e salva no Workers KV, vinculada ao token OAuth do ChatGPT.
 - Conta única: o Worker usa uma conta fixa do Despezzas (definida nos secrets) e protege o acesso com `MCP_OWNER_AUTH_CODE`.
 
-## Por Que Este Caminho Faz Sentido
+## Por que este caminho faz sentido
 
 - O plano gratuito do Workers cobre um MCP de finanças pessoais sem problemas.
 - Sem hibernação de container nem cold start como no Koyeb ou Render Free.
@@ -20,7 +20,7 @@ Dois modos de operação:
 
 O Cloudflare Workers Free tem limites diários, e Workers KV está disponível na plataforma. Durable Objects também estão disponíveis no plano Free com backend SQLite. Este repositório usa Workers KV para sessões multiusuário.
 
-## Antes do Deploy
+## Antes do deploy
 
 Troque a senha do Despezzas que foi colada no chat antes de configurar credenciais em qualquer provedor cloud.
 
@@ -45,7 +45,7 @@ npx wrangler login
 
 Se este for o primeiro Worker na conta Cloudflare, abra Workers & Pages no dashboard da Cloudflare e registre um subdomínio `workers.dev` antes do deploy. O Wrangler não seleciona subdomínio em builds CI/CD não interativos.
 
-## Configurar Secrets
+## Configurar secrets
 
 Gere um segredo de assinatura OAuth:
 
@@ -59,7 +59,7 @@ Adicione-o à Cloudflare:
 npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
 ```
 
-## Modo Multiusuário
+## Modo multiusuário
 
 Use este modo se mais de uma pessoa for conectar a própria conta Despezzas ao ChatGPT.
 
@@ -90,7 +90,7 @@ Adicione-a à Cloudflare:
 npx wrangler secret put SESSION_ENCRYPTION_KEY
 ```
 
-Adicione também a chave Firebase usada pelo fluxo de login por email/senha. É a mesma chave pública do Firebase Web que o frontend do Despezzas carrega — para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey` nos arquivos JavaScript.
+Adicione também a chave Firebase usada pelo fluxo de login por e-mail/senha. É a mesma chave pública do Firebase Web que o frontend do Despezzas carrega — para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey` nos arquivos JavaScript.
 
 ```powershell
 npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY
@@ -103,9 +103,9 @@ npx wrangler secret delete DESPEZZAS_EMAIL
 npx wrangler secret delete DESPEZZAS_PASSWORD
 ```
 
-Cada pessoa digita o próprio email e senha na tela de autorização OAuth. O Worker troca a senha por tokens do Firebase e guarda apenas a sessão criptografada no KV.
+Cada pessoa digita o próprio e-mail e senha na tela de autorização OAuth. O Worker troca a senha por tokens do Firebase e guarda apenas a sessão criptografada no KV.
 
-## Modo Conta Única
+## Modo conta única
 
 Use este modo só quando o Worker for para sua própria conta ChatGPT e sua própria conta Despezzas.
 
@@ -177,7 +177,7 @@ O Worker expõe os endpoints que o ChatGPT espera:
 - `GET|POST /oauth/authorize`
 - `POST /oauth/token`
 
-## Domínio Personalizado
+## Domínio personalizado
 
 O Worker normalmente infere a URL pública pela requisição recebida. Se você anexar um domínio personalizado e a descoberta OAuth retornar a URL errada, defina `MCP_PUBLIC_BASE_URL` em `wrangler.jsonc`:
 
@@ -195,7 +195,7 @@ Depois faça redeploy:
 npm run deploy:cloudflare
 ```
 
-## Notas de Runtime
+## Notas de runtime
 
 - `DESPEZZAS_SESSION_FILE=none` está fixo no `wrangler.jsonc` — Workers não têm sistema de arquivos persistente.
 - O modo multiusuário exige KV `DESPEZZAS_SESSIONS` e `SESSION_ENCRYPTION_KEY`.
@@ -204,6 +204,6 @@ npm run deploy:cloudflare
 - A página `/login` é para testes e autorização manual. Não oferece criação de conta, recuperação de senha nem "lembrar de mim" — esses fluxos são do app oficial do Despezzas. Usuários do ChatGPT devem conectar pelo OAuth do ChatGPT.
 - Uma versão futura poderia migrar de KV para `McpAgent` com Durable Objects se precisarmos de estado por sessão mais rico.
 
-## Nota de Confiança
+## Nota de confiança
 
 O Despezzas não tem OAuth oficial. No modo multiusuário, cada pessoa digita a própria senha na página de login deste MCP. Use apenas com pessoas que confiam em quem opera o Worker. O Worker não armazena senhas — apenas as recebe momentaneamente para trocar por tokens de sessão.

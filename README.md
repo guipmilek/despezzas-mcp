@@ -66,7 +66,9 @@
   </summary>
 
 - [📍 Visão Geral](#-visão-geral)
+- [⚡ Início Rápido](#-início-rápido)
 - [✨ Funcionalidades](#-funcionalidades)
+- [🧰 Catálogo de Ferramentas](#-catálogo-de-ferramentas)
 - [🛠 Tecnologias](#-tecnologias)
   - [Servidor MCP](#servidor-mcp)
   - [Deploy](#deploy)
@@ -74,6 +76,7 @@
 - [🚀 Primeiros Passos](#-primeiros-passos)
   - [📦 Configuração](#-configuração)
   - [✔️ Verificação](#️-verificação)
+- [📋 Variáveis de Ambiente](#-variáveis-de-ambiente)
 - [🔐 Autenticação](#-autenticação)
 - [🖥 Configuração MCP Local](#-configuração-mcp-local)
 - [🌐 Modo HTTP](#-modo-http)
@@ -81,6 +84,8 @@
 - [☁️ Deploy Remoto](#️-deploy-remoto)
 - [🔎 Inspeção de HAR](#-inspeção-de-har)
 - [📚 MCPs de Referência](#-mcps-de-referência)
+- [🗺 Roadmap](#-roadmap)
+- [🤝 Contribuição](#-contribuição)
 - [📄 Licença](#-licença)
 </details>
 
@@ -92,23 +97,49 @@ Servidor MCP pessoal para dados financeiros do [Despezzas](https://despezzas.com
 
 Este é um projeto open-source sob a licença MIT, construído a partir do tráfego observado no Despezzas Web e da inspeção do bundle frontend. O Despezzas não parece publicar uma API pública, então mantenha isto como uma integração pessoal não oficial e espere que detalhes de endpoints possam mudar.
 
+> [!WARNING]
+> O Despezzas não publica uma API pública oficial para esta integração. Endpoints, campos e fluxos de login podem mudar sem aviso.
+
+> [!IMPORTANT]
+> Este MCP pode ler e alterar dados financeiros pessoais. Nunca faça commit de `.env`, tokens, senhas, sessões, HARs não mascarados ou respostas reais da API.
+
+| Item | Valor |
+| --- | --- |
+| **Status** | MVP funcional para uso pessoal |
+| **API** | Integração não oficial com endpoints do Despezzas |
+| **Runtime** | Node.js `>=20` |
+| **Transportes** | `stdio`, HTTP Node, Cloudflare Workers |
+| **Autenticação** | Bearer token, email/senha, OAuth MCP |
+| **Deploy recomendado** | Cloudflare Workers |
+
+## ⚡ Início Rápido
+
+```powershell
+npm install
+npm run build
+Copy-Item .env.example .env
+npm run dev
+```
+
+Depois configure uma das opções de autenticação em `.env`: `DESPEZZAS_TOKEN` ou `DESPEZZAS_EMAIL` / `DESPEZZAS_PASSWORD` / `DESPEZZAS_FIREBASE_API_KEY`.
+
 ## ✨ Funcionalidades
 
-📖 Ferramentas de leitura: perfil, acessos de perfil, configuração pessoal, contas, bancos, cartões de crédito, categorias, subcategorias, busca compacta de transações, visão geral, resumo financeiro e diagnóstico de exportação/campos.
+📖 **Ferramentas de leitura:** perfil, acessos de perfil, configuração pessoal, contas, bancos, cartões de crédito, categorias, subcategorias, busca compacta de transações, visão geral, resumo financeiro e diagnóstico de exportação/campos.
 
-🧾 Ferramentas de pré-visualização para transações: preparam payloads de criação/edição/exclusão sem chamar o Despezzas.
+🧾 **Pré-visualização de transações:** prepara payloads de criação/edição/exclusão sem chamar o Despezzas.
 
-✍️ Ferramentas de escrita: trocar/criar/editar/excluir/sair de perfil, criar/editar/excluir conta, cartão de crédito, transação, transferência, duplicar transação e alternar pago.
+✍️ **Ferramentas de escrita:** trocar/criar/editar/excluir/sair de perfil, criar/editar/excluir conta, cartão de crédito, transação, transferência, duplicar transação e alternar pago.
 
-🔐 Autenticação: token bearer copiado, login por email/senha via variáveis de ambiente ou página HTTP de autorização MCP.
+🔐 **Autenticação:** token bearer copiado, login por email/senha via variáveis de ambiente ou página HTTP de autorização MCP.
 
-🔄 Renovação de token: sessões Firebase salvas são reutilizadas e renovadas automaticamente.
+🔄 **Renovação de token:** sessões Firebase salvas são reutilizadas e renovadas automaticamente.
 
-🛡 Trava de segurança: toda ferramenta de escrita/destrutiva exige `confirm: true`.
+🛡 **Trava de segurança:** toda ferramenta de escrita/destrutiva exige `confirm: true`.
 
-🔌 Transportes: `stdio` local, Streamable HTTP em Node no `/mcp` e Streamable HTTP em Cloudflare Workers no `/mcp`.
+🔌 **Transportes:** `stdio` local, Streamable HTTP em Node no `/mcp` e Streamable HTTP em Cloudflare Workers no `/mcp`.
 
-🔎 Depuração: inspetor de HAR e monitor de requisições no DevTools para capturar endpoints futuros.
+🔎 **Depuração:** inspetor de HAR e monitor de requisições no DevTools para capturar endpoints futuros.
 
 Valores usam centavos inteiros no formato nativo do Despezzas. Exemplo: `12345` significa `R$123.45`.
 
@@ -120,6 +151,17 @@ Para escritas de transação, use primeiro as ferramentas de preparo:
 4. Chame a ferramenta real de escrita com os mesmos campos e `confirm: true`.
 
 `despezzas_create_transaction` recusa intencionalmente payloads sem destino de conta/cartão, com conta e cartão ao mesmo tempo, ou sem `category_id`, a menos que `allow_uncategorized` seja explicitamente `true`.
+
+## 🧰 Catálogo de Ferramentas
+
+| Grupo | Exemplos | Escrita? | Observação |
+| --- | --- | --- | --- |
+| **Status e perfil** | `despezzas_status`, `despezzas_profile`, `despezzas_list_profiles` | Parcial | Trocar/criar/excluir perfil exige `confirm: true`. |
+| **Contas e cartões** | `despezzas_list_accounts`, `despezzas_list_credit_cards`, `despezzas_create_account` | Parcial | Escritas validam IDs e confirmação. |
+| **Categorias** | `despezzas_list_categories`, `despezzas_list_subcategories` | Não | Use antes de criar/editar transações. |
+| **Transações** | `despezzas_search_transactions`, `despezzas_create_transaction`, `despezzas_update_transaction` | Parcial | Criação exige destino, categoria ou `allow_uncategorized`. |
+| **Pré-visualização** | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction` | Não | Caminho recomendado antes de qualquer escrita. |
+| **Diagnóstico** | `despezzas_export_fields_diagnostics`, `despezzas_raw_request` | Parcial | Use com cuidado; respostas são mascaradas quando possível. |
 
 ## 🛠 Tecnologias
 
@@ -240,6 +282,22 @@ npm run smoke:readonly
 
 `npm test` cobre as proteções locais de payload e os diagnósticos. `npm run smoke:readonly` compila o projeto e chama apenas endpoints somente leitura do Despezzas usando o token/sessão configurado.
 
+## 📋 Variáveis de Ambiente
+
+| Variável | Obrigatória? | Uso |
+| --- | --- | --- |
+| `DESPEZZAS_TOKEN` | Opcional | Token bearer manual copiado de uma sessão web. |
+| `DESPEZZAS_EMAIL` | Opcional | Login por email/senha. |
+| `DESPEZZAS_PASSWORD` | Opcional | Login por email/senha. |
+| `DESPEZZAS_FIREBASE_API_KEY` | Para email/senha | Troca de token customizado e refresh Firebase. |
+| `DESPEZZAS_SESSION_FILE` | Opcional | Caminho de sessão persistida; use `none` para desativar. |
+| `MCP_TRANSPORT` | Opcional | `stdio` ou `http`; padrão `stdio`. |
+| `HOST` / `PORT` | Opcional | Bind do servidor HTTP; padrão `127.0.0.1:8787`. |
+| `MCP_PUBLIC_BASE_URL` | Produção/OAuth | URL pública HTTPS para metadados OAuth. |
+| `MCP_OAUTH_TOKEN_SECRET` | Recomendado | Assinatura estável dos tokens OAuth MCP. |
+| `MCP_OWNER_AUTH_CODE` | Deploy privado | Código de proprietário para autorizações de conta única. |
+| `SESSION_ENCRYPTION_KEY` | Cloudflare multiusuário | Criptografia de sessões no Workers KV. |
+
 ## 🔐 Autenticação
 
 Opções preferenciais:
@@ -256,6 +314,22 @@ O fluxo de login espelha o frontend do Despezzas:
 2. Usa o `firebase_token` retornado com Firebase `accounts:signInWithCustomToken` usando `DESPEZZAS_FIREBASE_API_KEY`.
 3. Usa o `idToken` do Firebase como `Authorization: Bearer ...` em `api.despezzas.com`.
 4. Salva o refresh token do Firebase em `%USERPROFILE%\.despezzas-mcp\session.json` por padrão.
+
+```mermaid
+sequenceDiagram
+  participant User as Usuário
+  participant MCP as Despezzas MCP
+  participant API as API Despezzas
+  participant Firebase
+  participant Client as Cliente MCP/ChatGPT
+
+  User->>MCP: Email/senha via /login
+  MCP->>API: POST /v2/auth
+  API-->>MCP: firebase_token
+  MCP->>Firebase: signInWithCustomToken
+  Firebase-->>MCP: idToken + refreshToken
+  MCP-->>Client: Token OAuth MCP opaco
+```
 
 Defina `DESPEZZAS_SESSION_FILE=none` para desativar a persistência de sessão. Se todos os métodos de autenticação falharem, `despezzas_status` indicará que você deve abrir a página de login ou configurar credenciais.
 
@@ -342,6 +416,9 @@ Essa camada OAuth protege a conexão MCP. Durante a autorização, a página de 
 
 `MCP_HTTP_BEARER_TOKEN` continua útil para scripts que não usam ChatGPT, mas, quando ele é omitido, o endpoint `/mcp` exige um token de acesso OAuth válido.
 
+<details>
+  <summary>Detalhes de descoberta OAuth e links oficiais</summary>
+
 Apps/conectores personalizados do ChatGPT exigem um endpoint MCP remoto em HTTPS. A documentação do Apps SDK da OpenAI descreve o MCP como a camada de servidor necessária para expor ferramentas ao ChatGPT, e o guia de conexão pelo ChatGPT usa um endpoint HTTPS para adicionar um servidor MCP. Veja:
 
 - [Quickstart do Apps SDK](https://developers.openai.com/apps-sdk/quickstart)
@@ -351,11 +428,21 @@ Apps/conectores personalizados do ChatGPT exigem um endpoint MCP remoto em HTTPS
 - [Construção de servidores MCP para ChatGPT Apps e integrações de API](https://developers.openai.com/api/docs/mcp)
 - [Especificação de autorização MCP](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
 
+</details>
+
 ## ☁️ Deploy Remoto
 
 Caminho recomendado primeiro: [Cloudflare Workers](docs/cloudflare-workers.md). Alternativa gratuita em container: [Koyeb Free](docs/koyeb.md).
 
 Veja [docs/deployment.md](docs/deployment.md) para a comparação mais ampla de hospedagens gratuitas e notas de configuração por provedor.
+
+| Provedor | Melhor para | Arquivos | Observação |
+| --- | --- | --- | --- |
+| **Cloudflare Workers** | MCP remoto recomendado | `wrangler.jsonc`, `src/cloudflare.ts` | Melhor caminho para OAuth com ChatGPT. |
+| **Docker/Koyeb** | Container simples | `Dockerfile` | Bom para uso pessoal; pode escalar para zero. |
+| **Vercel** | Função serverless Express | `vercel.json`, `api/index.js` | Sem estado; use env vars para credenciais. |
+| **Render/Railway** | Demos e deploy GitHub rápido | `render.yaml`, `railway.json` | Serviços gratuitos podem dormir ou ter limites. |
+| **Prefect Horizon** | Gateway MCP gerenciado | `horizon_proxy.py` | Proxy FastMCP para backend Node publicado. |
 
 Arquivos de deploy incluídos:
 
@@ -399,6 +486,23 @@ O estilo de implementação foi comparado com:
 - [WeslleyNasRocha/organizze-mcp](https://github.com/WeslleyNasRocha/organizze-mcp)
 
 Este repositório mantém uma estrutura parecida, mas usa endpoints nativos do Despezzas e IDs em UUID.
+
+## 🗺 Roadmap
+
+- [ ] Expandir cobertura de endpoints de relatórios, metas e investimentos.
+- [ ] Gerar documentação automática do catálogo de ferramentas MCP.
+- [ ] Adicionar screenshots do fluxo de conexão no ChatGPT.
+- [ ] Criar exemplos prontos para `Claude Desktop`, ChatGPT e clientes MCP locais.
+- [ ] Documentar mais casos de borda de perfis compartilhados.
+
+## 🤝 Contribuição
+
+Contribuições são bem-vindas. Antes de abrir um pull request:
+
+1. Leia [CONTRIBUTING.md](CONTRIBUTING.md).
+2. Rode `npm run typecheck` e `npm test`.
+3. Não inclua credenciais, tokens, sessões, HARs não mascarados ou dados financeiros reais.
+4. Mantenha `confirm: true` obrigatório para toda ferramenta de escrita/destrutiva.
 
 ## 📄 Licença
 

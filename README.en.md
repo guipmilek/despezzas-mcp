@@ -66,7 +66,9 @@
   </summary>
 
 - [📍 Overview](#-overview)
+- [⚡ Quick Start](#-quick-start)
 - [✨ Features](#-features)
+- [🧰 Tool Catalog](#-tool-catalog)
 - [🛠 Technologies](#-technologies)
   - [MCP Server](#mcp-server)
   - [Deploy](#deploy)
@@ -74,6 +76,7 @@
 - [🚀 Getting Started](#-getting-started)
   - [📦 Setup](#-setup)
   - [✔️ Verification](#️-verification)
+- [📋 Environment Variables](#-environment-variables)
 - [🔐 Authentication](#-authentication)
 - [🖥 Local MCP Configuration](#-local-mcp-configuration)
 - [🌐 HTTP Mode](#-http-mode)
@@ -81,6 +84,8 @@
 - [☁️ Remote Deploy](#️-remote-deploy)
 - [🔎 HAR Inspection](#-har-inspection)
 - [📚 Reference MCPs](#-reference-mcps)
+- [🗺 Roadmap](#-roadmap)
+- [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 </details>
 
@@ -92,23 +97,49 @@ Personal MCP server for financial data from [Despezzas](https://despezzas.com/).
 
 This is an open-source MIT-licensed project built from observed Despezzas Web traffic and frontend bundle inspection. Despezzas does not appear to publish a public API, so treat this as an unofficial personal integration and expect endpoint details to change.
 
+> [!WARNING]
+> Despezzas does not publish an official public API for this integration. Endpoints, fields, and login flows may change without notice.
+
+> [!IMPORTANT]
+> This MCP can read and change personal financial data. Never commit `.env`, tokens, passwords, sessions, unredacted HARs, or real API responses.
+
+| Item | Value |
+| --- | --- |
+| **Status** | Functional MVP for personal use |
+| **API** | Unofficial integration with Despezzas endpoints |
+| **Runtime** | Node.js `>=20` |
+| **Transports** | `stdio`, Node HTTP, Cloudflare Workers |
+| **Authentication** | Bearer token, email/password, MCP OAuth |
+| **Recommended deploy** | Cloudflare Workers |
+
+## ⚡ Quick Start
+
+```powershell
+npm install
+npm run build
+Copy-Item .env.example .env
+npm run dev
+```
+
+Then configure one authentication option in `.env`: `DESPEZZAS_TOKEN` or `DESPEZZAS_EMAIL` / `DESPEZZAS_PASSWORD` / `DESPEZZAS_FIREBASE_API_KEY`.
+
 ## ✨ Features
 
-📖 Read tools: profile, profile access, personal configuration, accounts, banks, credit cards, categories, subcategories, compact transaction search, overview, financial summaries, and export/field diagnostics.
+📖 **Read tools:** profile, profile access, personal configuration, accounts, banks, credit cards, categories, subcategories, compact transaction search, overview, financial summaries, and export/field diagnostics.
 
-🧾 Transaction preview tools: prepare create/update/delete payloads without calling Despezzas.
+🧾 **Transaction preview tools:** prepare create/update/delete payloads without calling Despezzas.
 
-✍️ Write tools: switch/create/update/delete/leave profile, create/update/delete account, credit card, transaction, transfer, duplicate transaction, and toggle paid status.
+✍️ **Write tools:** switch/create/update/delete/leave profile, create/update/delete account, credit card, transaction, transfer, duplicate transaction, and toggle paid status.
 
-🔐 Authentication: copied bearer token, email/password login through environment variables, or HTTP MCP authorization page.
+🔐 **Authentication:** copied bearer token, email/password login through environment variables, or HTTP MCP authorization page.
 
-🔄 Token refresh: saved Firebase sessions are reused and refreshed automatically.
+🔄 **Token refresh:** saved Firebase sessions are reused and refreshed automatically.
 
-🛡 Safety guard: every write/destructive tool requires `confirm: true`.
+🛡 **Safety guard:** every write/destructive tool requires `confirm: true`.
 
-🔌 Transports: local `stdio`, Streamable HTTP on Node at `/mcp`, and Streamable HTTP on Cloudflare Workers at `/mcp`.
+🔌 **Transports:** local `stdio`, Streamable HTTP on Node at `/mcp`, and Streamable HTTP on Cloudflare Workers at `/mcp`.
 
-🔎 Debugging: HAR inspector and DevTools request monitor for capturing future endpoints.
+🔎 **Debugging:** HAR inspector and DevTools request monitor for capturing future endpoints.
 
 Amounts use Despezzas native integer cents. Example: `12345` means `R$123.45`.
 
@@ -120,6 +151,17 @@ For transaction writes, use the prepare tools first:
 4. Call the real write tool with the same fields and `confirm: true`.
 
 `despezzas_create_transaction` intentionally rejects payloads without an account/card destination, with both account and card at the same time, or without `category_id`, unless `allow_uncategorized` is explicitly `true`.
+
+## 🧰 Tool Catalog
+
+| Group | Examples | Writes? | Note |
+| --- | --- | --- | --- |
+| **Status and profile** | `despezzas_status`, `despezzas_profile`, `despezzas_list_profiles` | Partial | Switching/creating/deleting profiles requires `confirm: true`. |
+| **Accounts and cards** | `despezzas_list_accounts`, `despezzas_list_credit_cards`, `despezzas_create_account` | Partial | Writes validate IDs and confirmation. |
+| **Categories** | `despezzas_list_categories`, `despezzas_list_subcategories` | No | Use before creating/updating transactions. |
+| **Transactions** | `despezzas_search_transactions`, `despezzas_create_transaction`, `despezzas_update_transaction` | Partial | Creation requires destination, category, or `allow_uncategorized`. |
+| **Preview** | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction` | No | Recommended path before any write. |
+| **Diagnostics** | `despezzas_export_fields_diagnostics`, `despezzas_raw_request` | Partial | Use carefully; responses are redacted when possible. |
 
 ## 🛠 Technologies
 
@@ -240,6 +282,22 @@ npm run smoke:readonly
 
 `npm test` covers local payload protections and diagnostics. `npm run smoke:readonly` builds the project and calls only read-only Despezzas endpoints using the configured token/session.
 
+## 📋 Environment Variables
+
+| Variable | Required? | Used For |
+| --- | --- | --- |
+| `DESPEZZAS_TOKEN` | Optional | Manual bearer token copied from a web session. |
+| `DESPEZZAS_EMAIL` | Optional | Email/password login. |
+| `DESPEZZAS_PASSWORD` | Optional | Email/password login. |
+| `DESPEZZAS_FIREBASE_API_KEY` | For email/password | Firebase custom token exchange and refresh. |
+| `DESPEZZAS_SESSION_FILE` | Optional | Persisted session path; use `none` to disable. |
+| `MCP_TRANSPORT` | Optional | `stdio` or `http`; default `stdio`. |
+| `HOST` / `PORT` | Optional | HTTP server bind; default `127.0.0.1:8787`. |
+| `MCP_PUBLIC_BASE_URL` | Production/OAuth | Public HTTPS URL for OAuth metadata. |
+| `MCP_OAUTH_TOKEN_SECRET` | Recommended | Stable signing secret for MCP OAuth tokens. |
+| `MCP_OWNER_AUTH_CODE` | Private deploy | Owner code for single-account authorizations. |
+| `SESSION_ENCRYPTION_KEY` | Cloudflare multi-user | Workers KV session encryption. |
+
 ## 🔐 Authentication
 
 Preferred options:
@@ -256,6 +314,22 @@ The login flow mirrors the Despezzas frontend:
 2. Uses the returned `firebase_token` with Firebase `accounts:signInWithCustomToken` using `DESPEZZAS_FIREBASE_API_KEY`.
 3. Uses the Firebase `idToken` as `Authorization: Bearer ...` on `api.despezzas.com`.
 4. Saves the Firebase refresh token to `%USERPROFILE%\.despezzas-mcp\session.json` by default.
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant MCP as Despezzas MCP
+  participant API as Despezzas API
+  participant Firebase
+  participant Client as MCP Client/ChatGPT
+
+  User->>MCP: Email/password through /login
+  MCP->>API: POST /v2/auth
+  API-->>MCP: firebase_token
+  MCP->>Firebase: signInWithCustomToken
+  Firebase-->>MCP: idToken + refreshToken
+  MCP-->>Client: Opaque MCP OAuth token
+```
 
 Set `DESPEZZAS_SESSION_FILE=none` to disable session persistence. If every authentication method fails, `despezzas_status` will tell you to open the login page or configure credentials.
 
@@ -342,6 +416,9 @@ This OAuth layer protects the MCP connection. During authorization, the login pa
 
 `MCP_HTTP_BEARER_TOKEN` is still useful for scripts that do not use ChatGPT, but when it is omitted, `/mcp` requires a valid OAuth access token.
 
+<details>
+  <summary>OAuth discovery details and official links</summary>
+
 Custom ChatGPT apps/connectors require a remote HTTPS MCP endpoint. See:
 
 - [Apps SDK quickstart](https://developers.openai.com/apps-sdk/quickstart)
@@ -351,11 +428,21 @@ Custom ChatGPT apps/connectors require a remote HTTPS MCP endpoint. See:
 - [MCP server building for ChatGPT Apps and API integrations](https://developers.openai.com/api/docs/mcp)
 - [MCP authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
 
+</details>
+
 ## ☁️ Remote Deploy
 
 Recommended first path: [Cloudflare Workers](docs/cloudflare-workers.md). Free container alternative: [Koyeb Free](docs/koyeb.md).
 
 See [docs/deployment.md](docs/deployment.md) for a broader comparison of free hosting options and provider-specific configuration notes.
+
+| Provider | Best For | Files | Note |
+| --- | --- | --- | --- |
+| **Cloudflare Workers** | Recommended remote MCP | `wrangler.jsonc`, `src/cloudflare.ts` | Best path for ChatGPT OAuth. |
+| **Docker/Koyeb** | Simple container deploy | `Dockerfile` | Good for personal use; may scale to zero. |
+| **Vercel** | Serverless Express function | `vercel.json`, `api/index.js` | Stateless; use env vars for credentials. |
+| **Render/Railway** | Quick demos and GitHub deploys | `render.yaml`, `railway.json` | Free services may sleep or have limits. |
+| **Prefect Horizon** | Managed MCP gateway | `horizon_proxy.py` | FastMCP proxy for a published Node backend. |
 
 Included deploy files:
 
@@ -399,6 +486,23 @@ The implementation style was compared with:
 - [WeslleyNasRocha/organizze-mcp](https://github.com/WeslleyNasRocha/organizze-mcp)
 
 This repository keeps a similar structure, but uses native Despezzas endpoints and UUID IDs.
+
+## 🗺 Roadmap
+
+- [ ] Expand coverage for reports, goals, and investment endpoints.
+- [ ] Generate automatic documentation for the MCP tool catalog.
+- [ ] Add screenshots for the ChatGPT connection flow.
+- [ ] Add ready-to-copy examples for `Claude Desktop`, ChatGPT, and local MCP clients.
+- [ ] Document more shared-profile edge cases.
+
+## 🤝 Contributing
+
+Contributions are welcome. Before opening a pull request:
+
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+2. Run `npm run typecheck` and `npm test`.
+3. Do not include credentials, tokens, sessions, unredacted HARs, or real financial data.
+4. Keep `confirm: true` mandatory for every write/destructive tool.
 
 ## 📄 License
 

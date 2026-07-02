@@ -34,6 +34,16 @@ npm run build
 Copy-Item .env.example .env
 ```
 
+## Verification
+
+```powershell
+npm run typecheck
+npm test
+npm run smoke:readonly
+```
+
+`npm test` covers the local payload guards and diagnostics. `npm run smoke:readonly` builds the project and calls only read-only Despezzas endpoints using the configured token/session.
+
 ## Authentication
 
 Preferred options:

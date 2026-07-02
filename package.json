@@ -20,6 +20,8 @@
     "inspect:har": "node scripts/inspect-har.mjs",
     "start": "node dist/index.js",
     "start:http": "cross-env MCP_TRANSPORT=http node dist/index.js",
+    "smoke:readonly": "npm run build && node scripts/smoke-readonly.mjs",
+    "test": "npm run build && node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

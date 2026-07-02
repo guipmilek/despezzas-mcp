@@ -1649,3 +1649,19 @@ function dropUndefined<T extends object>(value: T): T {
   }
   return cleaned as T;
 }
+
+export const __test = {
+  buildTransactionPayload,
+  buildTransactionUpdatePayload,
+  compactTransaction,
+  compactTransactions,
+  createTransactionIssues,
+  emptyProfileWarning,
+  prepareCreateTransaction,
+  prepareUpdateTransaction,
+  profileContextFrom,
+  summarizeFields,
+  summarizeTransactions,
+  toTransactionFilters,
+  transactionSearchDiagnostics,
+};

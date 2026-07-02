@@ -30,8 +30,8 @@ Defina `MCP_PUBLIC_BASE_URL=https://seu-host-publico` se a descoberta OAuth reto
 
 Para autenticação no Despezzas, escolha uma opção:
 
-- Hospedagem efêmera/escala para zero: defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_SESSION_FILE=none`.
-- Hospedagem durável com volume montado: defina `DESPEZZAS_SESSION_FILE` para um caminho no volume montado e use `/login` uma vez.
+- Hospedagem efêmera/escala para zero: defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, `DESPEZZAS_FIREBASE_API_KEY` e `DESPEZZAS_SESSION_FILE=none`.
+- Hospedagem durável com volume montado: defina `DESPEZZAS_FIREBASE_API_KEY`, defina `DESPEZZAS_SESSION_FILE` para um caminho no volume montado e use `/login` uma vez.
 
 Não faça commit de credenciais do Despezzas. Adicione-as apenas na tela de segredos do provedor.
 
@@ -54,7 +54,7 @@ Não faça commit de credenciais do Despezzas. Adicione-as apenas na tela de seg
    Melhor primeira escolha para este repositório agora. Oferece HTTPS, sem suspensão de container, um plano gratuito generoso para uso pessoal e orientação oficial de MCP remoto via Streamable HTTP. Este repositório usa `src/cloudflare.ts` com o transporte MCP web-standard bruto, então não precisa de Durable Object para as ferramentas sem estado atuais. Veja [cloudflare-workers.md](cloudflare-workers.md).
 
 2. Koyeb Free Instance
-   Melhor alternativa gratuita em container. Roda o Dockerfile incluído a partir do GitHub e fornece um domínio HTTPS público. O ponto de atenção é a escala para zero depois de 1 hora ociosa e a ausência de volumes persistentes na Free Instance; use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD` e `DESPEZZAS_SESSION_FILE=none`. Veja [koyeb.md](koyeb.md).
+   Melhor alternativa gratuita em container. Roda o Dockerfile incluído a partir do GitHub e fornece um domínio HTTPS público. O ponto de atenção é a escala para zero depois de 1 hora ociosa e a ausência de volumes persistentes na Free Instance; use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD`/`DESPEZZAS_FIREBASE_API_KEY` e `DESPEZZAS_SESSION_FILE=none`. Veja [koyeb.md](koyeb.md).
 
 3. Oracle Cloud Always Free VM
    Melhor opção "realmente gratuita e estável" se você aceita gerenciar uma VM pequena. Oferece disco persistente e processo sempre ativo, então o modelo de login/sessão do MCP funciona de forma mais natural. Ponto de atenção: mais trabalho de operação, SSH, firewall, Docker/systemd e configuração de TLS.
@@ -96,6 +96,7 @@ Defina secrets:
 ```powershell
 npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
 npx wrangler secret put SESSION_ENCRYPTION_KEY
+npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY
 ```
 
 Crie e associe o namespace KV:
@@ -106,7 +107,7 @@ npx wrangler kv namespace create DESPEZZAS_SESSIONS
 
 Cole o namespace id gerado em `wrangler.jsonc` no binding `DESPEZZAS_SESSIONS`. Não defina `DESPEZZAS_EMAIL` / `DESPEZZAS_PASSWORD` globais no modo multiusuário; cada usuário entra com a própria conta Despezzas durante o OAuth do ChatGPT.
 
-Para modo privado de conta única, defina `MCP_OWNER_AUTH_CODE`, `DESPEZZAS_EMAIL` e `DESPEZZAS_PASSWORD` como secrets.
+Para modo privado de conta única, defina `MCP_OWNER_AUTH_CODE`, `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_FIREBASE_API_KEY` como secrets.
 
 Deploy:
 
@@ -140,6 +141,7 @@ Depois de criar o Blueprint, preencha estes placeholders de secrets no Render:
 ```dotenv
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
+DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
 MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_PUBLIC_BASE_URL=https://seu-servico.onrender.com
 ```
@@ -162,6 +164,7 @@ MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
 MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
+DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 ```
 
@@ -198,6 +201,7 @@ MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
+DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 MCP_PUBLIC_BASE_URL=https://seu-projeto.vercel.app
 ```
@@ -270,6 +274,7 @@ MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
+DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 MCP_PUBLIC_BASE_URL=https://seu-app-sua-org.koyeb.app
 ```
@@ -294,6 +299,7 @@ MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
 MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
+DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 MCP_PUBLIC_BASE_URL=https://sua-url-cloud-run
 ```

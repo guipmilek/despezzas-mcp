@@ -46,7 +46,9 @@ export interface DespezzasAuthProvider {
 }
 
 export class AuthRequiredError extends Error {
-  constructor(message = "Autenticação obrigatória. Abra a página de login do MCP ou configure DESPEZZAS_TOKEN/DESPEZZAS_EMAIL.") {
+  constructor(
+    message = "Autenticação obrigatória. Abra a página de login do MCP ou configure DESPEZZAS_TOKEN ou DESPEZZAS_EMAIL/DESPEZZAS_PASSWORD/DESPEZZAS_FIREBASE_API_KEY.",
+  ) {
     super(message);
     this.name = "AuthRequiredError";
   }
@@ -117,7 +119,7 @@ export class DespezzasAuthManager {
       hasManualToken: Boolean(config.token),
       hasEnvCredentials: Boolean(config.email && config.password),
       hasSession: Boolean(this.session?.idToken),
-      canRefresh: Boolean(this.session?.refreshToken || (config.email && config.password)),
+      canRefresh: Boolean(config.firebaseApiKey && (this.session?.refreshToken || (config.email && config.password))),
       expiresAt: this.session?.expiresAt ? new Date(this.session.expiresAt).toISOString() : expirationFromJwt(config.token),
       sessionFile: config.sessionFile,
     };
@@ -185,6 +187,7 @@ export async function createDespezzasSessionFromPassword(email: string, password
     throw new AuthRequiredError("Email e senha são obrigatórios.");
   }
 
+  const firebaseApiKey = requireFirebaseApiKey();
   const response = await fetch(new URL("/v2/auth", config.apiBaseUrl), {
     method: "POST",
     headers: {
@@ -206,7 +209,7 @@ export async function createDespezzasSessionFromPassword(email: string, password
     throw new Error("O login no Despezzas não retornou firebase_token.");
   }
 
-  return exchangeCustomTokenForSession(data.firebase_token, data.user, email);
+  return exchangeCustomTokenForSession(firebaseApiKey, data.firebase_token, data.user, email);
 }
 
 export async function refreshDespezzasSession(session: AuthSession): Promise<AuthSession> {
@@ -218,9 +221,10 @@ export async function refreshDespezzasSession(session: AuthSession): Promise<Aut
     grant_type: "refresh_token",
     refresh_token: session.refreshToken,
   });
+  const firebaseApiKey = requireFirebaseApiKey();
 
   const response = await fetch(
-    `https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(config.firebaseApiKey)}`,
+    `https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(firebaseApiKey)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -250,9 +254,14 @@ export function isAuthSessionExpiringSoon(session: AuthSession): boolean {
   return isExpiringSoon(session.expiresAt) || isJwtExpiringSoon(session.idToken);
 }
 
-async function exchangeCustomTokenForSession(customToken: string, user?: unknown, email?: string): Promise<AuthSession> {
+async function exchangeCustomTokenForSession(
+  firebaseApiKey: string,
+  customToken: string,
+  user?: unknown,
+  email?: string,
+): Promise<AuthSession> {
   const response = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(config.firebaseApiKey)}`,
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(firebaseApiKey)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -273,6 +282,16 @@ async function exchangeCustomTokenForSession(customToken: string, user?: unknown
     email: email ?? data.email,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function requireFirebaseApiKey(): string {
+  if (!config.firebaseApiKey) {
+    throw new AuthRequiredError(
+      "DESPEZZAS_FIREBASE_API_KEY é obrigatório para login por email/senha e renovação de sessão Firebase.",
+    );
+  }
+
+  return config.firebaseApiKey;
 }
 
 function dirname(filePath: string): string {

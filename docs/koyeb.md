@@ -19,7 +19,7 @@ Como ele escala para zero e não aceita volumes persistentes, use credenciais do
 1. Envie este repositório para o GitHub.
 2. No Koyeb, crie um App.
 3. Escolha GitHub como método de deploy.
-4. Selecione `guipmilek/despezzas-mcp`.
+4. Selecione o repositório `despezzas-mcp` na sua conta GitHub.
 5. Construtor: `Dockerfile`.
 6. Caminho do Dockerfile: `Dockerfile`.
 7. Tipo de instância: `Free`.
@@ -41,6 +41,7 @@ MCP_OWNER_AUTH_CODE=<codigo-de-proprietario-digitado>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 DESPEZZAS_EMAIL=<seu-email>
 DESPEZZAS_PASSWORD=<sua-senha>
+DESPEZZAS_FIREBASE_API_KEY=<firebase-api-key-do-despezzas>
 DESPEZZAS_SESSION_FILE=none
 ```
 

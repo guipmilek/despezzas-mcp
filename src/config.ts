@@ -2,7 +2,7 @@ export type McpTransport = "stdio" | "http";
 
 export interface Config {
   apiBaseUrl: string;
-  firebaseApiKey: string;
+  firebaseApiKey: string | undefined;
   publicBaseUrl: string | undefined;
   allowedHosts: string[];
   token: string | undefined;
@@ -30,7 +30,7 @@ function normalizePort(value: string | undefined): number {
 
 export const config: Config = {
   apiBaseUrl: process.env.DESPEZZAS_API_BASE_URL ?? "https://api.despezzas.com",
-  firebaseApiKey: process.env.DESPEZZAS_FIREBASE_API_KEY ?? "INSIRA_SUA_DESPEZZAS_FIREBASE_API_KEY",
+  firebaseApiKey: process.env.DESPEZZAS_FIREBASE_API_KEY,
   publicBaseUrl: process.env.MCP_PUBLIC_BASE_URL?.replace(/\/$/, ""),
   allowedHosts: normalizeAllowedHosts(process.env.MCP_ALLOWED_HOSTS, process.env.MCP_PUBLIC_BASE_URL),
   token: process.env.DESPEZZAS_TOKEN,

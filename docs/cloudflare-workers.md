@@ -90,6 +90,12 @@ Adicione-a à Cloudflare:
 npx wrangler secret put SESSION_ENCRYPTION_KEY
 ```
 
+Adicione também a chave Firebase usada pelo fluxo de login por email/senha:
+
+```powershell
+npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY
+```
+
 Para modo multiusuário, não defina credenciais globais do Despezzas. Se você já as adicionou para testes privados, remova:
 
 ```powershell
@@ -115,6 +121,7 @@ Adicione o código e as credenciais Despezzas à Cloudflare:
 npx wrangler secret put MCP_OWNER_AUTH_CODE
 npx wrangler secret put DESPEZZAS_EMAIL
 npx wrangler secret put DESPEZZAS_PASSWORD
+npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY
 ```
 
 Secrets opcionais:
@@ -192,7 +199,7 @@ npm run deploy:cloudflare
 
 - `DESPEZZAS_SESSION_FILE=none` é definido em `wrangler.jsonc`; Workers não fornecem um sistema de arquivos persistente normal.
 - O modo multiusuário exige KV `DESPEZZAS_SESSIONS` e `SESSION_ENCRYPTION_KEY`.
-- O modo conta única exige `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `MCP_OWNER_AUTH_CODE`.
+- O modo conta única exige `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, `DESPEZZAS_FIREBASE_API_KEY` e `MCP_OWNER_AUTH_CODE`.
 - `MCP_OWNER_AUTH_CODE` é ignorado quando o armazenamento KV multiusuário está configurado.
 - A página `/login` é principalmente um caminho de teste/autorização manual. Ela não oferece criação de conta, recuperação de senha ou "lembrar de mim"; esses fluxos continuam no app/site oficial do Despezzas. Usuários do ChatGPT devem conectar pelo OAuth do ChatGPT.
 - Uma versão futura poderia migrar de KV para `McpAgent` com Durable Objects se precisarmos de estado por sessão mais rico.

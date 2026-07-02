@@ -23,5 +23,7 @@ services:
         sync: false
       - key: DESPEZZAS_PASSWORD
         sync: false
+      - key: DESPEZZAS_FIREBASE_API_KEY
+        sync: false
       - key: MCP_PUBLIC_BASE_URL
         sync: false

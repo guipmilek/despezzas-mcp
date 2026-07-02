@@ -26,7 +26,7 @@ Deixe o seletor em **Server URL** (não Tunnel) - este é um Cloudflare Worker p
 ## 5. URL do Servidor MCP
 
 ```
-https://despezzas-mcp.guipmilek.workers.dev/mcp
+https://despezzas-mcp.<sua-conta>.workers.dev/mcp
 ```
 
 ## 6. Autenticação
@@ -83,7 +83,7 @@ Não é necessário código de proprietário nem segredo compartilhado; este dep
 
 ## Checklist de Verificação Antes de Publicar
 
-- [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/health` retorna `"ok": true` e `"authMode": "multi-user"`.
-- [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/.well-known/oauth-protected-resource` responde corretamente.
+- [ ] `GET https://despezzas-mcp.<sua-conta>.workers.dev/health` retorna `"ok": true` e `"authMode": "multi-user"`.
+- [ ] `GET https://despezzas-mcp.<sua-conta>.workers.dev/.well-known/oauth-protected-resource` responde corretamente.
 - [ ] O login via `/login` com uma conta real do Despezzas funciona e mostra a página de sucesso do MCP.
 - [ ] Uma conexão de teste no ChatGPT consegue chamar uma ferramenta somente leitura (por exemplo, listar contas) depois do OAuth.

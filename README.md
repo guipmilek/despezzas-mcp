@@ -2,7 +2,7 @@
 
 Servidor MCP pessoal para dados financeiros do [Despezzas](https://despezzas.com/). Ele expõe ferramentas para clientes MCP compatíveis com ChatGPT listarem contas, cartões, categorias, pesquisarem transações, resumirem gastos e executarem operações de escrita com proteções.
 
-Este é um MVP construído a partir do tráfego observado no Despezzas Web e da inspeção do bundle frontend. O Despezzas não parece publicar uma API pública, então mantenha isto como uma integração pessoal e espere que detalhes de endpoints possam mudar.
+Este é um projeto open-source sob a licença MIT, construído a partir do tráfego observado no Despezzas Web e da inspeção do bundle frontend. O Despezzas não parece publicar uma API pública, então mantenha isto como uma integração pessoal não oficial e espere que detalhes de endpoints possam mudar.
 
 ## O Que Está Implementado
 
@@ -49,7 +49,7 @@ npm run smoke:readonly
 Opções preferenciais:
 
 1. Execute em modo HTTP e abra `http://127.0.0.1:8787/login`.
-2. Defina `DESPEZZAS_EMAIL` e `DESPEZZAS_PASSWORD` no `.env`.
+2. Defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_FIREBASE_API_KEY` no `.env`.
 3. Defina `DESPEZZAS_TOKEN` manualmente a partir do DevTools do navegador.
 
 A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: email, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha continuam pertencendo ao app/site oficial do Despezzas.
@@ -57,7 +57,7 @@ A página `/login` usa a identidade visual do Despezzas, acompanha os temas clar
 O fluxo de login espelha o frontend do Despezzas:
 
 1. `POST https://api.despezzas.com/v2/auth` com email/senha.
-2. Usa o `firebase_token` retornado com Firebase `accounts:signInWithCustomToken`.
+2. Usa o `firebase_token` retornado com Firebase `accounts:signInWithCustomToken` usando `DESPEZZAS_FIREBASE_API_KEY`.
 3. Usa o `idToken` do Firebase como `Authorization: Bearer ...` em `api.despezzas.com`.
 4. Salva o refresh token do Firebase em `%USERPROFILE%\.despezzas-mcp\session.json` por padrão.
 
@@ -74,7 +74,7 @@ Para um cliente MCP local via stdio:
   "mcpServers": {
     "despezzas": {
       "command": "node",
-      "args": ["C:\\Users\\guipm\\Documents\\despezzas-mcp\\dist\\index.js"],
+      "args": ["C:\\caminho\\para\\despezzas-mcp\\dist\\index.js"],
       "env": {
         "DESPEZZAS_TOKEN": "cole-o-token-aqui"
       }
@@ -170,7 +170,7 @@ Arquivos de deploy incluídos:
 - `Dockerfile` para Koyeb, Cloud Run, Fly.io, Northflank, deploys Docker no Railway ou uma VM.
 - `horizon_proxy.py` e `requirements.txt` para Prefect Horizon como proxy FastMCP na frente de um backend Node já publicado.
 
-Para o modo multiusuário em Cloudflare Workers, associe o namespace KV `DESPEZZAS_SESSIONS`, defina `MCP_OAUTH_TOKEN_SECRET` e `SESSION_ENCRYPTION_KEY` como secrets do Wrangler e faça deploy com `npm run deploy:cloudflare`. Para deploys privados de conta única, defina `MCP_OWNER_AUTH_CODE` junto com suas credenciais do Despezzas. Para Horizon, publique o backend Node em outro lugar e aponte `horizon_proxy.py:mcp` para esse backend.
+Para o modo multiusuário em Cloudflare Workers, associe o namespace KV `DESPEZZAS_SESSIONS`, defina `MCP_OAUTH_TOKEN_SECRET`, `SESSION_ENCRYPTION_KEY` e `DESPEZZAS_FIREBASE_API_KEY` como secrets do Wrangler e faça deploy com `npm run deploy:cloudflare`. Para deploys privados de conta única, defina `MCP_OWNER_AUTH_CODE` junto com suas credenciais do Despezzas e `DESPEZZAS_FIREBASE_API_KEY`. Para Horizon, publique o backend Node em outro lugar e aponte `horizon_proxy.py:mcp` para esse backend.
 
 ## Inspeção de HAR
 
@@ -203,3 +203,7 @@ O estilo de implementação foi comparado com:
 - [WeslleyNasRocha/organizze-mcp](https://github.com/WeslleyNasRocha/organizze-mcp)
 
 Este repositório mantém uma estrutura parecida, mas usa endpoints nativos do Despezzas e IDs em UUID.
+
+## Licença
+
+MIT. Veja [LICENSE](LICENSE).

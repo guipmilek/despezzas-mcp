@@ -340,7 +340,7 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         login_url: loginUrl(),
         note: configured
           ? "A autenticação do Despezzas está disponível."
-          : "Autenticação ausente. Configure DESPEZZAS_TOKEN, DESPEZZAS_EMAIL/DESPEZZAS_PASSWORD, ou execute o modo HTTP e abra /login.",
+          : "Autenticação ausente. Configure DESPEZZAS_TOKEN ou DESPEZZAS_EMAIL/DESPEZZAS_PASSWORD/DESPEZZAS_FIREBASE_API_KEY, ou execute o modo HTTP e abra /login.",
       });
     },
   );

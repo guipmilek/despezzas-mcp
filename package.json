@@ -3,7 +3,16 @@
   "version": "0.1.0",
   "description": "Servidor MCP para uma conta financeira pessoal do Despezzas.",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "Guilherme Milek",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guipmilek/despezzas-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/guipmilek/despezzas-mcp/issues"
+  },
+  "homepage": "https://github.com/guipmilek/despezzas-mcp#readme",
   "keywords": [
     "mcp",
     "despezzas",

@@ -1,10 +1,92 @@
-# Despezzas MCP
+<!-- ===== HEADER ===== -->
+<p align="right">
+  <img
+    src="https://img.shields.io/badge/lang-pt--br-green?style=flat-square&labelColor=202024"
+    alt="lang-pt-br"
+  />
+</p>
+
+<h1 id="top" align="center">Despezzas MCP</h1>
+
+<p align="center">
+  <img
+    src="https://img.shields.io/github/languages/count/guipmilek/despezzas-mcp?color=%2304D361&labelColor=202024"
+    alt="Repository language count"
+  />
+  <img
+    src="https://img.shields.io/github/repo-size/guipmilek/despezzas-mcp?labelColor=202024"
+    alt="Repository size"
+  />
+  <img
+    src="https://img.shields.io/github/commit-activity/m/guipmilek/despezzas-mcp?color=black&labelColor=202024"
+    alt="Commit activity"
+  />
+  <a
+    href="https://github.com/guipmilek/despezzas-mcp/commits/main"
+    title="Ver commits do repositório"
+  >
+    <img
+      src="https://img.shields.io/github/last-commit/guipmilek/despezzas-mcp?labelColor=202024"
+      alt="Last commit"
+    />
+  </a>
+  <a href="./LICENSE" title="Ver licença do projeto">
+    <img
+      src="https://img.shields.io/badge/license-MIT-brightgreen?labelColor=202024"
+      alt="Project license"
+    />
+  </a>
+  <img
+    src="https://img.shields.io/badge/Node.js-%3E%3D20-233056?logo=node.js&labelColor=202024"
+    alt="Node.js >= 20"
+  />
+</p>
+
+<p align="center">
+  <img
+    src="./assets/despezzas-mcp.png"
+    alt="Despezzas MCP logo"
+    width="120"
+  />
+</p>
+
+<p align="center">
+  Servidor MCP não oficial para conectar dados financeiros do Despezzas a clientes compatíveis com MCP, incluindo ChatGPT.
+</p>
+
+<details>
+  <summary>
+    <h2>Table of Contents</h2>
+  </summary>
+
+- [Visão Geral](#visão-geral)
+- [Funcionalidades](#funcionalidades)
+- [Tecnologias](#tecnologias)
+  - [Servidor MCP](#servidor-mcp)
+  - [Deploy](#deploy)
+  - [Ferramentas](#ferramentas)
+- [Primeiros Passos](#primeiros-passos)
+  - [Configuração](#configuração)
+  - [Verificação](#verificação)
+- [Autenticação](#autenticação)
+- [Configuração MCP Local](#configuração-mcp-local)
+- [Modo HTTP](#modo-http)
+- [Conexão OAuth Com ChatGPT](#conexão-oauth-com-chatgpt)
+- [Deploy Remoto](#deploy-remoto)
+- [Inspeção de HAR](#inspeção-de-har)
+- [MCPs de Referência](#mcps-de-referência)
+- [Licença](#licença)
+</details>
+
+<!-- ===== PROJECT INFOS ===== -->
+
+## Visão Geral
 
 Servidor MCP pessoal para dados financeiros do [Despezzas](https://despezzas.com/). Ele expõe ferramentas para clientes MCP compatíveis com ChatGPT listarem contas, cartões, categorias, pesquisarem transações, resumirem gastos e executarem operações de escrita com proteções.
 
 Este é um projeto open-source sob a licença MIT, construído a partir do tráfego observado no Despezzas Web e da inspeção do bundle frontend. O Despezzas não parece publicar uma API pública, então mantenha isto como uma integração pessoal não oficial e espere que detalhes de endpoints possam mudar.
 
-## O Que Está Implementado
+## Funcionalidades
 
 - Ferramentas de leitura: perfil, acessos de perfil, configuração pessoal, contas, bancos, cartões de crédito, categorias, subcategorias, busca compacta de transações, visão geral, resumo financeiro e diagnóstico de exportação/campos.
 - Ferramentas de pré-visualização para transações: preparam payloads de criação/edição/exclusão sem chamar o Despezzas.
@@ -26,7 +108,108 @@ Para escritas de transação, use primeiro as ferramentas de preparo:
 
 `despezzas_create_transaction` recusa intencionalmente payloads sem destino de conta/cartão, com conta e cartão ao mesmo tempo, ou sem `category_id`, a menos que `allow_uncategorized` seja explicitamente `true`.
 
-## Configuração
+## Tecnologias
+
+As principais ferramentas usadas neste projeto:
+
+### Servidor MCP
+
+<p>
+  <a href="https://www.typescriptlang.org/">
+    <img
+      src="https://img.shields.io/badge/TypeScript-white?style=for-the-badge&logo=TypeScript"
+      alt="TypeScript"
+    />
+  </a>
+  <a href="https://nodejs.org/">
+    <img
+      src="https://img.shields.io/badge/Node.js-233056?style=for-the-badge&logo=node.js"
+      alt="Node.js"
+    />
+  </a>
+  <a href="https://modelcontextprotocol.io/">
+    <img
+      src="https://img.shields.io/badge/Model_Context_Protocol-202024?style=for-the-badge"
+      alt="Model Context Protocol"
+    />
+  </a>
+  <a href="https://expressjs.com/">
+    <img
+      src="https://img.shields.io/badge/Express-111111?style=for-the-badge&logo=express"
+      alt="Express"
+    />
+  </a>
+  <a href="https://hono.dev/">
+    <img
+      src="https://img.shields.io/badge/Hono-e36002?style=for-the-badge"
+      alt="Hono"
+    />
+  </a>
+  <a href="https://github.com/colinhacks/zod">
+    <img
+      src="https://img.shields.io/badge/Zod-3068b7?style=for-the-badge&logo=zod"
+      alt="Zod"
+    />
+  </a>
+</p>
+
+### Deploy
+
+<p>
+  <a href="https://workers.cloudflare.com/">
+    <img
+      src="https://img.shields.io/badge/Cloudflare_Workers-f38020?style=for-the-badge&logo=cloudflare"
+      alt="Cloudflare Workers"
+    />
+  </a>
+  <a href="https://www.docker.com/">
+    <img
+      src="https://img.shields.io/badge/Docker-white?style=for-the-badge&logo=docker"
+      alt="Docker"
+    />
+  </a>
+  <a href="https://vercel.com/">
+    <img
+      src="https://img.shields.io/badge/Vercel-0a0a0a?style=for-the-badge&logo=vercel"
+      alt="Vercel"
+    />
+  </a>
+  <a href="https://render.com/">
+    <img
+      src="https://img.shields.io/badge/Render-111111?style=for-the-badge&logo=render"
+      alt="Render"
+    />
+  </a>
+</p>
+
+### Ferramentas
+
+<p>
+  <a href="https://git-scm.com/">
+    <img
+      src="https://img.shields.io/badge/Git-f1f1e9?style=for-the-badge&logo=git"
+      alt="Git"
+    />
+  </a>
+  <a href="https://www.npmjs.com/">
+    <img
+      src="https://img.shields.io/badge/npm-cb3837?style=for-the-badge&logo=npm"
+      alt="npm"
+    />
+  </a>
+  <a href="https://developers.cloudflare.com/workers/wrangler/">
+    <img
+      src="https://img.shields.io/badge/Wrangler-f38020?style=for-the-badge&logo=cloudflare"
+      alt="Wrangler"
+    />
+  </a>
+</p>
+
+_* Veja o arquivo [<kbd>package.json</kbd>](./package.json) para a lista completa de dependências._
+
+## Primeiros Passos
+
+### Configuração
 
 ```powershell
 npm install
@@ -34,7 +217,7 @@ npm run build
 Copy-Item .env.example .env
 ```
 
-## Verificação
+### Verificação
 
 ```powershell
 npm run typecheck
@@ -207,3 +390,18 @@ Este repositório mantém uma estrutura parecida, mas usa endpoints nativos do D
 ## Licença
 
 MIT. Veja [LICENSE](LICENSE).
+
+<!-- ===== FOOTER ===== -->
+
+---
+
+<p align="center">
+  Feito por
+  <a href="https://www.guipm.dev/">@guipm.dev</a>.
+</p>
+
+<p align="center">
+  <a href="#top">
+    <b>↑ Voltar ao topo ↑</b>
+  </a>
+</p>

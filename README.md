@@ -241,7 +241,7 @@ O fluxo de login espelha o frontend do Despezzas:
 
 Defina `DESPEZZAS_SESSION_FILE=none` para desativar a persistência de sessão. Se todos os métodos de autenticação falharem, `despezzas_status` indicará que é preciso abrir a página de login ou configurar credenciais.
 
-Não passe sua senha como argumento de ferramenta MCP. Argumentos de ferramentas podem ficar visíveis ao modelo/cliente. Use `.env` ou a página local `/login`.
+Não passe sua senha como argumento de ferramenta. Argumentos podem ficar visíveis ao cliente. Use `.env` ou a página `/login`.
 
 ## 🖥 Configuração MCP Local
 

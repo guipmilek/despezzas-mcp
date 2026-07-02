@@ -103,7 +103,7 @@ npx wrangler secret delete DESPEZZAS_EMAIL
 npx wrangler secret delete DESPEZZAS_PASSWORD
 ```
 
-Cada usuário digita o próprio email e senha na tela de autorização OAuth. O Worker troca a senha por tokens do Firebase e guarda apenas a sessão criptografada no KV.
+Cada pessoa digita o próprio email e senha na tela de autorização OAuth. O Worker troca a senha por tokens do Firebase e guarda apenas a sessão criptografada no KV.
 
 ## Modo Conta Única
 

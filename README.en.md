@@ -4,12 +4,7 @@
     src="https://img.shields.io/badge/lang-en-gray?style=flat-square&amp;labelColor=202024"
     alt="lang-en"
   />
-  <a href="./README.md" title="Ler o README em português brasileiro">
-    <img
-      src="https://img.shields.io/badge/lang-pt--br-green?style=flat-square&amp;labelColor=202024"
-      alt="lang-pt-br"
-    />
-  </a>
+  <a href="./README.md" title="Ler o README em português brasileiro"><img src="https://img.shields.io/badge/lang-pt--br-green?style=flat-square&amp;labelColor=202024" alt="lang-pt-br" /></a>
 </p>
 
 <p align="center">
@@ -35,21 +30,8 @@
     src="https://img.shields.io/github/commit-activity/m/guipmilek/despezzas-mcp?style=flat-square&amp;color=black&amp;labelColor=202024"
     alt="Commit activity"
   />
-  <a
-    href="https://github.com/guipmilek/despezzas-mcp/commits/main"
-    title="View repository commits"
-  >
-    <img
-      src="https://img.shields.io/badge/last%20commit-today-4b0?style=flat-square&amp;labelColor=202024"
-      alt="Last commit"
-    />
-  </a>
-  <a href="./LICENSE" title="View project license">
-    <img
-      src="https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square&amp;labelColor=202024"
-      alt="Project license"
-    />
-  </a>
+  <a href="https://github.com/guipmilek/despezzas-mcp/commits/main" title="View repository commits"><img src="https://img.shields.io/badge/last%20commit-today-4b0?style=flat-square&amp;labelColor=202024" alt="Last commit" /></a>
+  <a href="./LICENSE" title="View project license"><img src="https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square&amp;labelColor=202024" alt="Project license" /></a>
   <img
     src="https://img.shields.io/badge/Node.js-%3E%3D20-233056?style=flat-square&amp;logo=node.js&amp;labelColor=202024"
     alt="Node.js >= 20"

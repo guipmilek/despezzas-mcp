@@ -10,8 +10,20 @@ Use these settings on every remote provider:
 MCP_TRANSPORT=http
 HOST=0.0.0.0
 MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
+```
+
+For public multi-user Cloudflare Workers deployments, also configure:
+
+```dotenv
+DESPEZZAS_SESSIONS=<Cloudflare KV binding>
+SESSION_ENCRYPTION_KEY=<long-random-secret>
+```
+
+For private single-account deployments, use:
+
+```dotenv
+MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
 ```
 
 Set `MCP_PUBLIC_BASE_URL=https://your-public-host` if OAuth discovery returns the wrong host or protocol behind the provider proxy. Otherwise the server can infer the public base URL from forwarded request headers.
@@ -83,10 +95,18 @@ Set secrets:
 
 ```powershell
 npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
-npx wrangler secret put MCP_OWNER_AUTH_CODE
-npx wrangler secret put DESPEZZAS_EMAIL
-npx wrangler secret put DESPEZZAS_PASSWORD
+npx wrangler secret put SESSION_ENCRYPTION_KEY
 ```
+
+Create and bind the KV namespace:
+
+```powershell
+npx wrangler kv namespace create DESPEZZAS_SESSIONS
+```
+
+Paste the generated namespace id into `wrangler.jsonc` under the `DESPEZZAS_SESSIONS` binding. Do not set global `DESPEZZAS_EMAIL` / `DESPEZZAS_PASSWORD` for multi-user mode; each user logs in with their own Despezzas account during ChatGPT OAuth.
+
+For private single-account mode instead, set `MCP_OWNER_AUTH_CODE`, `DESPEZZAS_EMAIL`, and `DESPEZZAS_PASSWORD` as secrets.
 
 Deploy:
 

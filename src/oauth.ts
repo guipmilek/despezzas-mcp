@@ -19,14 +19,16 @@ interface AuthorizationCode {
   codeChallengeMethod: "S256";
   scope: string;
   resource: string;
+  sessionId?: string;
   expiresAt: number;
 }
 
-interface AccessToken {
+export interface AccessToken {
   token: string;
   clientId: string;
   scope: string;
   resource: string;
+  sessionId?: string;
   expiresAt: number;
 }
 
@@ -35,6 +37,7 @@ interface AccessTokenClaims {
   clientId: string;
   scope: string;
   resource: string;
+  sessionId?: string;
   exp: number;
 }
 
@@ -53,6 +56,7 @@ interface AuthorizationCodeClaims {
   codeChallengeMethod: "S256";
   scope: string;
   resource: string;
+  sessionId?: string;
   exp: number;
 }
 
@@ -126,6 +130,7 @@ class OAuthStore {
         codeChallengeMethod: input.codeChallengeMethod,
         scope: input.scope,
         resource: input.resource,
+        sessionId: input.sessionId,
         exp: Math.floor(expiresAt / 1000),
       }),
       expiresAt,
@@ -155,6 +160,7 @@ class OAuthStore {
       codeChallengeMethod: claims.codeChallengeMethod,
       scope: claims.scope,
       resource: claims.resource,
+      sessionId: claims.sessionId,
       expiresAt: claims.exp * 1000,
     };
   }
@@ -166,6 +172,7 @@ class OAuthStore {
       clientId: input.clientId,
       scope: input.scope,
       resource: input.resource,
+      sessionId: input.sessionId,
       exp: Math.floor(expiresAt / 1000),
     };
 
@@ -197,6 +204,7 @@ class OAuthStore {
       clientId: claims.clientId,
       scope: claims.scope,
       resource: claims.resource,
+      sessionId: claims.sessionId,
       expiresAt: claims.exp * 1000,
     };
   }
@@ -320,6 +328,19 @@ export async function completeAuthorization(input: {
 }) {
   await authManager.loginWithPassword(input.email, input.password);
 
+  return createAuthorizationRedirect(input);
+}
+
+export function createAuthorizationRedirect(input: {
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  codeChallengeMethod: "S256";
+  scope: string;
+  resource: string;
+  state?: string;
+  sessionId?: string;
+}) {
   const code = oauthStore.createCode({
     clientId: input.clientId,
     redirectUri: input.redirectUri,
@@ -327,6 +348,7 @@ export async function completeAuthorization(input: {
     codeChallengeMethod: input.codeChallengeMethod,
     scope: input.scope,
     resource: input.resource,
+    sessionId: input.sessionId,
   });
 
   const redirect = new URL(input.redirectUri);
@@ -357,6 +379,7 @@ export function exchangeAuthorizationCode(body: Record<string, unknown>, req: Ht
     clientId,
     scope: stored.scope,
     resource,
+    sessionId: stored.sessionId,
   });
 
   return {
@@ -379,6 +402,7 @@ function isAccessTokenClaims(value: AccessTokenClaims | undefined): value is Acc
     typeof value.clientId === "string" &&
     typeof value.scope === "string" &&
     typeof value.resource === "string" &&
+    (value.sessionId === undefined || typeof value.sessionId === "string") &&
     typeof value.exp === "number"
   );
 }
@@ -392,6 +416,7 @@ function isAuthorizationCodeClaims(value: AuthorizationCodeClaims | undefined): 
     value.codeChallengeMethod === "S256" &&
     typeof value.scope === "string" &&
     typeof value.resource === "string" &&
+    (value.sessionId === undefined || typeof value.sessionId === "string") &&
     typeof value.exp === "number"
   );
 }

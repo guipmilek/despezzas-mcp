@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import type { AccessToken } from "./oauth.js";
 
 interface Env {
   DESPEZZAS_API_BASE_URL?: string;
@@ -8,6 +9,7 @@ interface Env {
   DESPEZZAS_FIREBASE_API_KEY?: string;
   DESPEZZAS_PASSWORD?: string;
   DESPEZZAS_SESSION_FILE?: string;
+  DESPEZZAS_SESSIONS?: KVNamespace;
   DESPEZZAS_TOKEN?: string;
   MCP_ALLOWED_HOSTS?: string;
   MCP_HTTP_BEARER_TOKEN?: string;
@@ -15,6 +17,7 @@ interface Env {
   MCP_OAUTH_TOKEN_SECRET?: string;
   MCP_OWNER_AUTH_CODE?: string;
   MCP_PUBLIC_BASE_URL?: string;
+  SESSION_ENCRYPTION_KEY?: string;
 }
 
 type FormBody = Record<string, string | undefined>;
@@ -38,26 +41,44 @@ app.use("*", async (c, next) => {
 
 app.get("/health", async (c) => {
   const { authManager } = await import("./auth.js");
+  const { cloudflareSessionsConfigured } = await import("./cloudflareSessions.js");
   const auth = await authManager.getStatus();
+  const multiUserConfigured = cloudflareSessionsConfigured(c.env);
   return c.json({
     ok: true,
     name: "despezzas-mcp",
     transport: "cloudflare-workers",
-    authConfigured: auth.hasManualToken || auth.hasEnvCredentials || auth.hasSession,
+    authMode: multiUserConfigured ? "multi-user" : "single-account",
+    authConfigured: multiUserConfigured || auth.hasManualToken || auth.hasEnvCredentials || auth.hasSession,
+    multiUserConfigured,
     auth,
     notes: [
       "Cloudflare Workers should run with DESPEZZAS_SESSION_FILE=none.",
       process.env.MCP_OAUTH_TOKEN_SECRET
         ? "MCP_OAUTH_TOKEN_SECRET is configured."
         : "Set MCP_OAUTH_TOKEN_SECRET as a Wrangler secret before connecting ChatGPT.",
-      process.env.MCP_OWNER_AUTH_CODE
-        ? "MCP_OWNER_AUTH_CODE is configured."
-        : "Set MCP_OWNER_AUTH_CODE as a Wrangler secret so only you can authorize ChatGPT.",
+      multiUserConfigured
+        ? "DESPEZZAS_SESSIONS KV and SESSION_ENCRYPTION_KEY are configured for per-user sessions."
+        : "Set DESPEZZAS_SESSIONS KV and SESSION_ENCRYPTION_KEY for multi-user ChatGPT connections.",
+      multiUserConfigured
+        ? "Each ChatGPT OAuth login stores an encrypted Despezzas session for that user."
+        : process.env.MCP_OWNER_AUTH_CODE
+          ? "MCP_OWNER_AUTH_CODE is configured for single-account mode."
+          : "Set MCP_OWNER_AUTH_CODE if you keep using single-account mode.",
     ],
   });
 });
 
 app.get("/auth/status", async (c) => {
+  const { cloudflareSessionsConfigured } = await import("./cloudflareSessions.js");
+  if (cloudflareSessionsConfigured(c.env)) {
+    return c.json({
+      authMode: "multi-user",
+      hasSessionStorage: true,
+      note: "Per-user auth status is available only inside an authorized MCP tool call.",
+    });
+  }
+
   const { authManager } = await import("./auth.js");
   return c.json(await authManager.getStatus());
 });
@@ -107,19 +128,24 @@ app.get("/oauth/authorize", async (c) => {
   const { config } = await import("./config.js");
   const { mcpResource, validateAuthorizeParams } = await import("./oauth.js");
   const { ownerAuthCodeConfigured } = await import("./ownerAuth.js");
+  const { cloudflareSessionsConfigured } = await import("./cloudflareSessions.js");
   const { renderLoginPage } = await import("./loginPage.js");
 
   try {
     const query = c.req.query();
     const params = validateAuthorizeParams(query);
+    const multiUserConfigured = cloudflareSessionsConfigured(c.env);
     return c.html(
       renderLoginPage({
         status: await authManager.getStatus(),
-        error: ownerAuthCodeConfigured() ? undefined : "Configure MCP_OWNER_AUTH_CODE before authorizing ChatGPT.",
+        error:
+          multiUserConfigured || ownerAuthCodeConfigured()
+            ? undefined
+            : "Configure DESPEZZAS_SESSIONS and SESSION_ENCRYPTION_KEY for multi-user mode, or MCP_OWNER_AUTH_CODE for private single-account mode.",
         email: String(query.login_hint ?? ""),
         action: "/oauth/authorize",
-        ownerCodeRequired: true,
-        credentialsOptional: Boolean(config.email && config.password),
+        ownerCodeRequired: !multiUserConfigured,
+        credentialsOptional: !multiUserConfigured && Boolean(config.email && config.password),
         hidden: {
           client_id: params.clientId,
           redirect_uri: params.redirectUri,
@@ -140,23 +166,17 @@ app.get("/oauth/authorize", async (c) => {
 app.post("/oauth/authorize", async (c) => {
   const body = await formBody(c.req.raw);
   const { config } = await import("./config.js");
-  const { completeAuthorization, mcpResource } = await import("./oauth.js");
+  const { createAuthorizationRedirect, completeAuthorization, mcpResource } = await import("./oauth.js");
+  const { createDespezzasSessionFromPassword } = await import("./auth.js");
+  const { cloudflareSessionsConfigured, createCloudflareSessionStore } = await import("./cloudflareSessions.js");
   const { requireOwnerAuthCode } = await import("./ownerAuth.js");
   const { renderLoginPage } = await import("./loginPage.js");
+  const multiUserConfigured = cloudflareSessionsConfigured(c.env);
 
   try {
-    requireOwnerAuthCode(body.owner_code);
-    const redirect = await completeAuthorization({
-      email: body.email || config.email || "",
-      password: body.password || config.password || "",
-      clientId: body.client_id ?? "",
-      redirectUri: body.redirect_uri ?? "",
-      codeChallenge: body.code_challenge ?? "",
-      codeChallengeMethod: "S256",
-      scope: body.scope ?? "despezzas:read despezzas:write",
-      resource: body.resource || mcpResource(requestLike(c.req.raw)),
-      state: body.state,
-    });
+    const redirect = multiUserConfigured
+      ? await completeMultiUserAuthorization(c.env, body, mcpResource(requestLike(c.req.raw)))
+      : await completeSingleAccountAuthorization(body, mcpResource(requestLike(c.req.raw)));
     return c.redirect(redirect, 302);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Authorization failed.";
@@ -165,8 +185,8 @@ app.post("/oauth/authorize", async (c) => {
         error: message,
         email: body.email ?? "",
         action: "/oauth/authorize",
-        ownerCodeRequired: true,
-        credentialsOptional: Boolean(config.email && config.password),
+        ownerCodeRequired: !multiUserConfigured,
+        credentialsOptional: !multiUserConfigured && Boolean(config.email && config.password),
         hidden: {
           client_id: body.client_id,
           redirect_uri: body.redirect_uri,
@@ -179,6 +199,36 @@ app.post("/oauth/authorize", async (c) => {
       }),
       401,
     );
+  }
+
+  async function completeMultiUserAuthorization(env: Env, input: FormBody, fallbackResource: string): Promise<string> {
+    const session = await createDespezzasSessionFromPassword(input.email ?? "", input.password ?? "");
+    const sessionId = await createCloudflareSessionStore(env).create(session);
+    return createAuthorizationRedirect({
+      clientId: input.client_id ?? "",
+      redirectUri: input.redirect_uri ?? "",
+      codeChallenge: input.code_challenge ?? "",
+      codeChallengeMethod: "S256",
+      scope: input.scope ?? "despezzas:read despezzas:write",
+      resource: input.resource || fallbackResource,
+      state: input.state,
+      sessionId,
+    });
+  }
+
+  async function completeSingleAccountAuthorization(input: FormBody, fallbackResource: string): Promise<string> {
+    requireOwnerAuthCode(input.owner_code);
+    return completeAuthorization({
+      email: input.email || config.email || "",
+      password: input.password || config.password || "",
+      clientId: input.client_id ?? "",
+      redirectUri: input.redirect_uri ?? "",
+      codeChallenge: input.code_challenge ?? "",
+      codeChallengeMethod: "S256",
+      scope: input.scope ?? "despezzas:read despezzas:write",
+      resource: input.resource || fallbackResource,
+      state: input.state,
+    });
   }
 });
 
@@ -195,15 +245,20 @@ app.post("/oauth/token", async (c) => {
 app.get("/login", async (c) => {
   const { authManager } = await import("./auth.js");
   const { config } = await import("./config.js");
+  const { cloudflareSessionsConfigured } = await import("./cloudflareSessions.js");
   const { ownerAuthCodeConfigured } = await import("./ownerAuth.js");
   const { renderLoginPage } = await import("./loginPage.js");
+  const multiUserConfigured = cloudflareSessionsConfigured(c.env);
   return c.html(
     renderLoginPage({
       status: await authManager.getStatus(),
-      error: ownerAuthCodeConfigured() ? undefined : "Configure MCP_OWNER_AUTH_CODE before using this public login page.",
+      error:
+        multiUserConfigured || ownerAuthCodeConfigured()
+          ? undefined
+          : "Configure DESPEZZAS_SESSIONS and SESSION_ENCRYPTION_KEY for multi-user mode, or MCP_OWNER_AUTH_CODE for private single-account mode.",
       email: String(c.req.query("email") ?? ""),
-      ownerCodeRequired: true,
-      credentialsOptional: Boolean(config.email && config.password),
+      ownerCodeRequired: !multiUserConfigured,
+      credentialsOptional: !multiUserConfigured && Boolean(config.email && config.password),
     }),
   );
 });
@@ -212,12 +267,20 @@ app.post("/login", async (c) => {
   const body = await formBody(c.req.raw);
   const { authManager } = await import("./auth.js");
   const { config } = await import("./config.js");
+  const { createDespezzasSessionFromPassword } = await import("./auth.js");
+  const { cloudflareSessionsConfigured, createCloudflareSessionStore } = await import("./cloudflareSessions.js");
   const { requireOwnerAuthCode } = await import("./ownerAuth.js");
   const { renderLoginPage, renderLoginSuccessPage } = await import("./loginPage.js");
+  const multiUserConfigured = cloudflareSessionsConfigured(c.env);
 
   try {
-    requireOwnerAuthCode(body.owner_code);
-    await authManager.loginWithPassword(body.email || config.email || "", body.password || config.password || "");
+    if (multiUserConfigured) {
+      const session = await createDespezzasSessionFromPassword(body.email ?? "", body.password ?? "");
+      await createCloudflareSessionStore(c.env).create(session);
+    } else {
+      requireOwnerAuthCode(body.owner_code);
+      await authManager.loginWithPassword(body.email || config.email || "", body.password || config.password || "");
+    }
     return c.html(renderLoginSuccessPage(await authManager.getStatus()));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Login failed.";
@@ -226,8 +289,8 @@ app.post("/login", async (c) => {
         status: await authManager.getStatus(),
         email: body.email ?? "",
         error: message,
-        ownerCodeRequired: true,
-        credentialsOptional: Boolean(config.email && config.password),
+        ownerCodeRequired: !multiUserConfigured,
+        credentialsOptional: !multiUserConfigured && Boolean(config.email && config.password),
       }),
       401,
     );
@@ -246,14 +309,14 @@ app.all("/mcp", async (c) => {
     return methodNotAllowed();
   }
 
-  const unauthorized = await unauthorizedMcpResponse(c.req.raw);
-  if (unauthorized) {
-    return unauthorized;
+  const authorized = await authorizeMcpRequest(c.req.raw);
+  if (authorized instanceof Response) {
+    return authorized;
   }
 
   const { createServer } = await import("./server.js");
   const transport = new WebStandardStreamableHTTPServerTransport();
-  const server = createServer();
+  const server = createServer(await clientForAccess(c.env, authorized));
 
   try {
     await server.connect(transport);
@@ -299,7 +362,7 @@ function applyWorkerEnv(env: Env, request: Request) {
   Object.assign(process.env, values);
 }
 
-async function unauthorizedMcpResponse(request: Request): Promise<Response | undefined> {
+async function authorizeMcpRequest(request: Request): Promise<AccessToken | undefined | Response> {
   const { config } = await import("./config.js");
   const { oauthStore, wwwAuthenticate } = await import("./oauth.js");
   const token = bearerToken(request);
@@ -308,8 +371,9 @@ async function unauthorizedMcpResponse(request: Request): Promise<Response | und
     return undefined;
   }
 
-  if (oauthStore.verifyAccessToken(token)) {
-    return undefined;
+  const access = oauthStore.verifyAccessToken(token);
+  if (access) {
+    return access;
   }
 
   return new Response(
@@ -326,6 +390,18 @@ async function unauthorizedMcpResponse(request: Request): Promise<Response | und
       },
     },
   );
+}
+
+async function clientForAccess(env: Env, access: AccessToken | undefined) {
+  const { DespezzasClient } = await import("./client.js");
+  if (!access?.sessionId) {
+    return new DespezzasClient();
+  }
+
+  const { CloudflareSessionAuthProvider, createCloudflareSessionStore } = await import("./cloudflareSessions.js");
+  return new DespezzasClient({
+    auth: new CloudflareSessionAuthProvider(createCloudflareSessionStore(env), access.sessionId),
+  });
 }
 
 async function closeMcp(

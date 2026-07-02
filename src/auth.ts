@@ -22,7 +22,7 @@ interface FirebaseRefreshResponse {
   project_id?: string;
 }
 
-interface AuthSession {
+export interface AuthSession {
   idToken: string;
   refreshToken?: string;
   expiresAt?: number;
@@ -38,6 +38,11 @@ export interface AuthStatus {
   canRefresh: boolean;
   expiresAt?: string;
   sessionFile?: string;
+}
+
+export interface DespezzasAuthProvider {
+  getToken(options?: { forceRefresh?: boolean }): Promise<string>;
+  getStatus(): Promise<AuthStatus>;
 }
 
 export class AuthRequiredError extends Error {
@@ -119,92 +124,28 @@ export class DespezzasAuthManager {
   }
 
   private async doLoginWithPassword(email: string, password: string): Promise<string> {
-    const response = await fetch(new URL("/v2/auth", config.apiBaseUrl), {
-      method: "POST",
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Content-Type": "application/json",
-        Origin: "https://despezzas.com",
-        Referer: "https://despezzas.com/",
-        lang: "pt-BR",
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = (await readResponse(response)) as DespezzasAuthResponse;
-    if (!response.ok) {
-      throw new Error(apiErrorMessage(response.status, data, "Despezzas login failed."));
-    }
-
-    if (!data.firebase_token || typeof data.firebase_token !== "string") {
-      throw new Error("Despezzas login did not return firebase_token.");
-    }
-
-    return this.exchangeCustomToken(data.firebase_token, data.user, email);
-  }
-
-  private async exchangeCustomToken(customToken: string, user?: unknown, email?: string): Promise<string> {
-    const response = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(config.firebaseApiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: customToken, returnSecureToken: true }),
-      },
-    );
-
-    const data = (await readResponse(response)) as FirebaseCustomTokenResponse;
-    if (!response.ok) {
-      throw new Error(apiErrorMessage(response.status, data, "Firebase custom token exchange failed."));
-    }
-
-    const session: AuthSession = {
-      idToken: data.idToken,
-      refreshToken: data.refreshToken,
-      expiresAt: Date.now() + Number(data.expiresIn) * 1000,
-      user,
-      email: email ?? data.email,
-      updatedAt: new Date().toISOString(),
-    };
-
+    const session = await createDespezzasSessionFromPassword(email, password);
     await this.saveSession(session);
-    return data.idToken;
+    return session.idToken;
   }
 
   private async refreshWithSession(refreshToken: string): Promise<string> {
-    const body = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    });
-
-    const response = await fetch(
-      `https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(config.firebaseApiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body,
-      },
-    );
-
-    const data = (await readResponse(response)) as FirebaseRefreshResponse;
-    if (!response.ok) {
+    try {
+      const session = await refreshDespezzasSession({ ...this.session, refreshToken } as AuthSession);
+      await this.saveSession(session);
+      return session.idToken;
+    } catch (error) {
       await this.clearSession();
       if (config.email && config.password) {
         return this.loginWithPassword(config.email, config.password);
       }
+
+      if (error instanceof AuthRequiredError) {
+        throw error;
+      }
+
       throw new AuthRequiredError("Saved Despezzas session expired. Open the MCP login page again.");
     }
-
-    const session: AuthSession = {
-      ...this.session,
-      idToken: data.id_token,
-      refreshToken: data.refresh_token,
-      expiresAt: Date.now() + Number(data.expires_in) * 1000,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.saveSession(session);
-    return data.id_token;
   }
 
   private async loadSession(): Promise<void> {
@@ -237,6 +178,101 @@ export class DespezzasAuthManager {
     await fs.mkdir(dirname(config.sessionFile), { recursive: true });
     await fs.writeFile(config.sessionFile, `${JSON.stringify(session, null, 2)}\n`, "utf8");
   }
+}
+
+export async function createDespezzasSessionFromPassword(email: string, password: string): Promise<AuthSession> {
+  if (!email || !password) {
+    throw new AuthRequiredError("Email and password are required.");
+  }
+
+  const response = await fetch(new URL("/v2/auth", config.apiBaseUrl), {
+    method: "POST",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Content-Type": "application/json",
+      Origin: "https://despezzas.com",
+      Referer: "https://despezzas.com/",
+      lang: "pt-BR",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = (await readResponse(response)) as DespezzasAuthResponse;
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(response.status, data, "Despezzas login failed."));
+  }
+
+  if (!data.firebase_token || typeof data.firebase_token !== "string") {
+    throw new Error("Despezzas login did not return firebase_token.");
+  }
+
+  return exchangeCustomTokenForSession(data.firebase_token, data.user, email);
+}
+
+export async function refreshDespezzasSession(session: AuthSession): Promise<AuthSession> {
+  if (!session.refreshToken) {
+    throw new AuthRequiredError("Saved Despezzas session has no refresh token.");
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: session.refreshToken,
+  });
+
+  const response = await fetch(
+    `https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(config.firebaseApiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    },
+  );
+
+  const data = (await readResponse(response)) as FirebaseRefreshResponse;
+  if (!response.ok) {
+    throw new AuthRequiredError("Saved Despezzas session expired. Open the MCP login page again.");
+  }
+
+  return {
+    ...session,
+    idToken: data.id_token,
+    refreshToken: data.refresh_token,
+    expiresAt: Date.now() + Number(data.expires_in) * 1000,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function authSessionExpiresAt(session: AuthSession): string | undefined {
+  return session.expiresAt ? new Date(session.expiresAt).toISOString() : expirationFromJwt(session.idToken);
+}
+
+export function isAuthSessionExpiringSoon(session: AuthSession): boolean {
+  return isExpiringSoon(session.expiresAt) || isJwtExpiringSoon(session.idToken);
+}
+
+async function exchangeCustomTokenForSession(customToken: string, user?: unknown, email?: string): Promise<AuthSession> {
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${encodeURIComponent(config.firebaseApiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: customToken, returnSecureToken: true }),
+    },
+  );
+
+  const data = (await readResponse(response)) as FirebaseCustomTokenResponse;
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(response.status, data, "Firebase custom token exchange failed."));
+  }
+
+  return {
+    idToken: data.idToken,
+    refreshToken: data.refreshToken,
+    expiresAt: Date.now() + Number(data.expiresIn) * 1000,
+    user,
+    email: email ?? data.email,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function dirname(filePath: string): string {

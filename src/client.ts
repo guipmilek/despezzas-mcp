@@ -1,4 +1,4 @@
-import { AuthRequiredError, authManager, type DespezzasAuthManager } from "./auth.js";
+import { AuthRequiredError, authManager, type DespezzasAuthProvider } from "./auth.js";
 import { config } from "./config.js";
 import type {
   AccountPayload,
@@ -29,13 +29,13 @@ export class DespezzasApiError extends Error {
 export interface DespezzasClientOptions {
   baseUrl?: string;
   token?: string;
-  auth?: DespezzasAuthManager;
+  auth?: DespezzasAuthProvider;
 }
 
 export class DespezzasClient {
   private readonly baseUrl: string;
   private readonly token: string | undefined;
-  private readonly auth: DespezzasAuthManager;
+  private readonly auth: DespezzasAuthProvider;
 
   constructor(options: DespezzasClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? config.apiBaseUrl).replace(/\/$/, "");

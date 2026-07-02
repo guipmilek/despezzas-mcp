@@ -168,7 +168,7 @@ Included deployment files:
 - `Dockerfile` for Koyeb, Cloud Run, Fly.io, Northflank, Railway Docker deploys, or a VM.
 - `horizon_proxy.py` and `requirements.txt` for Prefect Horizon as a FastMCP proxy in front of a deployed Node backend.
 
-For Cloudflare Workers, set `MCP_OAUTH_TOKEN_SECRET`, `MCP_OWNER_AUTH_CODE`, `DESPEZZAS_EMAIL`, and `DESPEZZAS_PASSWORD` as Wrangler secrets and deploy with `npm run deploy:cloudflare`. For remote long-running/container hosting, set `MCP_TRANSPORT=http`, `HOST=0.0.0.0`, a stable `MCP_OAUTH_TOKEN_SECRET`, and `MCP_OWNER_AUTH_CODE`. For stateless or scale-to-zero hosting, use env credentials with `DESPEZZAS_SESSION_FILE=none`. For Horizon, deploy the Node backend elsewhere and point `horizon_proxy.py:mcp` at that backend.
+For Cloudflare Workers multi-user mode, bind the `DESPEZZAS_SESSIONS` KV namespace, set `MCP_OAUTH_TOKEN_SECRET` and `SESSION_ENCRYPTION_KEY` as Wrangler secrets, and deploy with `npm run deploy:cloudflare`. For private single-account deployments, set `MCP_OWNER_AUTH_CODE` plus your Despezzas credentials. For Horizon, deploy the Node backend elsewhere and point `horizon_proxy.py:mcp` at that backend.
 
 ## HAR Inspection
 

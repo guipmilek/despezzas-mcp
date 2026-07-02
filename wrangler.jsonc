@@ -8,6 +8,15 @@
   "observability": {
     "enabled": true
   },
+  // For multi-user mode, create a KV namespace with:
+  // npx wrangler kv namespace create DESPEZZAS_SESSIONS
+  // Then uncomment this block and paste the generated id.
+  // "kv_namespaces": [
+  //   {
+  //     "binding": "DESPEZZAS_SESSIONS",
+  //     "id": "paste-kv-namespace-id-here"
+  //   }
+  // ],
   "vars": {
     "MCP_TRANSPORT": "http",
     "HOST": "0.0.0.0",

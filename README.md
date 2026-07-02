@@ -2,12 +2,12 @@
 <p align="right">
   <a href="./README.en.md" title="Read the README in English">
     <img
-      src="https://img.shields.io/badge/lang-en-gray?style=flat-square&labelColor=202024"
+      src="https://img.shields.io/badge/lang-en-gray?style=flat-square&amp;labelColor=202024"
       alt="lang-en"
     />
   </a>
   <img
-    src="https://img.shields.io/badge/lang-pt--br-green?style=flat-square&labelColor=202024"
+    src="https://img.shields.io/badge/lang-pt--br-green?style=flat-square&amp;labelColor=202024"
     alt="lang-pt-br"
   />
 </p>
@@ -24,15 +24,15 @@
 
 <p align="center">
   <img
-    src="https://img.shields.io/github/languages/count/guipmilek/despezzas-mcp?color=%2304D361&labelColor=202024"
+    src="https://img.shields.io/github/languages/count/guipmilek/despezzas-mcp?style=flat-square&amp;color=%2304D361&amp;labelColor=202024"
     alt="Repository language count"
   />
   <img
-    src="https://img.shields.io/github/repo-size/guipmilek/despezzas-mcp?labelColor=202024"
+    src="https://img.shields.io/github/repo-size/guipmilek/despezzas-mcp?style=flat-square&amp;labelColor=202024"
     alt="Repository size"
   />
   <img
-    src="https://img.shields.io/github/commit-activity/m/guipmilek/despezzas-mcp?color=black&labelColor=202024"
+    src="https://img.shields.io/github/commit-activity/m/guipmilek/despezzas-mcp?style=flat-square&amp;color=black&amp;labelColor=202024"
     alt="Commit activity"
   />
   <a
@@ -40,18 +40,18 @@
     title="Ver commits do repositório"
   >
     <img
-      src="https://img.shields.io/github/last-commit/guipmilek/despezzas-mcp?labelColor=202024"
+      src="https://img.shields.io/github/last-commit/guipmilek/despezzas-mcp?style=flat-square&amp;labelColor=202024"
       alt="Last commit"
     />
   </a>
   <a href="./LICENSE" title="Ver licença do projeto">
     <img
-      src="https://img.shields.io/badge/license-MIT-brightgreen?labelColor=202024"
+      src="https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square&amp;labelColor=202024"
       alt="Project license"
     />
   </a>
   <img
-    src="https://img.shields.io/badge/Node.js-%3E%3D20-233056?logo=node.js&labelColor=202024"
+    src="https://img.shields.io/badge/Node.js-%3E%3D20-233056?style=flat-square&amp;logo=node.js&amp;labelColor=202024"
     alt="Node.js >= 20"
   />
 </p>
@@ -62,7 +62,7 @@
 
 <details>
   <summary>
-    <h2>📒 Table of Contents</h2>
+    <h2>📒 Sumário</h2>
   </summary>
 
 - [📍 Visão Geral](#-visão-geral)
@@ -315,21 +315,12 @@ O fluxo de login espelha o frontend do Despezzas:
 3. Usa o `idToken` do Firebase como `Authorization: Bearer ...` em `api.despezzas.com`.
 4. Salva o refresh token do Firebase em `%USERPROFILE%\.despezzas-mcp\session.json` por padrão.
 
-```mermaid
-sequenceDiagram
-  participant User as Usuário
-  participant MCP as Despezzas MCP
-  participant API as API Despezzas
-  participant Firebase
-  participant Client as Cliente MCP/ChatGPT
-
-  User->>MCP: Email/senha via /login
-  MCP->>API: POST /v2/auth
-  API-->>MCP: firebase_token
-  MCP->>Firebase: signInWithCustomToken
-  Firebase-->>MCP: idToken + refreshToken
-  MCP-->>Client: Token OAuth MCP opaco
-```
+| Etapa | Origem | Destino | Resultado |
+| --- | --- | --- | --- |
+| 1 | Usuário | `/login` do MCP | Envia email e senha para autorização local. |
+| 2 | MCP | API Despezzas | Troca credenciais por `firebase_token`. |
+| 3 | MCP | Firebase | Troca `firebase_token` por `idToken` e `refreshToken`. |
+| 4 | MCP | Cliente MCP/ChatGPT | Entrega um token OAuth MCP opaco. |
 
 Defina `DESPEZZAS_SESSION_FILE=none` para desativar a persistência de sessão. Se todos os métodos de autenticação falharem, `despezzas_status` indicará que você deve abrir a página de login ou configurar credenciais.
 

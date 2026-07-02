@@ -59,10 +59,40 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
         color: #0a0a0a;
         --background: #ffffff;
         --foreground: #0a0a0a;
+        --card: #ffffff;
         --muted-foreground: #6b7485;
         --border: #e7eaee;
+        --input: #e7eaee;
+        --ring: #0a0a0a;
         --primary: #171717;
         --primary-foreground: #fafafa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --background: #0b0f13;
+          --foreground: #fafafa;
+          --card: #161b22;
+          --muted-foreground: #9ca3b0;
+          --border: #2a323c;
+          --input: #2a323c;
+          --ring: #d4d4d4;
+          --primary: #fafafa;
+          --primary-foreground: #171717;
+        }
+      }
+      :root.dark,
+      html.dark {
+        color-scheme: dark;
+        --background: #0b0f13;
+        --foreground: #fafafa;
+        --card: #161b22;
+        --muted-foreground: #9ca3b0;
+        --border: #2a323c;
+        --input: #2a323c;
+        --ring: #d4d4d4;
+        --primary: #fafafa;
+        --primary-foreground: #171717;
       }
       * { box-sizing: border-box; }
       body {
@@ -90,32 +120,6 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
       dl {
         margin: 0;
       }
-      a {
-        color: inherit;
-      }
-      .back-button {
-        position: fixed;
-        top: 28px;
-        left: 20px;
-        width: 34px;
-        height: 34px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        background: #ffffff;
-        color: var(--foreground);
-        text-decoration: none;
-        transition: background-color 150ms ease, color 150ms ease;
-      }
-      .back-button:hover {
-        background: #f6f7f9;
-      }
-      .back-button svg {
-        width: 18px;
-        height: 18px;
-      }
       .shell {
         position: relative;
         width: 100%;
@@ -127,7 +131,7 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
         max-width: 464px;
         border: 1px solid var(--border);
         border-radius: 12px;
-        background: #ffffff;
+        background: var(--card);
         padding: 24px 16px;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         display: flex;
@@ -153,6 +157,7 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
         align-items: center;
         justify-content: center;
         border: 1px solid var(--border);
+        color: var(--foreground);
         border-radius: 8px;
         padding: 8px;
         margin-bottom: 24px;
@@ -208,7 +213,7 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
         border-radius: 9999px;
         background: transparent;
         color: var(--foreground);
-        box-shadow: 0 0 0 2px var(--border);
+        box-shadow: 0 0 0 2px var(--input);
         padding: 4px 20px;
         font-size: 14px;
         line-height: 20px;
@@ -219,27 +224,7 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
         color: var(--muted-foreground);
       }
       input:not([type="checkbox"]):focus {
-        box-shadow: 0 0 0 2px var(--foreground), 0 0 0 5px rgba(10, 10, 10, 0.12);
-      }
-      .remember {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        margin-bottom: 16px;
-      }
-      .remember input {
-        width: 13px;
-        height: 13px;
-        margin: 0 8px 0 0;
-        accent-color: var(--primary);
-      }
-      .remember label {
-        display: block;
-        color: var(--muted-foreground);
-        font-size: 14px;
-        font-weight: 400;
-        line-height: 20px;
-        margin: 0;
+        box-shadow: 0 0 0 2px var(--ring), 0 0 0 5px color-mix(in srgb, var(--ring) 18%, transparent);
       }
       button {
         width: 100%;
@@ -252,7 +237,7 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
         align-items: center;
         justify-content: center;
         padding: 0;
-        margin: 0 0 20px;
+        margin: 8px 0 0;
         font-size: 16px;
         font-weight: 400;
         line-height: 24px;
@@ -261,30 +246,6 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
       }
       button:hover {
         opacity: 0.9;
-      }
-      .auth-links {
-        width: 100%;
-        color: var(--muted-foreground);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        font-size: 14px;
-        line-height: 20px;
-        text-align: center;
-      }
-      .auth-links a {
-        color: var(--foreground);
-        text-decoration: underline;
-        cursor: pointer;
-      }
-      .create-link {
-        font-weight: 700;
-      }
-      .forgot-link {
-        display: block;
-        font-weight: 600;
       }
       .alert {
         border-radius: 8px;
@@ -336,8 +297,7 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
         .shell {
           max-width: 448px;
         }
-        .subtitle,
-        .auth-links {
+        .subtitle {
           font-size: 16px;
           line-height: 24px;
         }
@@ -351,22 +311,17 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
     </style>
   </head>
   <body>
-    <a class="back-button" href="https://despezzas.com/home" aria-label="Voltar" onclick="if (history.length > 1) { history.back(); return false; }">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </a>
     <div class="shell">
       <main>
         <div class="content">
           <div class="intro">
             <span class="mark" aria-hidden="true">
               <svg width="26" height="16" viewBox="0 0 26 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M17.913 12.5887L25.9405 3.14688V0H0.413039V3.44094H8.1834L0 12.8828V16H26V12.5887H17.913ZM5.31832 12.5887L13.0958 3.44094H20.7793L12.8506 12.5887H5.31832Z" fill="#1F1E29" />
+                <path d="M17.913 12.5887L25.9405 3.14688V0H0.413039V3.44094H8.1834L0 12.8828V16H26V12.5887H17.913ZM5.31832 12.5887L13.0958 3.44094H20.7793L12.8506 12.5887H5.31832Z" fill="currentColor" />
               </svg>
             </span>
             <h1>Entrar no Despezzas</h1>
-            <p class="subtitle">Bem-vindo de volta! efetue o login para continuar.</p>
+            <p class="subtitle">Entre para autorizar o MCP do Despezzas a acessar sua conta.</p>
           </div>
           ${error}
           ${success}
@@ -382,17 +337,9 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
                 <label for="password">Senha</label>
                 <input id="password" name="password" type="password" placeholder="Insira sua senha" autocomplete="current-password"${credentialRequired} />
               </div>
-              <div class="remember">
-                <input id="rememberMe" name="rememberMe" type="checkbox" autocomplete="off" />
-                <label for="rememberMe">Lembre-se de mim</label>
-              </div>
-              <button type="submit">Entrar</button>
+              <button type="submit">Entrar e autorizar</button>
             </div>
           </form>
-          <div class="auth-links">
-            <p>Não tem uma conta? <a class="create-link" href="https://despezzas.com/auth/register">Crie uma</a></p>
-            <a class="forgot-link" href="https://despezzas.com/auth/forgot-password">Esqueceu a senha?</a>
-          </div>
           ${mcpDetails}
         </div>
       </main>

@@ -9,7 +9,7 @@ Este é um MVP construído a partir do tráfego observado no Despezzas Web e da 
 - Ferramentas de leitura: perfil, acessos de perfil, configuração pessoal, contas, bancos, cartões de crédito, categorias, subcategorias, busca compacta de transações, visão geral, resumo financeiro e diagnóstico de exportação/campos.
 - Ferramentas de pré-visualização para transações: preparam payloads de criação/edição/exclusão sem chamar o Despezzas.
 - Ferramentas de escrita: trocar/criar/editar/excluir/sair de perfil, criar/editar/excluir conta, cartão de crédito, transação, transferência, duplicar transação e alternar pago.
-- Autenticação: token bearer copiado, login por email/senha via variáveis de ambiente ou página local HTTP de login.
+- Autenticação: token bearer copiado, login por email/senha via variáveis de ambiente ou página HTTP de autorização MCP.
 - Renovação de token: sessões Firebase salvas são reutilizadas e renovadas automaticamente.
 - Trava de segurança: toda ferramenta de escrita/destrutiva exige `confirm: true`.
 - Transportes: `stdio` local, Streamable HTTP em Node no `/mcp` e Streamable HTTP em Cloudflare Workers no `/mcp`.
@@ -51,6 +51,8 @@ Opções preferenciais:
 1. Execute em modo HTTP e abra `http://127.0.0.1:8787/login`.
 2. Defina `DESPEZZAS_EMAIL` e `DESPEZZAS_PASSWORD` no `.env`.
 3. Defina `DESPEZZAS_TOKEN` manualmente a partir do DevTools do navegador.
+
+A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: email, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha continuam pertencendo ao app/site oficial do Despezzas.
 
 O fluxo de login espelha o frontend do Despezzas:
 
@@ -101,13 +103,13 @@ Verificação de saúde:
 Invoke-RestMethod http://127.0.0.1:8787/health
 ```
 
-Abra a página local de login:
+Abra a página local de autorização:
 
 ```powershell
 Start-Process http://127.0.0.1:8787/login
 ```
 
-Se você expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso real na frente dele. A página `/login` aceita sua senha do Despezzas.
+Se você expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso real na frente dele. A página `/login` aceita sua senha do Despezzas para autorizar este MCP.
 
 ## Conexão OAuth Com ChatGPT
 
@@ -140,7 +142,7 @@ O servidor expõe os endpoints de descoberta esperados pelo ChatGPT:
 - `GET|POST /oauth/authorize`
 - `POST /oauth/token`
 
-Essa camada OAuth protege a conexão MCP. Durante a autorização, a página de login troca email/senha do Despezzas por uma sessão Despezzas/Firebase no lado do servidor. O ChatGPT recebe apenas um token de acesso MCP opaco.
+Essa camada OAuth protege a conexão MCP. Durante a autorização, a página de login troca email/senha do Despezzas por uma sessão Despezzas/Firebase no lado do servidor. O botão final é `Entrar e autorizar`, e o ChatGPT recebe apenas um token de acesso MCP opaco.
 
 `MCP_HTTP_BEARER_TOKEN` continua útil para scripts que não usam ChatGPT, mas, quando ele é omitido, o endpoint `/mcp` exige um token de acesso OAuth válido.
 

@@ -75,12 +75,12 @@
 
 ## 📍 Visão Geral
 
-Servidor MCP pessoal para dados financeiros do [Despezzas](https://despezzas.com/). Ele expõe ferramentas para clientes MCP compatíveis com ChatGPT listarem contas, cartões, categorias, pesquisarem transações, resumirem gastos e executarem operações de escrita com proteções.
+Servidor MCP para dados financeiros do [Despezzas](https://despezzas.com/). Expõe ferramentas para clientes MCP (como ChatGPT) listarem contas, cartões e categorias, pesquisarem transações, verem resumos e fazerem operações de escrita com proteções.
 
-Este é um projeto open-source sob a licença MIT, construído a partir do tráfego observado no Despezzas Web e da inspeção do bundle frontend. O Despezzas não parece publicar uma API pública, então mantenha isto como uma integração pessoal não oficial e espere que detalhes de endpoints possam mudar.
+Projeto open-source (MIT), construído analisando as requisições de rede e o código do frontend do Despezzas. O Despezzas não publica uma API oficial — trate isto como integração não oficial. Endpoints e campos podem mudar sem aviso.
 
 > [!WARNING]
-> O Despezzas não publica uma API pública oficial para esta integração. Endpoints, campos e fluxos de login podem mudar sem aviso.
+> Integração não oficial. Endpoints e fluxos de login podem mudar sem aviso.
 
 > [!IMPORTANT]
 > Este MCP pode ler e alterar dados financeiros pessoais. Nunca faça commit de `.env`, tokens, senhas, sessões, HARs não mascarados ou respostas reais da API.
@@ -103,7 +103,7 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-Depois configure uma das opções de autenticação em `.env`: `DESPEZZAS_TOKEN` ou `DESPEZZAS_EMAIL` / `DESPEZZAS_PASSWORD` / `DESPEZZAS_FIREBASE_API_KEY`.
+Depois configure a autenticação no `.env` com `DESPEZZAS_TOKEN` ou `DESPEZZAS_EMAIL` + `DESPEZZAS_PASSWORD` + `DESPEZZAS_FIREBASE_API_KEY`.
 
 ## ✨ Funcionalidades
 
@@ -119,7 +119,7 @@ Depois configure uma das opções de autenticação em `.env`: `DESPEZZAS_TOKEN`
 
 🛡 **Trava de segurança:** toda ferramenta de escrita/destrutiva exige `confirm: true`.
 
-🔌 **Transportes:** `stdio` local, Streamable HTTP em Node no `/mcp` e Streamable HTTP em Cloudflare Workers no `/mcp`.
+🔌 **Transportes:** `stdio` local e Streamable HTTP (Node ou Cloudflare Workers).
 
 🔎 **Depuração:** inspetor de HAR e monitor de requisições no DevTools para capturar endpoints futuros.
 
@@ -221,7 +221,7 @@ Opções preferenciais:
 
 1. Execute em modo HTTP e abra `http://127.0.0.1:8787/login`.
 2. Defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_FIREBASE_API_KEY` (chave pública — veja [.env.example](.env.example)) no `.env`.
-3. Defina `DESPEZZAS_TOKEN` manualmente a partir do DevTools do navegador.
+3. Copie o `DESPEZZAS_TOKEN` pelas DevTools do navegador.
 
 A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: email, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha continuam pertencendo ao app/site oficial do Despezzas.
 
@@ -239,7 +239,7 @@ O fluxo de login espelha o frontend do Despezzas:
 | 3 | MCP | Firebase | Troca `firebase_token` por `idToken` e `refreshToken`. |
 | 4 | MCP | Cliente MCP/ChatGPT | Entrega um token OAuth MCP opaco. |
 
-Defina `DESPEZZAS_SESSION_FILE=none` para desativar a persistência de sessão. Se todos os métodos de autenticação falharem, `despezzas_status` indicará que você deve abrir a página de login ou configurar credenciais.
+Defina `DESPEZZAS_SESSION_FILE=none` para desativar a persistência de sessão. Se todos os métodos de autenticação falharem, `despezzas_status` indicará que é preciso abrir a página de login ou configurar credenciais.
 
 Não passe sua senha como argumento de ferramenta MCP. Argumentos de ferramentas podem ficar visíveis ao modelo/cliente. Use `.env` ou a página local `/login`.
 
@@ -254,7 +254,7 @@ Para um cliente MCP local via stdio:
       "command": "node",
       "args": ["C:\\caminho\\para\\despezzas-mcp\\dist\\index.js"],
       "env": {
-        "DESPEZZAS_TOKEN": "cole-o-token-aqui"
+        "DESPEZZAS_TOKEN": "seu-token-aqui"
       }
     }
   }
@@ -287,7 +287,7 @@ Abra a página local de autorização:
 Start-Process http://127.0.0.1:8787/login
 ```
 
-Se você expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso real na frente dele. A página `/login` aceita sua senha do Despezzas para autorizar este MCP.
+Se expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso na frente. A página `/login` aceita sua senha do Despezzas para autorizar este MCP.
 
 ## 🤖 Conexão OAuth Com ChatGPT
 
@@ -322,7 +322,7 @@ O servidor expõe os endpoints de descoberta esperados pelo ChatGPT:
 
 Essa camada OAuth protege a conexão MCP. Durante a autorização, a página de login troca email/senha do Despezzas por uma sessão Despezzas/Firebase no lado do servidor. O botão final é `Entrar e autorizar`, e o ChatGPT recebe apenas um token de acesso MCP opaco.
 
-`MCP_HTTP_BEARER_TOKEN` continua útil para scripts que não usam ChatGPT, mas, quando ele é omitido, o endpoint `/mcp` exige um token de acesso OAuth válido.
+`MCP_HTTP_BEARER_TOKEN` ainda é útil para scripts fora do ChatGPT. Quando omitido, o `/mcp` exige um token OAuth válido.
 
 <details>
   <summary>Detalhes de descoberta OAuth e links oficiais</summary>
@@ -340,7 +340,7 @@ Apps/conectores personalizados do ChatGPT exigem um endpoint MCP remoto em HTTPS
 
 ## ☁️ Deploy Remoto
 
-Caminho recomendado primeiro: [Cloudflare Workers](docs/cloudflare-workers.md). Alternativa gratuita em container: [Koyeb Free](docs/koyeb.md).
+Caminho recomendado: [Cloudflare Workers](docs/cloudflare-workers.md). Alternativa em container: [Koyeb Free](docs/koyeb.md).
 
 Veja [docs/deployment.md](docs/deployment.md) para a comparação mais ampla de hospedagens gratuitas e notas de configuração por provedor.
 
@@ -349,7 +349,7 @@ Veja [docs/deployment.md](docs/deployment.md) para a comparação mais ampla de 
 | **Cloudflare Workers** | MCP remoto recomendado | `wrangler.jsonc`, `src/cloudflare.ts` | Melhor caminho para OAuth com ChatGPT. |
 | **Docker/Koyeb** | Container simples | `Dockerfile` | Bom para uso pessoal; pode escalar para zero. |
 | **Vercel** | Função serverless Express | `vercel.json`, `api/index.js` | Sem estado; use env vars para credenciais. |
-| **Render/Railway** | Demos e deploy GitHub rápido | `render.yaml`, `railway.json` | Serviços gratuitos podem dormir ou ter limites. |
+| **Render/Railway** | Demos e deploys rápidos pelo GitHub | `render.yaml`, `railway.json` | Planos gratuitos podem hibernar ou ter limites. |
 | **Prefect Horizon** | Gateway MCP gerenciado | `horizon_proxy.py` | Proxy FastMCP para backend Node publicado. |
 
 Arquivos de deploy incluídos:
@@ -377,7 +377,7 @@ O script imprime apenas chamadas para `api.despezzas.com` e mascara segredos com
 - Metas, limites de gastos, relatórios, investimentos, gerenciamento de conexão Open Finance e ações do chat de IA.
 - Qualquer caso de borda de perfil ainda não coberto por `despezzas_list_profiles` / `despezzas_switch_profile` / ferramentas de gerenciamento de perfil.
 
-Se exportar um HAR for trabalhoso, cole [scripts/request-monitor-devtools.js](scripts/request-monitor-devtools.js) no DevTools em `despezzas.com`, execute a ação e depois rode:
+Se preferir não exportar um HAR, cole [scripts/request-monitor-devtools.js](scripts/request-monitor-devtools.js) no DevTools em `despezzas.com`, execute a ação e depois rode:
 
 ```js
 window.__despezzasMcpMonitor.download()
@@ -387,7 +387,7 @@ Ele exporta um relatório JSON mascarado das chamadas `fetch`/XHR para `api.desp
 
 ## 📚 MCPs de Referência
 
-O estilo de implementação foi comparado com:
+Este projeto tomou como referência:
 
 - [SamuelMoraesF/mcp-organizze](https://github.com/SamuelMoraesF/mcp-organizze)
 - [silviorodrigues/organizze-mcp](https://github.com/silviorodrigues/organizze-mcp)
@@ -400,7 +400,7 @@ Este repositório mantém uma estrutura parecida, mas usa endpoints nativos do D
 - [ ] Expandir cobertura de endpoints de relatórios, metas e investimentos.
 - [ ] Gerar documentação automática do catálogo de ferramentas MCP.
 - [ ] Adicionar screenshots do fluxo de conexão no ChatGPT.
-- [ ] Criar exemplos prontos para `Claude Desktop`, ChatGPT e clientes MCP locais.
+- [ ] Criar exemplos de configuração para Claude Desktop, ChatGPT e clientes MCP.
 - [ ] Documentar mais casos de borda de perfis compartilhados.
 
 ## 🤝 Contribuição

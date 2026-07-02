@@ -1,6 +1,6 @@
 # Notas de Deploy
 
-Este servidor MCP precisa de uma URL HTTPS pública, acesso HTTPS de saída para Despezzas e Firebase, e variáveis de ambiente secretas. Ele não combina bem com hospedagem estática. Pode rodar em serviços Node de longa duração, containers, funções Express serverless ou atrás de um proxy Python FastMCP no Prefect Horizon quando o estado OAuth é assinado com um `MCP_OAUTH_TOKEN_SECRET` estável.
+Este servidor MCP precisa de URL HTTPS pública e acesso de saída para Despezzas e Firebase. Não funciona em hospedagem estática. Roda em Node (serviço tradicional, container, serverless) ou atrás de um proxy FastMCP no Prefect Horizon, desde que o `MCP_OAUTH_TOKEN_SECRET` seja estável.
 
 ## Configurações Obrigatórias de Runtime
 
@@ -26,7 +26,7 @@ Para deploys privados de conta única, use:
 MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 ```
 
-Defina `MCP_PUBLIC_BASE_URL=https://seu-host-publico` se a descoberta OAuth retornar host ou protocolo incorreto atrás do proxy do provedor. Caso contrário, o servidor consegue inferir a URL pública a partir dos cabeçalhos encaminhados da requisição.
+Defina `MCP_PUBLIC_BASE_URL=https://seu-host-publico` se a descoberta OAuth retornar host ou protocolo incorreto atrás do proxy do provedor. Caso contrário, o servidor infere a URL pública pelos cabeçalhos da requisição.
 
 Para autenticação no Despezzas, escolha uma opção:
 
@@ -51,22 +51,22 @@ Não faça commit de credenciais do Despezzas. Adicione-as apenas na tela de seg
 ## Melhores Opções Gratuitas Para Este MCP
 
 1. Cloudflare Workers Free
-   Melhor primeira escolha para este repositório agora. Oferece HTTPS, sem suspensão de container, um plano gratuito generoso para uso pessoal e orientação oficial de MCP remoto via Streamable HTTP. Este repositório usa `src/cloudflare.ts` com o transporte MCP web-standard bruto, então não precisa de Durable Object para as ferramentas sem estado atuais. Veja [cloudflare-workers.md](cloudflare-workers.md).
+   Melhor escolha atual. Oferece HTTPS, sem hibernação de container, plano gratuito generoso e suporte oficial para MCP remoto via Streamable HTTP. O worker usa o transporte web-standard diretamente, sem Durable Objects — as ferramentas atuais são stateless. Veja [cloudflare-workers.md](cloudflare-workers.md).
 
 2. Koyeb Free Instance
-   Melhor alternativa gratuita em container. Roda o Dockerfile incluído a partir do GitHub e fornece um domínio HTTPS público. O ponto de atenção é a escala para zero depois de 1 hora ociosa e a ausência de volumes persistentes na Free Instance; use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD`/`DESPEZZAS_FIREBASE_API_KEY` e `DESPEZZAS_SESSION_FILE=none`. Veja [koyeb.md](koyeb.md).
+   Melhor alternativa gratuita em container. Roda o Dockerfile incluído a partir do GitHub e fornece um domínio HTTPS público. A Free Instance escala para zero após 1 hora ociosa e não oferece volumes persistentes; use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD`/`DESPEZZAS_FIREBASE_API_KEY` e `DESPEZZAS_SESSION_FILE=none`. Veja [koyeb.md](koyeb.md).
 
 3. Oracle Cloud Always Free VM
-   Melhor opção "realmente gratuita e estável" se você aceita gerenciar uma VM pequena. Oferece disco persistente e processo sempre ativo, então o modelo de login/sessão do MCP funciona de forma mais natural. Ponto de atenção: mais trabalho de operação, SSH, firewall, Docker/systemd e configuração de TLS.
+   Melhor opção "realmente gratuita e estável" se você aceita gerenciar uma VM pequena. Oferece disco persistente e processo sempre ativo, então o modelo de login/sessão do MCP funciona de forma mais natural. Contrapartida: mais trabalho com SSH, firewall, Docker/systemd e TLS.
 
 4. Vercel Hobby
-   Boa opção gratuita baseada em Git, com orientação específica da Vercel para Functions, metadados OAuth e hosts MCP. Este repositório usa um adaptador de função Express em vez do exemplo com `mcp-handler`, porque o servidor já existe em `@modelcontextprotocol/sdk`.
+   Boa opção gratuita baseada em Git. A Vercel tem documentação específica para Functions, metadados OAuth e hosts MCP. Este repositório usa um adaptador Express em vez do `mcp-handler` dos exemplos oficiais.
 
 5. Prefect Horizon
-   Melhor opção de gateway nativo para MCP se você quer hospedagem gerenciada, autenticação, controle de acesso, registro, Inspector e testes com ChatMCP. O Horizon espera um ponto de entrada Python FastMCP, então este repositório inclui um proxy que encaminha para um backend Node já publicado em Koyeb, Vercel, Render, Cloudflare ou similar.
+   Melhor gateway nativo MCP para quem quer hospedagem gerenciada com autenticação, controle de acesso, logs, Inspector e ChatMCP. O Horizon espera um ponto de entrada Python FastMCP, então este repositório inclui um proxy que encaminha para um backend Node já publicado em Koyeb, Vercel, Render, Cloudflare ou similar.
 
 6. Render Free Web Service
-   Caminho GitHub-para-URL mais simples e bom para testar MVP. O ponto de atenção é que serviços web gratuitos entram em suspensão depois de 15 minutos e perdem alterações no sistema de arquivos local em reinícios/suspensões. Use o `render.yaml` incluído, defina credenciais Despezzas como segredos e mantenha `DESPEZZAS_SESSION_FILE=none`.
+   Caminho GitHub-para-URL mais simples e bom para testar MVP. Serviços web gratuitos hibernam após 15 minutos e perdem alterações no sistema de arquivos em reinícios. Use o `render.yaml` incluído, defina credenciais Despezzas como segredos e mantenha `DESPEZZAS_SESSION_FILE=none`.
 
 7. Railway Free
    Experiência de desenvolvimento muito fluida e permite anexar um volume pequeno, mas o plano gratuito é baseado em créditos de uso. Bom para testes e uso pessoal de curta duração; menos ideal como serviço sempre ligado e gratuito para sempre.
@@ -76,13 +76,13 @@ Não faça commit de credenciais do Despezzas. Adicione-as apenas na tela de seg
 
 Google Cloud Run continua tecnicamente suportado pelo Dockerfile, mas não é o caminho atual.
 
-Discussões da comunidade também apontam para AWS, Supabase, Zapier e plataformas MCP especializadas. Vale acompanhar essas opções, mas este repositório não está adaptado hoje para builders MCP low-code.
+Discussões da comunidade apontam também AWS, Supabase, Zapier e plataformas MCP especializadas. Vale acompanhar, mas o repositório atual não foi feito para builders low-code.
 
-Evite Netlify/hosts estáticos para este repositório como está. O servidor atual é um serviço MCP Express com rotas OAuth e não pode ser servido como arquivos estáticos.
+Evite Netlify e hosts estáticos. O servidor é um serviço Express com rotas OAuth — não funciona como arquivos estáticos.
 
 ## Cloudflare Workers
 
-Cloudflare é o alvo de deploy preferido para este MCP.
+Cloudflare Workers é o deploy recomendado.
 
 Suporte incluído:
 
@@ -98,8 +98,6 @@ npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
 npx wrangler secret put SESSION_ENCRYPTION_KEY
 npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY
 ```
-
-
 
 > **Dica:** `DESPEZZAS_FIREBASE_API_KEY` é uma chave pública do Firebase Web — o próprio frontend do Despezzas a expõe no código-fonte. Para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey`.
 Crie e associe o namespace KV:

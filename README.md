@@ -28,7 +28,7 @@
     alt="Repository language count"
   />
   <img
-    src="https://img.shields.io/github/repo-size/guipmilek/despezzas-mcp?style=flat-square&amp;labelColor=202024"
+    src="https://img.shields.io/github/repo-size/guipmilek/despezzas-mcp?cacheSeconds=3600&amp;labelColor=202024"
     alt="Repository size"
   />
   <img
@@ -40,7 +40,7 @@
     title="Ver commits do repositório"
   >
     <img
-      src="https://img.shields.io/github/last-commit/guipmilek/despezzas-mcp?style=flat-square&amp;labelColor=202024"
+      src="https://img.shields.io/github/last-commit/guipmilek/despezzas-mcp/main?labelColor=202024"
       alt="Last commit"
     />
   </a>

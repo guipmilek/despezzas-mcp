@@ -28,6 +28,7 @@ Run this before reading large files or editing anything:
    - Documentation only
 6. State the owner files before editing.
 7. State the verification command before editing.
+8. **Task Checklist Initialization**: When creating `task.md` checklist at task startup, always include the checkpoint check as the first item, and formatting/verification, handoff reflection/instruction validation, and final checkpoint creation as the final items (following `docs/agent-task-template.md`).
 
 ## Edit Ownership
 

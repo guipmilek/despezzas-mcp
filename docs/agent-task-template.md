@@ -33,6 +33,14 @@ Before editing, state:
 Stop and checkpoint if:
 - The same tool error happens 3 times.
 - More than 30 tool calls happen without a concrete edit or verified finding.
-- Full verification fails because of files outside the touched scope.
+- Full lint/build fails because of files outside the touched scope.
 - Sensitive API/HAR/session data cannot be safely redacted.
+
+Task list (initialize in task.md):
+- [ ] Read existing session checkpoint (.agents/session-checkpoint.md)
+- [ ] <task sub-item 1>
+- [ ] <task sub-item 2>
+- [ ] Run formatting (npm run format) and verification (npm run verify)
+- [ ] Review initial demand, what was accomplished, how it was done, and validate agent instructions/files
+- [ ] Run session checkpoint (npm run session:checkpoint)
 ```

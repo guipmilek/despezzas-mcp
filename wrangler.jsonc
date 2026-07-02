@@ -6,16 +6,16 @@
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   "version_metadata": {
-    "binding": "VERSION_METADATA"
+    "binding": "VERSION_METADATA",
   },
   "kv_namespaces": [
     {
       "binding": "DESPEZZAS_SESSIONS",
-      "id": "2211d888425e4a63a9223fc5bc10bc46"
-    }
+      "id": "2211d888425e4a63a9223fc5bc10bc46",
+    },
   ],
   "vars": {
     "MCP_TRANSPORT": "http",
@@ -23,6 +23,6 @@
     "PORT": "8787",
     "DESPEZZAS_SESSION_FILE": "none",
     "MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS": "3600",
-    "MCP_OAUTH_REFRESH_TOKEN_TTL_SECONDS": "7776000"
-  }
+    "MCP_OAUTH_REFRESH_TOKEN_TTL_SECONDS": "7776000",
+  },
 }

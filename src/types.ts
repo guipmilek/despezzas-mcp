@@ -1,11 +1,5 @@
 export type JsonObject = Record<string, unknown>;
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export type SortField = "date" | "title" | "amount";
 export type SortOrder = "asc" | "desc";
@@ -15,14 +9,7 @@ export type ProfileAccessType = "pf" | "pj" | "family" | "investments";
 export type ExtraProfileAccessType = "pj" | "family" | "investments";
 export type ProfileInviteRole = "editor" | "viewer";
 export type Frequency =
-  | "DAILY"
-  | "WEEKLY"
-  | "BIWEEKLY"
-  | "MONTHLY"
-  | "BIMONTHLY"
-  | "QUARTERLY"
-  | "SEMIANNUAL"
-  | "YEARLY";
+  "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "BIMONTHLY" | "QUARTERLY" | "SEMIANNUAL" | "YEARLY";
 export type TransactionKind = "FIXED" | "RECURRENT" | "PARCELLED";
 
 export interface TransactionFilters {

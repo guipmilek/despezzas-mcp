@@ -1,0 +1,10 @@
+dist/
+node_modules/
+.wrangler/
+coverage/
+.despezzas-mcp/
+package-lock.json
+*.har
+*.har.json
+*.log
+

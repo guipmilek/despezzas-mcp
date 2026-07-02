@@ -164,20 +164,22 @@ describe("diagnósticos de busca de transações", () => {
     ];
     const returned = transactions.slice(0, 2);
 
-    assert.deepEqual(__test.transactionSearchDiagnostics(transactions, returned, 2, { order_by: "date", order: "desc" }), {
-      requested_limit: 2,
-      api_returned_count: 3,
-      returned_count_after_limit: 2,
-      truncated_by_mcp_limit: true,
-      sort_check: {
-        field: "date",
-        order: "desc",
-        ok: true,
-        checked_pairs: 1,
+    assert.deepEqual(
+      __test.transactionSearchDiagnostics(transactions, returned, 2, { order_by: "date", order: "desc" }),
+      {
+        requested_limit: 2,
+        api_returned_count: 3,
+        returned_count_after_limit: 2,
+        truncated_by_mcp_limit: true,
+        sort_check: {
+          field: "date",
+          order: "desc",
+          ok: true,
+          checked_pairs: 1,
+        },
+        note: "O Despezzas atualmente retorna uma única lista correspondente para esses filtros; este MCP aplica limit localmente e informa has_more/truncated_by_mcp_limit quando o limite local oculta linhas.",
       },
-      note:
-        "O Despezzas atualmente retorna uma única lista correspondente para esses filtros; este MCP aplica limit localmente e informa has_more/truncated_by_mcp_limit quando o limite local oculta linhas.",
-    });
+    );
   });
 
   it("detecta divergências de ordenação", () => {

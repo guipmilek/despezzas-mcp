@@ -88,9 +88,7 @@ Payloads de criação/edição usam:
 {
   "name": "Família Silva",
   "type": "family",
-  "invites": [
-    { "email": "partner@example.com", "role": "editor" }
-  ]
+  "invites": [{ "email": "partner@example.com", "role": "editor" }]
 }
 ```
 

@@ -46,8 +46,14 @@
     if (typeof text !== "string") return text;
     return text
       .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [mascarado]")
-      .replace(/("(?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)"\s*:\s*)"[^"]*"/gi, '$1"[mascarado]"')
-      .replace(/((?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)=)[^&\s]*/gi, "$1[mascarado]");
+      .replace(
+        /("(?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)"\s*:\s*)"[^"]*"/gi,
+        '$1"[mascarado]"',
+      )
+      .replace(
+        /((?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)=)[^&\s]*/gi,
+        "$1[mascarado]",
+      );
   }
 
   function redactHeaders(headers) {
@@ -126,7 +132,8 @@
 
     if (shouldRecord) {
       try {
-        requestBody = init && "body" in init ? await bodyToText(init.body) : request ? await request.clone().text() : undefined;
+        requestBody =
+          init && "body" in init ? await bodyToText(init.body) : request ? await request.clone().text() : undefined;
       } catch (error) {
         requestBody = `[corpo da requisição ilegível: ${error instanceof Error ? error.message : String(error)}]`;
       }
@@ -203,7 +210,10 @@
       this.addEventListener("loadend", () => {
         let responseBody;
         try {
-          responseBody = this.responseType && this.responseType !== "text" ? `[tipoResposta:${this.responseType}]` : this.responseText;
+          responseBody =
+            this.responseType && this.responseType !== "text"
+              ? `[tipoResposta:${this.responseType}]`
+              : this.responseText;
         } catch (error) {
           responseBody = `[corpo da resposta ilegível: ${error instanceof Error ? error.message : String(error)}]`;
         }

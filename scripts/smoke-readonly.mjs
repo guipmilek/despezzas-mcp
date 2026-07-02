@@ -18,28 +18,31 @@ function profileName(context) {
 async function main() {
   const auth = await client.authStatus();
   if (!auth.hasManualToken && !auth.hasEnvCredentials && !auth.hasSession) {
-    throw new Error("Nenhuma autenticação do Despezzas configurada. Faça login localmente ou configure credenciais de ambiente antes da verificação rápida.");
+    throw new Error(
+      "Nenhuma autenticação do Despezzas configurada. Faça login localmente ou configure credenciais de ambiente antes da verificação rápida.",
+    );
   }
 
-  const [profile, access, accounts, cards, categories, subcategories, transactions, exportableCount] = await Promise.all([
-    client.getProfile(),
-    client.listProfileAccess(),
-    client.getAccounts(),
-    client.getCreditCards(),
-    client.getCategories(true),
-    client.getSubcategories(true),
-    client.getTransactions({
-      account_type: "bank_account",
-      date_start: range.date_start,
-      date_end: range.date_end,
-      order_by: "date",
-      order: "desc",
-    }),
-    client.countExportableTransactions({
-      date_start: range.date_start,
-      date_end: range.date_end,
-    }),
-  ]);
+  const [profile, access, accounts, cards, categories, subcategories, transactions, exportableCount] =
+    await Promise.all([
+      client.getProfile(),
+      client.listProfileAccess(),
+      client.getAccounts(),
+      client.getCreditCards(),
+      client.getCategories(true),
+      client.getSubcategories(true),
+      client.getTransactions({
+        account_type: "bank_account",
+        date_start: range.date_start,
+        date_end: range.date_end,
+        order_by: "date",
+        order: "desc",
+      }),
+      client.countExportableTransactions({
+        date_start: range.date_start,
+        date_end: range.date_end,
+      }),
+    ]);
 
   const output = {
     ok: true,

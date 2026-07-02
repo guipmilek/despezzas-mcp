@@ -565,10 +565,7 @@ async function clientForAccess(env: Env, access: AccessToken | undefined) {
   });
 }
 
-async function closeMcp(
-  server: { close(): Promise<void> },
-  transport: { close(): Promise<void> },
-) {
+async function closeMcp(server: { close(): Promise<void> }, transport: { close(): Promise<void> }) {
   await Promise.allSettled([transport.close(), server.close()]);
 }
 
@@ -666,11 +663,7 @@ async function formBody(request: Request): Promise<FormBody> {
 }
 
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function methodNotAllowed() {

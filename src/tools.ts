@@ -322,7 +322,8 @@ function registerTool<InputArgs extends undefined | ZodRawShapeCompat | AnySchem
 }
 
 export function registerTools(server: McpServer, client = new DespezzasClient()) {
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_status",
     {
       title: "Status do Despezzas MCP",
@@ -345,7 +346,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_profile",
     {
       title: "Obter Perfil do Despezzas",
@@ -361,7 +363,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_list_profiles",
     {
       title: "Listar Perfis do Despezzas",
@@ -382,7 +385,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_switch_profile",
     {
       title: "Trocar Perfil Ativo",
@@ -416,7 +420,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_create_profile",
     {
       title: "Criar Perfil Compartilhado",
@@ -424,7 +429,9 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         "Operação de escrita. Cria um dos três perfis extras do Despezzas (PJ, família ou investimentos). Exige confirm: true.",
       inputSchema: {
         name: z.string().min(1).max(60),
-        type: extraProfileTypeSchema.describe("Tipo de perfil extra do Despezzas. Normalmente só é permitido um de cada tipo."),
+        type: extraProfileTypeSchema.describe(
+          "Tipo de perfil extra do Despezzas. Normalmente só é permitido um de cada tipo.",
+        ),
         invites: profileInvitesSchema.describe("Lista opcional de convites. Os papéis são editor ou viewer."),
         confirm: z.boolean().optional(),
       },
@@ -451,7 +458,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_update_profile_access",
     {
       title: "Editar Perfil Compartilhado",
@@ -477,7 +485,10 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       });
 
       if (Object.keys(payload).length === 0) {
-        return errorResponse(new Error("Informe pelo menos um dos campos name, type ou invites."), "editar perfil compartilhado");
+        return errorResponse(
+          new Error("Informe pelo menos um dos campos name, type ou invites."),
+          "editar perfil compartilhado",
+        );
       }
 
       try {
@@ -488,11 +499,13 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_delete_profile",
     {
       title: "Excluir Perfil Compartilhado",
-      description: "Operação de escrita destrutiva. Exclui um perfil compartilhado de sua propriedade. Exige confirm: true.",
+      description:
+        "Operação de escrita destrutiva. Exclui um perfil compartilhado de sua propriedade. Exige confirm: true.",
       inputSchema: {
         id: idSchema.describe("ID do perfil compartilhado em despezzas_list_profiles."),
         confirm: z.boolean().optional(),
@@ -512,7 +525,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_leave_profile",
     {
       title: "Sair de Perfil Compartilhado",
@@ -535,11 +549,13 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_personal_config",
     {
       title: "Obter Configuração Pessoal",
-      description: "Busca preferências de visibilidade financeira, como inclusão de transferências, contas ou investimentos.",
+      description:
+        "Busca preferências de visibilidade financeira, como inclusão de transferências, contas ou investimentos.",
       inputSchema: {},
     },
     async () => {
@@ -551,11 +567,13 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_list_accounts",
     {
       title: "Listar Contas",
-      description: "Lista contas bancárias/dinheiro do Despezzas. Use primeiro para descobrir IDs de conta para filtros de transação.",
+      description:
+        "Lista contas bancárias/dinheiro do Despezzas. Use primeiro para descobrir IDs de conta para filtros de transação.",
       inputSchema: {},
     },
     async () => {
@@ -568,7 +586,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_list_banks",
     {
       title: "Listar Bancos/Logos de Conta",
@@ -584,14 +603,18 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_create_account",
     {
       title: "Criar Conta Manual",
       description: "Operação de escrita. Cria uma conta manual no Despezzas. Exige confirm: true.",
       inputSchema: {
         name: z.string().min(1),
-        logo: z.string().min(1).describe("URL do logo ou valor de logo de banco do Despezzas vindo de despezzas_list_banks."),
+        logo: z
+          .string()
+          .min(1)
+          .describe("URL do logo ou valor de logo de banco do Despezzas vindo de despezzas_list_banks."),
         initial_balance_cents: z.number().int().optional(),
         include_total_balance: z.boolean().default(true),
         confirm: z.boolean().optional(),
@@ -616,7 +639,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_update_account",
     {
       title: "Editar Conta",
@@ -644,7 +668,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_delete_account",
     {
       title: "Excluir Conta",
@@ -668,7 +693,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_list_credit_cards",
     {
       title: "Listar Cartões de Crédito",
@@ -677,7 +703,10 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
     async () => {
       try {
-        const [credit_cards, profile_context] = await Promise.all([client.getCreditCards(), safeProfileContext(client)]);
+        const [credit_cards, profile_context] = await Promise.all([
+          client.getCreditCards(),
+          safeProfileContext(client),
+        ]);
         return jsonResponse(withProfileAwareCollection("credit_cards", credit_cards, profile_context));
       } catch (error) {
         return errorResponse(error, "listar cartões de crédito");
@@ -685,7 +714,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_create_credit_card",
     {
       title: "Criar Cartão de Crédito",
@@ -696,7 +726,10 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         limit_cents: z.number().int().optional(),
         available_limit_cents: z.number().int().optional(),
         is_unlimited: z.boolean().optional(),
-        expiring_date: z.string().optional().describe("Campo de dia/mês de vencimento como o Despezzas espera, geralmente uma string de dia."),
+        expiring_date: z
+          .string()
+          .optional()
+          .describe("Campo de dia/mês de vencimento como o Despezzas espera, geralmente uma string de dia."),
         closing_date: z.string().optional().describe("String com o dia de fechamento."),
         account_id: idSchema.optional(),
         confirm: z.boolean().optional(),
@@ -720,7 +753,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_update_credit_card",
     {
       title: "Editar Cartão de Crédito",
@@ -756,7 +790,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_delete_credit_card",
     {
       title: "Excluir Cartão de Crédito",
@@ -780,7 +815,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_list_categories",
     {
       title: "Listar Categorias",
@@ -798,11 +834,13 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_list_subcategories",
     {
       title: "Listar Subcategorias",
-      description: "Lista subcategorias padrão e, opcionalmente, subcategorias criadas pelo usuário no Despezzas. Use category_id no resultado para vinculá-las às categorias.",
+      description:
+        "Lista subcategorias padrão e, opcionalmente, subcategorias criadas pelo usuário no Despezzas. Use category_id no resultado para vinculá-las às categorias.",
       inputSchema: {
         include_user: z.boolean().default(true),
       },
@@ -816,7 +854,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_search_transactions",
     {
       title: "Buscar Transações",
@@ -837,7 +876,10 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         order_by: z.enum(["date", "title", "amount"]).default("date"),
         order: z.enum(["asc", "desc"]).default("desc"),
         limit: z.number().int().min(1).max(500).default(100),
-        include_raw: z.boolean().default(false).describe("Retorna objetos completos de transação do Despezzas em vez de linhas compactas."),
+        include_raw: z
+          .boolean()
+          .default(false)
+          .describe("Retorna objetos completos de transação do Despezzas em vez de linhas compactas."),
       },
       outputSchema: transactionSearchOutputSchema,
     },
@@ -871,7 +913,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_transaction_overview",
     {
       title: "Visão Geral de Transações",
@@ -889,7 +932,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_finance_summary",
     {
       title: "Resumo Financeiro",
@@ -931,7 +975,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_prepare_create_transaction",
     {
       title: "Preparar Criação de Transação",
@@ -954,7 +999,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_create_transaction",
     {
       title: "Criar Transação",
@@ -999,7 +1045,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_prepare_update_transaction",
     {
       title: "Preparar Edição de Transação",
@@ -1014,7 +1061,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_update_transaction",
     {
       title: "Editar Transação",
@@ -1053,20 +1101,28 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_batch_update_transactions",
     {
       title: "Editar Transações em Lote",
       description:
-        "Operação de escrita. Pré-visualiza e depois edita várias transações do Despezzas com uma chamada confirm:true. Chame uma vez sem confirm para inspecionar os payloads; repita com confirm:true apenas depois de verificar cada id e payload.",
+        "Operação de escrita. Pré-visualiza e depois edita várias transações do Despezzas com uma chamada confirm:true. Exige confirm: true. Chame uma vez sem confirm para inspecionar os payloads; repita com confirm:true apenas depois de verificar cada id e payload.",
       inputSchema: {
         updates: z
           .array(transactionBatchUpdateItemInputSchema)
           .min(1)
           .max(50)
-          .describe("Edições de transação. Cada item usa os mesmos campos de despezzas_update_transaction, incluindo id."),
+          .describe(
+            "Edições de transação. Cada item usa os mesmos campos de despezzas_update_transaction, incluindo id.",
+          ),
         confirm: z.boolean().optional(),
-        stop_on_error: z.boolean().default(true).describe("Para após o primeiro erro de API. A validação sempre roda para todos os itens antes de qualquer escrita."),
+        stop_on_error: z
+          .boolean()
+          .default(true)
+          .describe(
+            "Para após o primeiro erro de API. A validação sempre roda para todos os itens antes de qualquer escrita.",
+          ),
       },
       outputSchema: batchUpdateTransactionOutputSchema,
       annotations: { destructiveHint: true },
@@ -1146,7 +1202,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_prepare_delete_transaction",
     {
       title: "Preparar Exclusão de Transação",
@@ -1171,7 +1228,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_delete_transaction",
     {
       title: "Excluir Transação",
@@ -1197,7 +1255,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_duplicate_transaction",
     {
       title: "Duplicar Transação",
@@ -1220,7 +1279,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_toggle_transaction_paid",
     {
       title: "Alternar Pagamento da Transação",
@@ -1244,7 +1304,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_create_transfer",
     {
       title: "Criar Transferência",
@@ -1274,7 +1335,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_export_transactions",
     {
       title: "Exportar Transações",
@@ -1321,7 +1383,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  registerTool(server,
+  registerTool(
+    server,
     "despezzas_raw_api",
     {
       title: "Chamada Bruta à API Despezzas",
@@ -1516,7 +1579,9 @@ function buildTransactionUpdatePayload(
   });
 }
 
-async function captureApiResult<T>(operation: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+async function captureApiResult<T>(
+  operation: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
   try {
     return { ok: true, value: await operation() };
   } catch (error) {
@@ -1568,8 +1633,7 @@ function transactionSearchDiagnostics(
     returned_count_after_limit: returnedTransactions.length,
     truncated_by_mcp_limit: transactions.length > limit,
     sort_check: verifySort(returnedTransactions, filters.order_by, filters.order),
-    note:
-      "O Despezzas atualmente retorna uma única lista correspondente para esses filtros; este MCP aplica limit localmente e informa has_more/truncated_by_mcp_limit quando o limite local oculta linhas.",
+    note: "O Despezzas atualmente retorna uma única lista correspondente para esses filtros; este MCP aplica limit localmente e informa has_more/truncated_by_mcp_limit quando o limite local oculta linhas.",
   };
 }
 
@@ -1646,7 +1710,11 @@ function summarizeFields(transactions: unknown[]) {
   };
 }
 
-function collectFields(value: Record<string, unknown>, fields: Map<string, { count: number; types: Set<string> }>, prefix = "") {
+function collectFields(
+  value: Record<string, unknown>,
+  fields: Map<string, { count: number; types: Set<string> }>,
+  prefix = "",
+) {
   for (const [key, child] of Object.entries(value)) {
     const path = prefix ? `${prefix}.${key}` : key;
     const existing = fields.get(path) ?? { count: 0, types: new Set<string>() };
@@ -1792,7 +1860,11 @@ function withProfileAwareCollection(
   };
 }
 
-function emptyProfileWarning(resource: string, count: number, profileContext: ProfileContextResult): string | undefined {
+function emptyProfileWarning(
+  resource: string,
+  count: number,
+  profileContext: ProfileContextResult,
+): string | undefined {
   if (count > 0 || !("active_profile" in profileContext) || profileContext.active_profile.id === null) {
     return undefined;
   }
@@ -1833,7 +1905,9 @@ function validateCreateProfile(access: JsonObject, type: ExtraProfileAccessType)
 
   if (extraProfiles.length >= MAX_EXTRA_PROFILES) {
     return errorResponse(
-      new Error(`O Despezzas permite no máximo ${MAX_EXTRA_PROFILES} perfis extras. Exclua ou edite um perfil existente em vez disso.`),
+      new Error(
+        `O Despezzas permite no máximo ${MAX_EXTRA_PROFILES} perfis extras. Exclua ou edite um perfil existente em vez disso.`,
+      ),
       "criar perfil compartilhado",
     );
   }

@@ -27,13 +27,14 @@ export function renderLoginPage(options: LoginPageOptions = {}): string {
     : "";
   const error = options.error ? `<p class="alert alert-error">${escapeHtml(options.error)}</p>` : "";
   const success = options.success ? `<p class="alert alert-success">${escapeHtml(options.success)}</p>` : "";
-  const authDetails = options.status && options.success
-    ? `<dl class="status">
+  const authDetails =
+    options.status && options.success
+      ? `<dl class="status">
         <div><dt>Sessão</dt><dd>${options.status.hasSession ? "Salva" : "Ausente"}</dd></div>
         <div><dt>Refresh</dt><dd>${options.status.canRefresh ? "Disponível" : "Indisponível"}</dd></div>
         <div><dt>Expira em</dt><dd>${escapeHtml(options.status.expiresAt ?? "Desconhecido")}</dd></div>
       </dl>`
-    : "";
+      : "";
   const logout =
     options.status?.hasSession && options.success ? `<a class="logout" href="/logout">Sair desta sessão MCP</a>` : "";
   const mcpDetails = authDetails || logout ? `<div class="mcp-details">${authDetails}${logout}</div>` : "";

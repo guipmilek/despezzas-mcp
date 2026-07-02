@@ -120,7 +120,9 @@ export class DespezzasAuthManager {
       hasEnvCredentials: Boolean(config.email && config.password),
       hasSession: Boolean(this.session?.idToken),
       canRefresh: Boolean(config.firebaseApiKey && (this.session?.refreshToken || (config.email && config.password))),
-      expiresAt: this.session?.expiresAt ? new Date(this.session.expiresAt).toISOString() : expirationFromJwt(config.token),
+      expiresAt: this.session?.expiresAt
+        ? new Date(this.session.expiresAt).toISOString()
+        : expirationFromJwt(config.token),
       sessionFile: config.sessionFile,
     };
   }
@@ -345,7 +347,9 @@ function jwtExpirationMs(token: string): number | undefined {
   if (!payload) return undefined;
 
   try {
-    const decoded = JSON.parse(Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")) as {
+    const decoded = JSON.parse(
+      Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"),
+    ) as {
       exp?: unknown;
     };
     return typeof decoded.exp === "number" ? decoded.exp * 1000 : undefined;

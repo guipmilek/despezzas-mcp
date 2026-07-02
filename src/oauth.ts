@@ -115,11 +115,7 @@ class OAuthStore {
     }
 
     const signedClient = verifyEnvelope<RegisteredClientClaims>("client", clientId);
-    if (
-      signedClient?.v === 1 &&
-      Array.isArray(signedClient.redirectUris) &&
-      typeof signedClient.iat === "number"
-    ) {
+    if (signedClient?.v === 1 && Array.isArray(signedClient.redirectUris) && typeof signedClient.iat === "number") {
       return {
         clientId,
         redirectUris: signedClient.redirectUris.filter((value): value is string => typeof value === "string"),

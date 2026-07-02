@@ -23,6 +23,8 @@ This project was largely AI-assisted, or "vibecoded": most implementation work w
 
 ## Important Files
 
+- [AGENTS.md](AGENTS.md): mandatory AI-agent workflow, safety rules, and verification guidance.
+- [PROJECT_PATHS.md](PROJECT_PATHS.md): canonical local paths and sensitive/generated path notes.
 - [README.md](README.md): main Portuguese user documentation.
 - [README.en.md](README.en.md): English user documentation.
 - [CONTRIBUTING.md](CONTRIBUTING.md): contribution rules and safety notes.
@@ -41,6 +43,9 @@ This project was largely AI-assisted, or "vibecoded": most implementation work w
 - [src/response.ts](src/response.ts): MCP JSON/error responses and confirmation guard.
 - [src/types.ts](src/types.ts): shared TypeScript payload types.
 - [test](test): Node test suite.
+- [docs/agent-playbook.md](docs/agent-playbook.md): AI-agent preflight, ownership, verification, and stop rules.
+- [docs/agent-task-template.md](docs/agent-task-template.md): reusable prompt template for AI-agent tasks.
+- [docs/agent-architecture-map.md](docs/agent-architecture-map.md): source ownership map and change checklists.
 - [docs/cloudflare-workers.md](docs/cloudflare-workers.md): Cloudflare Workers deployment.
 - [docs/deployment.md](docs/deployment.md): deployment options.
 - [docs/chatgpt-app-setup.md](docs/chatgpt-app-setup.md): ChatGPT app/connector setup.
@@ -51,9 +56,14 @@ Use these from the repository root:
 
 ```powershell
 npm install
+npm run check:repo-safety
+npm run check:mcp-tools
+npm run format:check
+npm run lint
 npm run build
 npm run typecheck
 npm test
+npm run verify
 ```
 
 Development:
@@ -78,6 +88,7 @@ npm run smoke:readonly
 ```
 
 `npm run smoke:readonly` requires working Despezzas authentication and calls only read-only endpoints.
+`npm run verify` includes `format:check`; run `npm run format` before verification when changing formatted files.
 
 ## Environment Variables
 
@@ -143,8 +154,10 @@ Write or destructive tools must keep requiring `confirm: true`. Transaction writ
 ## Agent Guidelines
 
 - Keep changes small and reviewable because this integration touches financial data and undocumented APIs.
+- Read `AGENTS.md` and `docs/agent-playbook.md` before non-trivial changes.
 - Preserve the `confirm: true` safety requirement for every write or destructive operation.
 - Add focused tests for new tool payload validation, dangerous write paths, and ambiguous transaction/account/card behavior.
+- Keep the MCP tool catalog synchronized with `src/tools.ts`; `npm run check:mcp-tools` validates `llms.txt` and documented `despezzas_*` references.
 - Prefer existing helpers in `src/response.ts`, `src/client.ts`, `src/auth.ts`, and `src/tools.ts` over introducing parallel patterns.
 - Use integer cents for money values. Example: `12345` means `R$123.45`.
 - Use `YYYY-MM-DD` dates for tool inputs.

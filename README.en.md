@@ -70,6 +70,7 @@
 - [🗺 Roadmap](#-roadmap)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
+
 </details>
 
 <!-- ===== PROJECT INFOS ===== -->
@@ -92,14 +93,14 @@ This project was largely AI-assisted, or "vibecoded": most implementation work w
 
 AI agents working in this repository should use [`llms.txt`](llms.txt) as their starting context. It summarizes the architecture, key files, commands, MCP tools, safety rules, and deployment notes.
 
-| Item | Value |
-| --- | --- |
-| **Status** | Functional MVP for personal use |
-| **API** | Unofficial integration with Despezzas endpoints |
-| **Runtime** | Node.js `>=20` |
-| **Transports** | `stdio`, Node HTTP, Cloudflare Workers |
-| **Authentication** | Bearer token, email/password, MCP OAuth |
-| **Recommended deploy** | Cloudflare Workers |
+| Item                   | Value                                           |
+| ---------------------- | ----------------------------------------------- |
+| **Status**             | Functional MVP for personal use                 |
+| **API**                | Unofficial integration with Despezzas endpoints |
+| **Runtime**            | Node.js `>=20`                                  |
+| **Transports**         | `stdio`, Node HTTP, Cloudflare Workers          |
+| **Authentication**     | Bearer token, email/password, MCP OAuth         |
+| **Recommended deploy** | Cloudflare Workers                              |
 
 ## ⚡ Quick Start
 
@@ -143,14 +144,14 @@ For transaction writes, use the prepare tools first:
 
 ## 🧰 Tool Catalog
 
-| Group | Examples | Writes? | Note |
-| --- | --- | --- | --- |
-| **Status and profile** | `despezzas_status`, `despezzas_profile`, `despezzas_list_profiles` | Partial | Switching/creating/deleting profiles requires `confirm: true`. |
-| **Accounts and cards** | `despezzas_list_accounts`, `despezzas_list_credit_cards`, `despezzas_create_account` | Partial | Writes validate IDs and confirmation. |
-| **Categories** | `despezzas_list_categories`, `despezzas_list_subcategories` | No | Use before creating/updating transactions. |
-| **Transactions** | `despezzas_search_transactions`, `despezzas_create_transaction`, `despezzas_update_transaction` | Partial | Creation requires destination, category, or `allow_uncategorized`. |
-| **Preview** | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction` | No | Recommended path before any write. |
-| **Diagnostics** | `despezzas_export_fields_diagnostics`, `despezzas_raw_request` | Partial | Use carefully; responses are redacted when possible. |
+| Group                  | Examples                                                                                        | Writes? | Note                                                               |
+| ---------------------- | ----------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------ |
+| **Status and profile** | `despezzas_status`, `despezzas_profile`, `despezzas_list_profiles`                              | Partial | Switching/creating/deleting profiles requires `confirm: true`.     |
+| **Accounts and cards** | `despezzas_list_accounts`, `despezzas_list_credit_cards`, `despezzas_create_account`            | Partial | Writes validate IDs and confirmation.                              |
+| **Categories**         | `despezzas_list_categories`, `despezzas_list_subcategories`                                     | No      | Use before creating/updating transactions.                         |
+| **Transactions**       | `despezzas_search_transactions`, `despezzas_create_transaction`, `despezzas_update_transaction` | Partial | Creation requires destination, category, or `allow_uncategorized`. |
+| **Preview**            | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction`                  | No      | Recommended path before any write.                                 |
+| **Diagnostics**        | `despezzas_export_transactions`, `despezzas_raw_api`                                            | Partial | Use carefully; responses are redacted when possible.               |
 
 ## 🛠 Technologies
 
@@ -184,7 +185,7 @@ Main tools used in this project:
   <a href="https://developers.cloudflare.com/workers/wrangler/"><img src="https://img.shields.io/badge/Wrangler-f38020?style=for-the-badge&amp;logo=cloudflare&amp;logoColor=202024" alt="Wrangler" /></a>
 </p>
 
-_* See [<kbd>package.json</kbd>](./package.json) for the full dependency list._
+_\* See [<kbd>package.json</kbd>](./package.json) for the full dependency list._
 
 ## 🚀 Getting Started
 
@@ -199,28 +200,38 @@ Copy-Item .env.example .env
 ### ✔️ Verification
 
 ```powershell
-npm run typecheck
-npm test
+npm run verify
 npm run smoke:readonly
 ```
 
-`npm test` covers local payload protections and diagnostics. `npm run smoke:readonly` builds the project and calls only read-only Despezzas endpoints using the configured token/session.
+`npm run verify` runs repo safety, MCP catalog synchronization, Prettier, ESLint, TypeScript, and tests. `npm run smoke:readonly` builds the project and calls only read-only Despezzas endpoints using the configured token/session.
+
+Useful individual checks:
+
+```powershell
+npm run check:repo-safety
+npm run check:mcp-tools
+npm run format:check
+npm run lint
+npm run typecheck
+npm test
+```
 
 ## 📋 Environment Variables
 
-| Variable | Required? | Used For |
-| --- | --- | --- |
-| `DESPEZZAS_TOKEN` | Optional | Manual bearer token copied from a web session. |
-| `DESPEZZAS_EMAIL` | Optional | Email/password login. |
-| `DESPEZZAS_PASSWORD` | Optional | Email/password login. |
-| `DESPEZZAS_FIREBASE_API_KEY` | For email/password | Public Firebase Web key used for token exchange and refresh. See how to obtain it in [.env.example](.env.example). |
-| `DESPEZZAS_SESSION_FILE` | Optional | Persisted session path; use `none` to disable. |
-| `MCP_TRANSPORT` | Optional | `stdio` or `http`; default `stdio`. |
-| `HOST` / `PORT` | Optional | HTTP server bind; default `127.0.0.1:8787`. |
-| `MCP_PUBLIC_BASE_URL` | Production/OAuth | Public HTTPS URL for OAuth metadata. |
-| `MCP_OAUTH_TOKEN_SECRET` | Recommended | Stable signing secret for MCP OAuth tokens. |
-| `MCP_OWNER_AUTH_CODE` | Private deploy | Owner code for single-account authorizations. |
-| `SESSION_ENCRYPTION_KEY` | Cloudflare multi-user | Workers KV session encryption. |
+| Variable                     | Required?             | Used For                                                                                                           |
+| ---------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DESPEZZAS_TOKEN`            | Optional              | Manual bearer token copied from a web session.                                                                     |
+| `DESPEZZAS_EMAIL`            | Optional              | Email/password login.                                                                                              |
+| `DESPEZZAS_PASSWORD`         | Optional              | Email/password login.                                                                                              |
+| `DESPEZZAS_FIREBASE_API_KEY` | For email/password    | Public Firebase Web key used for token exchange and refresh. See how to obtain it in [.env.example](.env.example). |
+| `DESPEZZAS_SESSION_FILE`     | Optional              | Persisted session path; use `none` to disable.                                                                     |
+| `MCP_TRANSPORT`              | Optional              | `stdio` or `http`; default `stdio`.                                                                                |
+| `HOST` / `PORT`              | Optional              | HTTP server bind; default `127.0.0.1:8787`.                                                                        |
+| `MCP_PUBLIC_BASE_URL`        | Production/OAuth      | Public HTTPS URL for OAuth metadata.                                                                               |
+| `MCP_OAUTH_TOKEN_SECRET`     | Recommended           | Stable signing secret for MCP OAuth tokens.                                                                        |
+| `MCP_OWNER_AUTH_CODE`        | Private deploy        | Owner code for single-account authorizations.                                                                      |
+| `SESSION_ENCRYPTION_KEY`     | Cloudflare multi-user | Workers KV session encryption.                                                                                     |
 
 ## 🔐 Authentication
 
@@ -239,12 +250,12 @@ The login flow mirrors the Despezzas frontend:
 3. Uses the Firebase `idToken` as `Authorization: Bearer ...` on `api.despezzas.com`.
 4. Saves the Firebase refresh token to `%USERPROFILE%\.despezzas-mcp\session.json` by default.
 
-| Step | Source | Target | Result |
-| --- | --- | --- | --- |
-| 1 | User | MCP `/login` | Sends email and password for local authorization. |
-| 2 | MCP | Despezzas API | Exchanges credentials for `firebase_token`. |
-| 3 | MCP | Firebase | Exchanges `firebase_token` for `idToken` and `refreshToken`. |
-| 4 | MCP | MCP Client/ChatGPT | Returns an opaque MCP OAuth token. |
+| Step | Source | Target             | Result                                                       |
+| ---- | ------ | ------------------ | ------------------------------------------------------------ |
+| 1    | User   | MCP `/login`       | Sends email and password for local authorization.            |
+| 2    | MCP    | Despezzas API      | Exchanges credentials for `firebase_token`.                  |
+| 3    | MCP    | Firebase           | Exchanges `firebase_token` for `idToken` and `refreshToken`. |
+| 4    | MCP    | MCP Client/ChatGPT | Returns an opaque MCP OAuth token.                           |
 
 Set `DESPEZZAS_SESSION_FILE=none` to disable session persistence. If every authentication method fails, `despezzas_status` will tell you to open the login page or configure credentials.
 
@@ -351,13 +362,13 @@ Recommended first path: [Cloudflare Workers](docs/cloudflare-workers.md). Free c
 
 See [docs/deployment.md](docs/deployment.md) for a broader comparison of free hosting options and provider-specific configuration notes.
 
-| Provider | Best For | Files | Note |
-| --- | --- | --- | --- |
-| **Cloudflare Workers** | Recommended remote MCP | `wrangler.jsonc`, `src/cloudflare.ts` | Best path for ChatGPT OAuth. |
-| **Docker/Koyeb** | Simple container deploy | `Dockerfile` | Good for personal use; may scale to zero. |
-| **Vercel** | Serverless Express function | `vercel.json`, `api/index.js` | Stateless; use env vars for credentials. |
-| **Render/Railway** | Quick demos and GitHub deploys | `render.yaml`, `railway.json` | Free services may sleep or have limits. |
-| **Prefect Horizon** | Managed MCP gateway | `horizon_proxy.py` | FastMCP proxy for a published Node backend. |
+| Provider               | Best For                       | Files                                 | Note                                        |
+| ---------------------- | ------------------------------ | ------------------------------------- | ------------------------------------------- |
+| **Cloudflare Workers** | Recommended remote MCP         | `wrangler.jsonc`, `src/cloudflare.ts` | Best path for ChatGPT OAuth.                |
+| **Docker/Koyeb**       | Simple container deploy        | `Dockerfile`                          | Good for personal use; may scale to zero.   |
+| **Vercel**             | Serverless Express function    | `vercel.json`, `api/index.js`         | Stateless; use env vars for credentials.    |
+| **Render/Railway**     | Quick demos and GitHub deploys | `render.yaml`, `railway.json`         | Free services may sleep or have limits.     |
+| **Prefect Horizon**    | Managed MCP gateway            | `horizon_proxy.py`                    | FastMCP proxy for a published Node backend. |
 
 Included deploy files:
 
@@ -387,7 +398,7 @@ The script prints only calls to `api.despezzas.com` and masks common secrets. Us
 If exporting a HAR is cumbersome, paste [scripts/request-monitor-devtools.js](scripts/request-monitor-devtools.js) into DevTools on `despezzas.com`, perform the action, then run:
 
 ```js
-window.__despezzasMcpMonitor.download()
+window.__despezzasMcpMonitor.download();
 ```
 
 It exports a masked JSON report of `fetch`/XHR calls to `api.despezzas.com`.
@@ -415,10 +426,10 @@ This repository keeps a similar structure, but uses native Despezzas endpoints a
 Contributions are welcome. Before opening a pull request:
 
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
-2. Run `npm run typecheck` and `npm test`.
+2. Run `npm run verify`.
 3. Do not include credentials, tokens, sessions, unredacted HARs, or real financial data.
 4. Keep `confirm: true` mandatory for every write/destructive tool.
-5. Update [`llms.txt`](llms.txt) when changing architecture, commands, MCP tools, or important agent-facing rules.
+5. Update [`llms.txt`](llms.txt), [`AGENTS.md`](AGENTS.md), and docs under [`docs/`](docs/) when changing architecture, commands, MCP tools, or important agent-facing rules.
 
 ## 📄 License
 

@@ -13,4 +13,3 @@ export function currentMonthRange(now = new Date()): { date_start: string; date_
     date_end: formatDate(end),
   };
 }
-

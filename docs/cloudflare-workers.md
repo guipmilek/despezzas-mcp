@@ -74,7 +74,7 @@ O comando retorna um bloco `kv_namespaces`. Cole o `id` gerado no `wrangler.json
 ```jsonc
 {
   "binding": "DESPEZZAS_SESSIONS",
-  "id": "generated-kv-id"
+  "id": "generated-kv-id",
 }
 ```
 
@@ -184,8 +184,8 @@ O Worker normalmente infere a URL pública pela requisição recebida. Se você 
 ```jsonc
 {
   "vars": {
-    "MCP_PUBLIC_BASE_URL": "https://mcp.seu-dominio.com"
-  }
+    "MCP_PUBLIC_BASE_URL": "https://mcp.seu-dominio.com",
+  },
 }
 ```
 

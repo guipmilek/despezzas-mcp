@@ -117,7 +117,9 @@ export class CloudflareSessionAuthProvider implements DespezzasAuthProvider {
   private async loadSession(): Promise<AuthSession> {
     const session = await this.store.get(this.sessionId);
     if (!session) {
-      throw new AuthRequiredError("Nenhuma sessão Despezzas está armazenada para esta conexão do ChatGPT. Reconecte o MCP.");
+      throw new AuthRequiredError(
+        "Nenhuma sessão Despezzas está armazenada para esta conexão do ChatGPT. Reconecte o MCP.",
+      );
     }
     return session;
   }

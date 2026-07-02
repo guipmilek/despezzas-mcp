@@ -95,7 +95,10 @@ export function createHttpApp() {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Requisição de autorização inválida.";
-      res.status(400).type("html").send(renderLoginPage({ error: message }));
+      res
+        .status(400)
+        .type("html")
+        .send(renderLoginPage({ error: message }));
     }
   });
 
@@ -119,23 +122,26 @@ export function createHttpApp() {
       res.redirect(302, redirect);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Autorização falhou.";
-      res.status(401).type("html").send(
-        renderLoginPage({
-          error: message,
-          email: String(req.body.email ?? ""),
-          action: "/oauth/authorize",
-          ownerCodeRequired: ownerAuthCodeConfigured(),
-          hidden: {
-            client_id: String(req.body.client_id ?? ""),
-            redirect_uri: String(req.body.redirect_uri ?? ""),
-            code_challenge: String(req.body.code_challenge ?? ""),
-            code_challenge_method: String(req.body.code_challenge_method ?? "S256"),
-            scope: String(req.body.scope ?? ""),
-            resource: String(req.body.resource ?? ""),
-            state: typeof req.body.state === "string" ? req.body.state : undefined,
-          },
-        }),
-      );
+      res
+        .status(401)
+        .type("html")
+        .send(
+          renderLoginPage({
+            error: message,
+            email: String(req.body.email ?? ""),
+            action: "/oauth/authorize",
+            ownerCodeRequired: ownerAuthCodeConfigured(),
+            hidden: {
+              client_id: String(req.body.client_id ?? ""),
+              redirect_uri: String(req.body.redirect_uri ?? ""),
+              code_challenge: String(req.body.code_challenge ?? ""),
+              code_challenge_method: String(req.body.code_challenge_method ?? "S256"),
+              scope: String(req.body.scope ?? ""),
+              resource: String(req.body.resource ?? ""),
+              state: typeof req.body.state === "string" ? req.body.state : undefined,
+            },
+          }),
+        );
     }
   });
 
@@ -172,14 +178,17 @@ export function createHttpApp() {
       res.type("html").send(renderLoginSuccessPage(await authManager.getStatus()));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Login falhou.";
-      res.status(401).type("html").send(
-        renderLoginPage({
-          status: await authManager.getStatus(),
-          email,
-          error: message,
-          ownerCodeRequired: ownerAuthCodeConfigured(),
-        }),
-      );
+      res
+        .status(401)
+        .type("html")
+        .send(
+          renderLoginPage({
+            status: await authManager.getStatus(),
+            email,
+            error: message,
+            ownerCodeRequired: ownerAuthCodeConfigured(),
+          }),
+        );
     }
   });
 
@@ -274,11 +283,7 @@ function bearerToken(req: Request): string | undefined {
 }
 
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function methodNotAllowed(_req: Request, res: Response) {

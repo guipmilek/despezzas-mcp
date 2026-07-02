@@ -197,12 +197,7 @@ export class DespezzasClient {
     return this.request<unknown>(path, method, body, query);
   }
 
-  private async request<T>(
-    path: string,
-    method: HttpMethod = "GET",
-    body?: unknown,
-    query?: JsonObject,
-  ): Promise<T> {
+  private async request<T>(path: string, method: HttpMethod = "GET", body?: unknown, query?: JsonObject): Promise<T> {
     const url = new URL(path, this.baseUrl);
     appendQuery(url.searchParams, query);
     const token = await this.getAuthToken();
@@ -225,7 +220,7 @@ export class DespezzasClient {
       return await this.auth.getToken({ forceRefresh });
     } catch (error) {
       if (error instanceof AuthRequiredError) {
-        throw new Error(`${error.message} No modo HTTP, abra /login neste servidor MCP.`);
+        throw new Error(`${error.message} No modo HTTP, abra /login neste servidor MCP.`, { cause: error });
       }
       throw error;
     }

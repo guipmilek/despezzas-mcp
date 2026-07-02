@@ -40,7 +40,10 @@ export function jsonResponse(data: unknown, note?: string) {
 
 export function errorResponse(error: unknown, action: string) {
   const message = error instanceof Error ? error.message : String(error);
-  const details = error && typeof error === "object" && "details" in error ? redact((error as { details: unknown }).details) : undefined;
+  const details =
+    error && typeof error === "object" && "details" in error
+      ? redact((error as { details: unknown }).details)
+      : undefined;
   const structuredContent = dropUndefined({
     error: message,
     action,

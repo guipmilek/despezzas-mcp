@@ -100,7 +100,7 @@ npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY
 ```
 
 > **Dica:** `DESPEZZAS_FIREBASE_API_KEY` é uma chave pública do Firebase Web — o próprio frontend do Despezzas a expõe no código-fonte. Para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey`.
-Crie e associe o namespace KV:
+> Crie e associe o namespace KV:
 
 ```powershell
 npx wrangler kv namespace create DESPEZZAS_SESSIONS
@@ -256,6 +256,7 @@ Nesse caminho, o Horizon é a camada pública de autenticação MCP e o backend 
 Use o Dockerfile deste repositório. Koyeb Free é adequado para testes hobby, mas escala para zero depois de tempo ocioso e não suporta volumes, então configure credenciais por ambiente e desative persistência de sessão.
 
 Configurações recomendadas no Koyeb:
+
 - Método de deploy: GitHub.
 - Construtor: Dockerfile.
 - Local do Dockerfile: `Dockerfile`.

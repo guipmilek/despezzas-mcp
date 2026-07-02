@@ -137,3 +137,13 @@ Verification already run:
    - Always run `npm run format` before running verification commands or committing. Prettier formatting is strictly checked and must pass.
    - In `despezzas-mcp`, ESLint strictly forbids unused variables (e.g., unused catch error bindings `catch (e)`) and empty blocks. Use optional catch binding `catch {` and add descriptive comments inside empty blocks to satisfy the compiler.
    - Avoid staging or committing `.agents/session-checkpoint.md` or `.agents/session-diff.patch`. Keep them git-ignored.
+
+## Documentation & README Style Standards
+
+1. **Bilingual Layout**: Every project README must support both Portuguese (`README.md`) and English (`README.en.md`) versions, with language-selection flags in the top-right header of each file.
+2. **Visual Header**: Center the project logo and use `flat-square` Shields.io badges styled with `labelColor=202024` for metadata (Node.js, license, commit activity).
+3. **Collapsible Table of Contents**: Include a collapsible summary dropdown (`📒 Sumário` or `📒 Table of Contents`) using HTML `<details>`.
+4. **IA Context & Metadata Table**: Outline the assist-coded (vibecoded) nature of the project. Link to agent files (`AGENTS.md`, `docs/`, `PROJECT_PATHS.md`) and present a clean metadata table mapping the project's tech stack, linting, and visual foundations.
+5. **Context Maintenance**: Whenever changing project architecture, script APIs, visual primitives, or tools:
+   - Update `llms.txt` to keep the context representation accurate for LLMs and AI agents.
+   - Update `README.md` and `README.en.md` to reflect any new setup/verify commands or folder maps.

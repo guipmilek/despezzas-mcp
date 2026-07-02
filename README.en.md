@@ -1,10 +1,10 @@
 <!-- ===== HEADER ===== -->
 <p align="right">
   <img
-    src="https://img.shields.io/badge/lang-en-gray?style=flat-square&amp;labelColor=202024"
+    src="https://img.shields.io/badge/lang-en-green?style=flat-square&amp;labelColor=202024"
     alt="lang-en"
   />
-  <a href="./README.md" title="Ler o README em português brasileiro"><img src="https://img.shields.io/badge/lang-pt--br-green?style=flat-square&amp;labelColor=202024" alt="lang-pt-br" /></a>
+  <a href="./README.md" title="Ler o README em português brasileiro"><img src="https://img.shields.io/badge/lang-pt--br-gray?style=flat-square&amp;labelColor=202024" alt="lang-pt-br" /></a>
 </p>
 
 <p align="center">

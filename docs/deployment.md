@@ -99,6 +99,9 @@ npx wrangler secret put SESSION_ENCRYPTION_KEY
 npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY
 ```
 
+
+
+> **Dica:** `DESPEZZAS_FIREBASE_API_KEY` é uma chave pública do Firebase Web — o próprio frontend do Despezzas a expõe no código-fonte. Para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey`.
 Crie e associe o namespace KV:
 
 ```powershell

@@ -1,4 +1,4 @@
-# Deploy em Cloudflare Workers
+﻿# Deploy em Cloudflare Workers
 
 Cloudflare Workers é a hospedagem remota gratuita preferida para este MCP no momento. O repositório inclui um ponto de entrada nativo de Worker em `src/cloudflare.ts` e `wrangler.jsonc`.
 
@@ -90,7 +90,7 @@ Adicione-a à Cloudflare:
 npx wrangler secret put SESSION_ENCRYPTION_KEY
 ```
 
-Adicione também a chave Firebase usada pelo fluxo de login por email/senha:
+Adicione também a chave Firebase usada pelo fluxo de login por email/senha. É a mesma chave pública do Firebase Web que o frontend do Despezzas carrega — para encontrá-la, abra https://despezzas.com, pressione F12, vá em Sources e procure por `apiKey` nos arquivos JavaScript.
 
 ```powershell
 npx wrangler secret put DESPEZZAS_FIREBASE_API_KEY

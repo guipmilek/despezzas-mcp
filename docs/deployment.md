@@ -1,6 +1,6 @@
 # Notas de Deploy
 
-Este servidor MCP precisa de URL HTTPS pública e acesso de saída para Despezzas e Firebase. Não funciona em hospedagem estática. Roda em Node (serviço tradicional, container, serverless) ou atrás de um proxy FastMCP no Prefect Horizon, desde que o `MCP_OAUTH_TOKEN_SECRET` seja estável.
+Este servidor MCP precisa de URL HTTPS pública e acesso de saída para Despezzas e Firebase. Não funciona em hospedagem estática. Roda em Node (serviço tradicional, container ou serverless) ou atrás de um proxy FastMCP no Prefect Horizon — desde que o `MCP_OAUTH_TOKEN_SECRET` seja estável.
 
 ## Configurações Obrigatórias de Runtime
 
@@ -30,10 +30,10 @@ Defina `MCP_PUBLIC_BASE_URL=https://seu-host-publico` se a descoberta OAuth reto
 
 Para autenticação no Despezzas, escolha uma opção:
 
-- Hospedagem efêmera/escala para zero: defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, `DESPEZZAS_FIREBASE_API_KEY` e `DESPEZZAS_SESSION_FILE=none`.
-- Hospedagem durável com volume montado: defina `DESPEZZAS_FIREBASE_API_KEY`, defina `DESPEZZAS_SESSION_FILE` para um caminho no volume montado e use `/login` uma vez.
+- Hospedagem efêmera (escala a zero): defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, `DESPEZZAS_FIREBASE_API_KEY` e `DESPEZZAS_SESSION_FILE=none`.
+- Hospedagem durável (com volume): defina `DESPEZZAS_FIREBASE_API_KEY`, aponte `DESPEZZAS_SESSION_FILE` para um caminho no volume e use `/login` uma vez.
 
-Não faça commit de credenciais do Despezzas. Adicione-as apenas na tela de segredos do provedor.
+Não faça commit de credenciais do Despezzas. Adicione-as apenas como secrets/variáveis de ambiente no provedor.
 
 ## Suporte Atual do Repositório
 
@@ -220,7 +220,7 @@ Vercel Functions são sem estado e escalam para zero, então não dependa do arq
 
 Horizon é uma plataforma de deploy nativa para MCP da equipe FastMCP. Ela oferece hospedagem gerenciada, autenticação, controle de acesso, registro, Inspector e testes com ChatMCP, com um plano pessoal gratuito descrito na documentação do FastMCP.
 
-Nota importante de adequação: o Horizon publica servidores Python FastMCP. Este projeto é um servidor MCP TypeScript/Node, então `horizon_proxy.py` é um pequeno proxy FastMCP que encaminha tráfego do Horizon para um backend Node hospedado em outro lugar.
+Nota: o Horizon publica servidores Python FastMCP. Este projeto é TypeScript/Node, então `horizon_proxy.py` é um proxy FastMCP que encaminha tráfego do Horizon para um backend Node hospedado em outro lugar.
 
 Fluxo de deploy:
 
@@ -256,7 +256,6 @@ Nesse caminho, o Horizon é a camada pública de autenticação MCP e o backend 
 Use o Dockerfile deste repositório. Koyeb Free é adequado para testes hobby, mas escala para zero depois de tempo ocioso e não suporta volumes, então configure credenciais por ambiente e desative persistência de sessão.
 
 Configurações recomendadas no Koyeb:
-
 - Método de deploy: GitHub.
 - Construtor: Dockerfile.
 - Local do Dockerfile: `Dockerfile`.

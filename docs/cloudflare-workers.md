@@ -2,7 +2,7 @@
 
 Cloudflare Workers é a hospedagem remota recomendada para este MCP. O repositório inclui um ponto de entrada nativo de Worker em `src/cloudflare.ts` e `wrangler.jsonc`.
 
-Usa Streamable HTTP no `/mcp` conforme a documentação da Cloudflare. O transporte é `WebStandardStreamableHTTPServerTransport` em vez de `McpAgent` — as ferramentas são stateless e o estado OAuth é assinado com `MCP_OAUTH_TOKEN_SECRET`.
+Usa Streamable HTTP no `/mcp`, seguindo a documentação da Cloudflare. O transporte é `WebStandardStreamableHTTPServerTransport` em vez de `McpAgent` — as ferramentas são stateless e o estado OAuth é assinado com `MCP_OAUTH_TOKEN_SECRET`.
 
 Dois modos de operação:
 
@@ -18,11 +18,11 @@ Dois modos de operação:
 - Senhas do Despezzas nunca são armazenadas. Apenas tokens de sessão Firebase criptografados vão para o Workers KV.
 - O ChatGPT recebe apenas um token de acesso OAuth MCP opaco.
 
-O Cloudflare Workers Free tem limites diários, e Workers KV está disponível na plataforma Workers. Durable Objects também estão disponíveis no Workers Free com backend de armazenamento SQLite. Este repositório usa Workers KV para sessões multiusuário.
+O Cloudflare Workers Free tem limites diários, e Workers KV está disponível na plataforma. Durable Objects também estão disponíveis no plano Free com backend SQLite. Este repositório usa Workers KV para sessões multiusuário.
 
 ## Antes do Deploy
 
-Troque a senha do Despezzas que foi colada no histórico de chat antes de colocar credenciais em qualquer provedor cloud.
+Troque a senha do Despezzas que foi colada no chat antes de configurar credenciais em qualquer provedor cloud.
 
 Instale as dependências:
 
@@ -107,9 +107,9 @@ Cada usuário digita o próprio email e senha na tela de autorização OAuth. O 
 
 ## Modo Conta Única
 
-Use este modo apenas quando o Worker for para sua própria conta ChatGPT e sua própria conta Despezzas.
+Use este modo só quando o Worker for para sua própria conta ChatGPT e sua própria conta Despezzas.
 
-Crie um código de acesso de proprietário. Este é o código que você digita na tela de login do MCP quando o ChatGPT conecta, para que só você possa autorizar o ChatGPT a usar a conta Despezzas armazenada nos secrets do Worker:
+Crie um código de acesso de proprietário. É o código que você digita na tela de login do MCP quando o ChatGPT conecta, para garantir que só você autorize o acesso à conta Despezzas nos secrets do Worker:
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"
@@ -153,7 +153,7 @@ Invoke-RestMethod https://despezzas-mcp.<sua-conta>.workers.dev/health
 
 Se o deploy falhar com `You need to register a workers.dev subdomain before publishing to workers.dev`, conclua o onboarding de Workers na Cloudflare e rode `npm run deploy:cloudflare` novamente.
 
-Abra a página de login se quiser testar diretamente a tela de autorização MCP do Despezzas:
+Abra a página de login para testar a tela de autorização:
 
 ```text
 https://despezzas-mcp.<sua-conta>.workers.dev/login
@@ -167,7 +167,7 @@ Em ChatGPT Apps / Custom Tool:
 - URL do servidor: `https://despezzas-mcp.<sua-conta>.workers.dev/mcp`
 - Autenticação: `OAuth`
 
-No modo multiusuário, cada usuário verá o formulário de autorização do Despezzas MCP durante o OAuth e deve informar as próprias credenciais do Despezzas. A tela usa a identidade visual do Despezzas, acompanha tema claro/escuro e contém apenas os campos necessários para autorizar o MCP. O token de acesso OAuth do ChatGPT fica vinculado à sessão criptografada desse usuário no KV.
+No modo multiusuário, cada pessoa verá o formulário de autorização durante o OAuth e informa as próprias credenciais do Despezzas. A tela usa a identidade visual do Despezzas, acompanha tema claro/escuro e contém apenas os campos necessários. O token OAuth do ChatGPT fica vinculado à sessão criptografada desse usuário no KV.
 
 O Worker expõe os endpoints de descoberta esperados pelo ChatGPT:
 

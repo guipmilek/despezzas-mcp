@@ -75,7 +75,7 @@
 
 ## 📍 Visão Geral
 
-Servidor MCP para dados financeiros do [Despezzas](https://despezzas.com/). Expõe ferramentas para clientes MCP (como ChatGPT) listarem contas, cartões e categorias, pesquisarem transações, verem resumos e fazerem operações de escrita com proteções.
+Servidor MCP para dados financeiros do [Despezzas](https://despezzas.com/). Expõe ferramentas para clientes MCP (como ChatGPT) listarem contas, cartões e categorias, pesquisarem transações, consultarem resumos de gastos e fazerem operações de escrita com proteções.
 
 Projeto open-source (MIT), construído analisando as requisições de rede e o código do frontend do Despezzas. O Despezzas não publica uma API oficial — trate isto como integração não oficial. Endpoints e campos podem mudar sem aviso.
 

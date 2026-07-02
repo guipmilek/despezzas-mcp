@@ -36,14 +36,29 @@ For any non-trivial task, read and follow:
 
 Minimum preflight:
 
+1. Check if a session checkpoint exists at `.agents/session-checkpoint.md`. If it does, read it (or run `npm run session:resume`) to restore context.
+2. Confirm workspace status:
+
 ```powershell
 git status --short
 Get-Location
 Test-Path -LiteralPath '<target path>'
 ```
 
-Use `rg` for search. Use `rg -F` for literal strings. Do not assume `grep` exists
-in this Windows environment.
+Checkpointing:
+Before wrapping up a session or when session/context limits are approaching, run:
+`npm run session:checkpoint -- --goal="<goal>" --evidence="<findings>" --next="<next steps>"` to save the state for the next agent.
+
+Post-implementation Handoff & Version Control:
+Before completing a task, you must:
+
+1. Update all relevant documentation, Readmes, `llms.txt`, or playbook files to reflect structural or behavioral changes.
+2. Build the output using `npm run build` (if changes are code-level).
+3. Verify formatting and compile safety (`npm run verify` or `npm run lint`).
+4. Stage and commit the modifications using Conventional Commits format matching the repo history (e.g., `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`, `chore: ...`).
+5. Push the commit to the remote repository.
+
+Use `rg` for search. Use `rg -F` for literal strings. Do not assume `grep` exists in this Windows environment.
 
 ## Verification
 
@@ -93,3 +108,19 @@ Stop and write a checkpoint instead of continuing blindly when any of these happ
 - A build, typecheck, or test failure is clearly outside the touched scope.
 - A HAR/API capture contains unredacted sensitive values that cannot be safely summarized.
 - The requested path is outside this repository and `PROJECT_PATHS.md` does not make it clear.
+
+## Token Optimization & Common Pitfalls
+
+1. **Avoid Wasted File Views (Token Saving)**:
+   - Do NOT view complete files if they are large (e.g. `src/tools.ts` or `package-lock.json`). Always specify `StartLine` and `EndLine` in `view_file` to only load the lines of interest.
+   - Avoid reading files under `dist/` or other generated outputs.
+2. **Tool Call Arguments Safety**:
+   - **`write_to_file` / `replace_file_content`**: Never supply `ArtifactMetadata` when writing to a file in the workspace directory (e.g. `src/` or `scripts/`). `ArtifactMetadata` is reserved _only_ for files written to the Antigravity conversation brain directory. Specifying it for workspace paths will cause an execution error.
+   - **`view_file`**: If you specify `StartLine`, you must also specify `EndLine`. Leaving `EndLine` omitted or 0 when `StartLine` is provided will cause validation errors.
+3. **Shell Environment Constraints (Windows PowerShell)**:
+   - The shell is Windows PowerShell. Do NOT run Unix-specific tools like `grep`, `sed`, `awk`, or `export` directly in `run_command`. Use `rg` for searching, and PowerShell commands like `$env:VAR = "value"` for environment variables.
+   - Do not assume external tools like `gh` (GitHub CLI) or `jq` are available unless verified. Use Node scripts or PowerShell commands instead.
+4. **Prettier and Linters Alignment**:
+   - Always run `npm run format` before running verification commands or committing. Prettier formatting is strictly checked and must pass.
+   - In `despezzas-mcp`, ESLint strictly forbids unused variables (e.g., unused catch error bindings `catch (e)`) and empty blocks. Use optional catch binding `catch {` and add descriptive comments inside empty blocks to satisfy the compiler.
+   - Avoid staging or committing `.agents/session-checkpoint.md` or `.agents/session-diff.patch`. Keep them git-ignored.

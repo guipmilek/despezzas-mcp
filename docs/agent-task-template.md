@@ -7,6 +7,7 @@ Task:
 <specific desired change>
 
 Preflight:
+- Check if a session checkpoint exists at `.agents/session-checkpoint.md`. If it does, run `npm run session:resume` (or read the file directly) to restore session context immediately.
 - Confirm cwd with git status --short and Get-Location.
 - Verify target paths with Test-Path -LiteralPath.
 - Use rg for search; use rg -F for literal strings.

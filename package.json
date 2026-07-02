@@ -40,7 +40,9 @@
     "smoke:readonly": "npm run build && node scripts/smoke-readonly.mjs",
     "test": "npm run build && node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run check:repo-safety && npm run check:mcp-tools && npm run format:check && npm run lint && npm run typecheck && npm test"
+    "verify": "npm run check:repo-safety && npm run check:mcp-tools && npm run format:check && npm run lint && npm run typecheck && npm test",
+    "session:checkpoint": "node scripts/session-manager.mjs checkpoint",
+    "session:resume": "node scripts/session-manager.mjs resume"
   },
   "engines": {
     "node": ">=20"

@@ -7,17 +7,18 @@ to reduce repeated context, wrong tool calls, and long recovery loops.
 
 Run this before reading large files or editing anything:
 
-1. Confirm the current directory:
+1. Check if a session checkpoint exists at `.agents/session-checkpoint.md`. If it does, read it (or run `npm run session:resume`) to restore session context immediately.
+2. Confirm the current directory:
    - `git status --short`
    - `Get-Location`
-2. Confirm target paths exist before searching inside them:
+3. Confirm target paths exist before searching inside them:
    - `Test-Path -LiteralPath '<absolute path>'`
-3. Use Windows-safe search:
+4. Use Windows-safe search:
    - Prefer `rg`.
    - Use `rg -F` for literal strings.
    - Use `Select-String -SimpleMatch` when PowerShell-native search is clearer.
    - Do not assume `grep` exists.
-4. Classify the task:
+5. Classify the task:
    - MCP tool schema or handler
    - Despezzas API endpoint/client behavior
    - Authentication or session persistence
@@ -25,8 +26,8 @@ Run this before reading large files or editing anything:
    - Cloudflare Workers deployment
    - Tests or safety validation
    - Documentation only
-5. State the owner files before editing.
-6. State the verification command before editing.
+6. State the owner files before editing.
+7. State the verification command before editing.
 
 ## Edit Ownership
 
@@ -104,7 +105,12 @@ Stop and write a checkpoint instead of continuing blindly when any of these happ
   redacted in the current context.
 - A task references a path outside this repository and `PROJECT_PATHS.md` is ambiguous.
 
-Checkpoint format:
+To automatically generate a session checkpoint and git patch file, run:
+`npm run session:checkpoint -- --goal="<goal>" --evidence="<findings>" --blocker="<blockers>" --next="<next steps>"`
+
+This will create or update `.agents/session-checkpoint.md` and `.agents/session-diff.patch`.
+
+Alternatively, use the following manual format:
 
 ```text
 Goal:
@@ -115,3 +121,19 @@ Current blocker:
 Next command:
 Verification already run:
 ```
+
+## Token Optimization & Tool Call Pitfalls
+
+1. **Avoid Wasted File Views (Token Saving)**:
+   - Do NOT view complete files if they are large (e.g. `src/tools.ts` or `package-lock.json`). Always specify `StartLine` and `EndLine` in `view_file` to only load the lines of interest.
+   - Avoid reading files under `dist/` or other generated outputs.
+2. **Tool Call Arguments Safety**:
+   - **`write_to_file` / `replace_file_content`**: Never supply `ArtifactMetadata` when writing to a file in the workspace directory (e.g. `src/` or `scripts/`). `ArtifactMetadata` is reserved _only_ for files written to the Antigravity conversation brain directory. Specifying it for workspace paths will cause an execution error.
+   - **`view_file`**: If you specify `StartLine`, you must also specify `EndLine`. Leaving `EndLine` omitted or 0 when `StartLine` is provided will cause validation errors.
+3. **Shell Environment Constraints (Windows PowerShell)**:
+   - The shell is Windows PowerShell. Do NOT run Unix-specific tools like `grep`, `sed`, `awk`, or `export` directly in `run_command`. Use `rg` for searching, and PowerShell commands like `$env:VAR = "value"` for environment variables.
+   - Do not assume external tools like `gh` (GitHub CLI) or `jq` are available unless verified. Use Node scripts or PowerShell commands instead.
+4. **Prettier and Linters Alignment**:
+   - Always run `npm run format` before running verification commands or committing. Prettier formatting is strictly checked and must pass.
+   - In `despezzas-mcp`, ESLint strictly forbids unused variables (e.g., unused catch error bindings `catch (e)`) and empty blocks. Use optional catch binding `catch {` and add descriptive comments inside empty blocks to satisfy the compiler.
+   - Avoid staging or committing `.agents/session-checkpoint.md` or `.agents/session-diff.patch`. Keep them git-ignored.

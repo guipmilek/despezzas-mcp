@@ -6,6 +6,14 @@
   />
 </p>
 
+<p align="center">
+  <img
+    src="./assets/despezzas-mcp.png"
+    alt="Despezzas MCP logo"
+    width="120"
+  />
+</p>
+
 <h1 id="top" align="center">Despezzas MCP</h1>
 
 <p align="center">
@@ -43,59 +51,58 @@
 </p>
 
 <p align="center">
-  <img
-    src="./assets/despezzas-mcp.png"
-    alt="Despezzas MCP logo"
-    width="120"
-  />
-</p>
-
-<p align="center">
   Servidor MCP não oficial para conectar dados financeiros do Despezzas a clientes compatíveis com MCP, incluindo ChatGPT.
 </p>
 
 <details>
   <summary>
-    <h2>Table of Contents</h2>
+    <h2>📒 Table of Contents</h2>
   </summary>
 
-- [Visão Geral](#visão-geral)
-- [Funcionalidades](#funcionalidades)
-- [Tecnologias](#tecnologias)
+- [📍 Visão Geral](#-visão-geral)
+- [✨ Funcionalidades](#-funcionalidades)
+- [🛠 Tecnologias](#-tecnologias)
   - [Servidor MCP](#servidor-mcp)
   - [Deploy](#deploy)
   - [Ferramentas](#ferramentas)
-- [Primeiros Passos](#primeiros-passos)
-  - [Configuração](#configuração)
-  - [Verificação](#verificação)
-- [Autenticação](#autenticação)
-- [Configuração MCP Local](#configuração-mcp-local)
-- [Modo HTTP](#modo-http)
-- [Conexão OAuth Com ChatGPT](#conexão-oauth-com-chatgpt)
-- [Deploy Remoto](#deploy-remoto)
-- [Inspeção de HAR](#inspeção-de-har)
-- [MCPs de Referência](#mcps-de-referência)
-- [Licença](#licença)
+- [🚀 Primeiros Passos](#-primeiros-passos)
+  - [📦 Configuração](#-configuração)
+  - [✔️ Verificação](#️-verificação)
+- [🔐 Autenticação](#-autenticação)
+- [🖥 Configuração MCP Local](#-configuração-mcp-local)
+- [🌐 Modo HTTP](#-modo-http)
+- [🤖 Conexão OAuth Com ChatGPT](#-conexão-oauth-com-chatgpt)
+- [☁️ Deploy Remoto](#️-deploy-remoto)
+- [🔎 Inspeção de HAR](#-inspeção-de-har)
+- [📚 MCPs de Referência](#-mcps-de-referência)
+- [📄 Licença](#-licença)
 </details>
 
 <!-- ===== PROJECT INFOS ===== -->
 
-## Visão Geral
+## 📍 Visão Geral
 
 Servidor MCP pessoal para dados financeiros do [Despezzas](https://despezzas.com/). Ele expõe ferramentas para clientes MCP compatíveis com ChatGPT listarem contas, cartões, categorias, pesquisarem transações, resumirem gastos e executarem operações de escrita com proteções.
 
 Este é um projeto open-source sob a licença MIT, construído a partir do tráfego observado no Despezzas Web e da inspeção do bundle frontend. O Despezzas não parece publicar uma API pública, então mantenha isto como uma integração pessoal não oficial e espere que detalhes de endpoints possam mudar.
 
-## Funcionalidades
+## ✨ Funcionalidades
 
-- Ferramentas de leitura: perfil, acessos de perfil, configuração pessoal, contas, bancos, cartões de crédito, categorias, subcategorias, busca compacta de transações, visão geral, resumo financeiro e diagnóstico de exportação/campos.
-- Ferramentas de pré-visualização para transações: preparam payloads de criação/edição/exclusão sem chamar o Despezzas.
-- Ferramentas de escrita: trocar/criar/editar/excluir/sair de perfil, criar/editar/excluir conta, cartão de crédito, transação, transferência, duplicar transação e alternar pago.
-- Autenticação: token bearer copiado, login por email/senha via variáveis de ambiente ou página HTTP de autorização MCP.
-- Renovação de token: sessões Firebase salvas são reutilizadas e renovadas automaticamente.
-- Trava de segurança: toda ferramenta de escrita/destrutiva exige `confirm: true`.
-- Transportes: `stdio` local, Streamable HTTP em Node no `/mcp` e Streamable HTTP em Cloudflare Workers no `/mcp`.
-- Depuração: inspetor de HAR e monitor de requisições no DevTools para capturar endpoints futuros.
+📖 Ferramentas de leitura: perfil, acessos de perfil, configuração pessoal, contas, bancos, cartões de crédito, categorias, subcategorias, busca compacta de transações, visão geral, resumo financeiro e diagnóstico de exportação/campos.
+
+🧾 Ferramentas de pré-visualização para transações: preparam payloads de criação/edição/exclusão sem chamar o Despezzas.
+
+✍️ Ferramentas de escrita: trocar/criar/editar/excluir/sair de perfil, criar/editar/excluir conta, cartão de crédito, transação, transferência, duplicar transação e alternar pago.
+
+🔐 Autenticação: token bearer copiado, login por email/senha via variáveis de ambiente ou página HTTP de autorização MCP.
+
+🔄 Renovação de token: sessões Firebase salvas são reutilizadas e renovadas automaticamente.
+
+🛡 Trava de segurança: toda ferramenta de escrita/destrutiva exige `confirm: true`.
+
+🔌 Transportes: `stdio` local, Streamable HTTP em Node no `/mcp` e Streamable HTTP em Cloudflare Workers no `/mcp`.
+
+🔎 Depuração: inspetor de HAR e monitor de requisições no DevTools para capturar endpoints futuros.
 
 Valores usam centavos inteiros no formato nativo do Despezzas. Exemplo: `12345` significa `R$123.45`.
 
@@ -108,7 +115,7 @@ Para escritas de transação, use primeiro as ferramentas de preparo:
 
 `despezzas_create_transaction` recusa intencionalmente payloads sem destino de conta/cartão, com conta e cartão ao mesmo tempo, ou sem `category_id`, a menos que `allow_uncategorized` seja explicitamente `true`.
 
-## Tecnologias
+## 🛠 Tecnologias
 
 As principais ferramentas usadas neste projeto:
 
@@ -207,9 +214,9 @@ As principais ferramentas usadas neste projeto:
 
 _* Veja o arquivo [<kbd>package.json</kbd>](./package.json) para a lista completa de dependências._
 
-## Primeiros Passos
+## 🚀 Primeiros Passos
 
-### Configuração
+### 📦 Configuração
 
 ```powershell
 npm install
@@ -217,7 +224,7 @@ npm run build
 Copy-Item .env.example .env
 ```
 
-### Verificação
+### ✔️ Verificação
 
 ```powershell
 npm run typecheck
@@ -227,7 +234,7 @@ npm run smoke:readonly
 
 `npm test` cobre as proteções locais de payload e os diagnósticos. `npm run smoke:readonly` compila o projeto e chama apenas endpoints somente leitura do Despezzas usando o token/sessão configurado.
 
-## Autenticação
+## 🔐 Autenticação
 
 Opções preferenciais:
 
@@ -248,7 +255,7 @@ Defina `DESPEZZAS_SESSION_FILE=none` para desativar a persistência de sessão. 
 
 Não passe sua senha como argumento de ferramenta MCP. Argumentos de ferramentas podem ficar visíveis ao modelo/cliente. Use `.env` ou a página local `/login`.
 
-## Configuração MCP Local
+## 🖥 Configuração MCP Local
 
 Para um cliente MCP local via stdio:
 
@@ -272,7 +279,7 @@ Para desenvolvimento sem compilar:
 npm run dev
 ```
 
-## Modo HTTP
+## 🌐 Modo HTTP
 
 ```powershell
 $env:MCP_TRANSPORT = "http"
@@ -294,7 +301,7 @@ Start-Process http://127.0.0.1:8787/login
 
 Se você expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso real na frente dele. A página `/login` aceita sua senha do Despezzas para autorizar este MCP.
 
-## Conexão OAuth Com ChatGPT
+## 🤖 Conexão OAuth Com ChatGPT
 
 Para a tela **New App** em ChatGPT Apps & Connectors:
 
@@ -338,7 +345,7 @@ Apps/conectores personalizados do ChatGPT exigem um endpoint MCP remoto em HTTPS
 - [Construção de servidores MCP para ChatGPT Apps e integrações de API](https://developers.openai.com/api/docs/mcp)
 - [Especificação de autorização MCP](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
 
-## Deploy Remoto
+## ☁️ Deploy Remoto
 
 Caminho recomendado primeiro: [Cloudflare Workers](docs/cloudflare-workers.md). Alternativa gratuita em container: [Koyeb Free](docs/koyeb.md).
 
@@ -355,7 +362,7 @@ Arquivos de deploy incluídos:
 
 Para o modo multiusuário em Cloudflare Workers, associe o namespace KV `DESPEZZAS_SESSIONS`, defina `MCP_OAUTH_TOKEN_SECRET`, `SESSION_ENCRYPTION_KEY` e `DESPEZZAS_FIREBASE_API_KEY` como secrets do Wrangler e faça deploy com `npm run deploy:cloudflare`. Para deploys privados de conta única, defina `MCP_OWNER_AUTH_CODE` junto com suas credenciais do Despezzas e `DESPEZZAS_FIREBASE_API_KEY`. Para Horizon, publique o backend Node em outro lugar e aponte `horizon_proxy.py:mcp` para esse backend.
 
-## Inspeção de HAR
+## 🔎 Inspeção de HAR
 
 Quando capturar mais ações do frontend:
 
@@ -377,7 +384,7 @@ window.__despezzasMcpMonitor.download()
 
 Ele exporta um relatório JSON mascarado das chamadas `fetch`/XHR para `api.despezzas.com`.
 
-## MCPs de Referência
+## 📚 MCPs de Referência
 
 O estilo de implementação foi comparado com:
 
@@ -387,7 +394,7 @@ O estilo de implementação foi comparado com:
 
 Este repositório mantém uma estrutura parecida, mas usa endpoints nativos do Despezzas e IDs em UUID.
 
-## Licença
+## 📄 Licença
 
 MIT. Veja [LICENSE](LICENSE).
 

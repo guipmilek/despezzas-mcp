@@ -225,7 +225,7 @@ export class DespezzasClient {
       return await this.auth.getToken({ forceRefresh });
     } catch (error) {
       if (error instanceof AuthRequiredError) {
-        throw new Error(`${error.message} In HTTP mode, open /login on this MCP server.`);
+        throw new Error(`${error.message} No modo HTTP, abra /login neste servidor MCP.`);
       }
       throw error;
     }

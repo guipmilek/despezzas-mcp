@@ -1,87 +1,87 @@
-# ChatGPT App/Connector Quick Setup
+# Configuração Rápida do App/Connector no ChatGPT
 
-Step-by-step values for the ChatGPT **Settings → Apps & Connectors → New App** dialog, matching each field in order.
+Valores passo a passo para o diálogo **Settings -> Apps & Connectors -> New App** do ChatGPT, seguindo cada campo na ordem.
 
-## 1. Icon (optional)
+## 1. Ícone (opcional)
 
-- **Requirement:** PNG only, best at 256x256px or larger, **max file size 10 KB**.
-- **File to upload:** [`assets/despezzas-mcp.png`](../assets/despezzas-mcp.png) — the official Despezzas double-Z app icon, 512x512, optimized to ~3 KB (light lavender background `#f1f6ff`, near-black mark `#171717`). Upload it as-is.
+- **Requisito:** apenas PNG, idealmente 256x256px ou maior, **tamanho máximo de 10 KB**.
+- **Arquivo para upload:** [`assets/despezzas-mcp.png`](../assets/despezzas-mcp.png) - o ícone oficial de duplo Z do app Despezzas, 512x512, otimizado para ~3 KB (fundo lilás claro `#f1f6ff`, marca quase preta `#171717`). Faça upload dele como está.
 
-## 2. Name
+## 2. Nome
 
 ```
 Despezzas
 ```
 
-## 3. Description (optional)
+## 3. Descrição (opcional)
 
 ```
-Personal finance for Despezzas: check accounts, cards, categories, and spending, and log transactions.
+Finanças pessoais para Despezzas: consulte contas, cartões, categorias e gastos, e registre transações.
 ```
 
-## 4. Connection
+## 4. Conexão
 
-Leave the toggle on **Server URL** (not Tunnel) — this is a permanently deployed Cloudflare Worker, not a local tunnel.
+Deixe o seletor em **Server URL** (não Tunnel) - este é um Cloudflare Worker publicado de forma permanente, não um túnel local.
 
-## 5. MCP Server URL
+## 5. URL do Servidor MCP
 
 ```
 https://despezzas-mcp.guipmilek.workers.dev/mcp
 ```
 
-## 6. Authentication
+## 6. Autenticação
 
-Select **OAuth** from the dropdown (not "No Auth" or "Mixed").
+Selecione **OAuth** no menu (não "No Auth" ou "Mixed").
 
-After entering a valid Server URL above, the **Advanced OAuth settings** panel below it becomes enabled and auto-discovers the server's OAuth metadata from:
+Depois de informar uma Server URL válida acima, o painel **Advanced OAuth settings** abaixo fica habilitado e descobre automaticamente os metadados OAuth do servidor a partir de:
 
 - `GET /.well-known/oauth-protected-resource`
 - `GET /.well-known/oauth-authorization-server`
 
-You don't need to fill in client ID/secret manually — the Worker exposes public dynamic client registration (`POST /oauth/register`) and ChatGPT registers itself automatically during the first connection.
+Você não precisa preencher client ID/secret manualmente - o Worker expõe registro dinâmico público de clientes (`POST /oauth/register`) e o ChatGPT registra a si mesmo automaticamente na primeira conexão.
 
-## 7. Risk acknowledgment checkbox
+## 7. Checkbox de ciência de risco
 
-Check **"I understand and want to continue"** — this is required for any custom/unverified MCP server (the "Create" button stays disabled until it's checked).
+Marque **"I understand and want to continue"** - isso é obrigatório para qualquer servidor MCP personalizado/não verificado (o botão "Create" fica desabilitado até a marcação).
 
-## 8. Create
+## 8. Criar
 
-Click **Create**. ChatGPT will immediately try to connect and may prompt you to complete the OAuth login flow (see below) before the app is fully added.
+Clique em **Create**. O ChatGPT tentará conectar imediatamente e pode pedir que você conclua o fluxo de login OAuth (veja abaixo) antes de adicionar o app por completo.
 
-## Longer Description (optional, for app listing)
-
-```
-Connect your Despezzas account to ChatGPT. Ask about your balances, credit
-cards, categories, and recent transactions, get spending summaries, and
-create or update transactions with a confirmation step before anything is
-written. Each user signs in with their own Despezzas email and password
-during setup — ChatGPT never sees your password, only a secure session
-token.
-```
-
-## What to tell users during OAuth login
-
-When ChatGPT redirects to the Despezzas MCP login screen, users should:
-
-1. Enter their **Despezzas email and password** (the same ones used on despezzas.com or the Despezzas app).
-2. Click **Entrar** to authorize.
-3. Return to ChatGPT — the connection is now active and scoped to their account only.
-
-No owner code or shared secret is needed; this deployment runs in **multi-user mode**, so each person's session is stored encrypted and independently in Cloudflare KV.
-
-## Suggested Example Prompts (for the App Store listing "Try asking" section)
+## Descrição Longa (opcional, para a listagem do app)
 
 ```
-- "What's my current balance across all accounts?"
-- "Show my last 10 transactions on my Nubank card."
-- "How much did I spend on restaurants this month?"
-- "Add a R$45.90 grocery expense to my checking account today."
-- "List my spending categories."
+Conecte sua conta Despezzas ao ChatGPT. Pergunte sobre seus saldos,
+cartões de crédito, categorias e transações recentes, veja resumos de
+gastos e crie ou atualize transações com uma etapa de confirmação antes
+de qualquer gravação. Cada usuário entra com seu próprio email e senha
+do Despezzas durante a configuração - o ChatGPT nunca vê sua senha,
+apenas um token de sessão seguro.
 ```
 
-## Verification Checklist Before Publishing
+## O Que Informar aos Usuários Durante o Login OAuth
 
-- [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/health` returns `"ok": true` and `"authMode": "multi-user"`.
-- [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/.well-known/oauth-protected-resource` resolves.
-- [ ] Logging in via `/login` with a real Despezzas account succeeds and shows the success page.
-- [ ] A test ChatGPT connection can call a read-only tool (e.g. list accounts) after OAuth.
+Quando o ChatGPT redirecionar para a tela de login do Despezzas MCP, os usuários devem:
+
+1. Informar **email e senha do Despezzas** (os mesmos usados em despezzas.com ou no app Despezzas).
+2. Clicar em **Entrar** para autorizar.
+3. Voltar ao ChatGPT - a conexão estará ativa e restrita apenas à conta deles.
+
+Não é necessário código de proprietário nem segredo compartilhado; este deploy roda em **modo multiusuário**, então a sessão de cada pessoa é armazenada de forma criptografada e independente no Cloudflare KV.
+
+## Prompts de Exemplo Sugeridos (para a seção "Try asking" da App Store)
+
+```
+- "Qual é meu saldo atual somando todas as contas?"
+- "Mostre minhas últimas 10 transações no cartão Nubank."
+- "Quanto gastei com restaurantes este mês?"
+- "Adicione uma despesa de mercado de R$45,90 na minha conta corrente hoje."
+- "Liste minhas categorias de gastos."
+```
+
+## Checklist de Verificação Antes de Publicar
+
+- [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/health` retorna `"ok": true` e `"authMode": "multi-user"`.
+- [ ] `GET https://despezzas-mcp.guipmilek.workers.dev/.well-known/oauth-protected-resource` responde corretamente.
+- [ ] O login via `/login` com uma conta real do Despezzas funciona e mostra a página de sucesso.
+- [ ] Uma conexão de teste no ChatGPT consegue chamar uma ferramenta somente leitura (por exemplo, listar contas) depois do OAuth.

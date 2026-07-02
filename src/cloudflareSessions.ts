@@ -100,7 +100,7 @@ export class CloudflareSessionAuthProvider implements DespezzasAuthProvider {
       return session.idToken;
     }
 
-    throw new AuthRequiredError("Saved Despezzas session expired. Reconnect the MCP in ChatGPT.");
+    throw new AuthRequiredError("A sessão salva do Despezzas expirou. Reconecte o MCP no ChatGPT.");
   }
 
   async getStatus(): Promise<AuthStatus> {
@@ -117,7 +117,7 @@ export class CloudflareSessionAuthProvider implements DespezzasAuthProvider {
   private async loadSession(): Promise<AuthSession> {
     const session = await this.store.get(this.sessionId);
     if (!session) {
-      throw new AuthRequiredError("No Despezzas session is stored for this ChatGPT connection. Reconnect the MCP.");
+      throw new AuthRequiredError("Nenhuma sessão Despezzas está armazenada para esta conexão do ChatGPT. Reconecte o MCP.");
     }
     return session;
   }
@@ -128,11 +128,11 @@ export function createCloudflareSessionStore(input: {
   SESSION_ENCRYPTION_KEY?: string;
 }): CloudflareSessionStore {
   if (!input.DESPEZZAS_SESSIONS) {
-    throw new Error("Cloudflare KV binding DESPEZZAS_SESSIONS is not configured.");
+    throw new Error("O binding Cloudflare KV DESPEZZAS_SESSIONS não está configurado.");
   }
 
   if (!input.SESSION_ENCRYPTION_KEY) {
-    throw new Error("SESSION_ENCRYPTION_KEY is not configured.");
+    throw new Error("SESSION_ENCRYPTION_KEY não está configurado.");
   }
 
   return new CloudflareSessionStore(input.DESPEZZAS_SESSIONS, input.SESSION_ENCRYPTION_KEY);
@@ -154,7 +154,7 @@ async function encryptJson(value: unknown, secret: string): Promise<string> {
 async function decryptJson(raw: string, secret: string): Promise<unknown> {
   const payload = JSON.parse(raw) as EncryptedPayload;
   if (payload.v !== 1) {
-    throw new Error("Unsupported encrypted session version.");
+    throw new Error("Versão de sessão criptografada não suportada.");
   }
 
   const key = await encryptionKey(secret);

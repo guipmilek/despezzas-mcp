@@ -31,7 +31,7 @@ if (isDirectRun()) {
   try {
     await runCli();
   } catch (error) {
-    console.error("Fatal error running Despezzas MCP:", error);
+    console.error("Erro fatal ao executar o Despezzas MCP:", error);
     process.exit(1);
   }
 }

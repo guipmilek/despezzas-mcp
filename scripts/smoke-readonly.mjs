@@ -18,7 +18,7 @@ function profileName(context) {
 async function main() {
   const auth = await client.authStatus();
   if (!auth.hasManualToken && !auth.hasEnvCredentials && !auth.hasSession) {
-    throw new Error("No Despezzas auth configured. Login locally or configure env credentials before smoke testing.");
+    throw new Error("Nenhuma autenticação do Despezzas configurada. Faça login localmente ou configure credenciais de ambiente antes da verificação rápida.");
   }
 
   const [profile, access, accounts, cards, categories, subcategories, transactions, exportableCount] = await Promise.all([

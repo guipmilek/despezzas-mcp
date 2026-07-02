@@ -1,5 +1,5 @@
-// Paste this whole file into the browser DevTools console on despezzas.com.
-// It records api.despezzas.com fetch/XHR calls and exposes:
+// Cole este arquivo inteiro no console do DevTools do navegador em despezzas.com.
+// Ele registra chamadas fetch/XHR para api.despezzas.com e expõe:
 //   window.__despezzasMcpMonitor.download()
 //   window.__despezzasMcpMonitor.copy()
 //   window.__despezzasMcpMonitor.report()
@@ -39,21 +39,21 @@
 
   function clip(text) {
     if (typeof text !== "string") return text;
-    return text.length > MAX_TEXT_LENGTH ? `${text.slice(0, MAX_TEXT_LENGTH)}...[truncated]` : text;
+    return text.length > MAX_TEXT_LENGTH ? `${text.slice(0, MAX_TEXT_LENGTH)}...[truncado]` : text;
   }
 
   function redactString(text) {
     if (typeof text !== "string") return text;
     return text
-      .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [redacted]")
-      .replace(/("(?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)"\s*:\s*)"[^"]*"/gi, '$1"[redacted]"')
-      .replace(/((?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)=)[^&\s]*/gi, "$1[redacted]");
+      .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [mascarado]")
+      .replace(/("(?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)"\s*:\s*)"[^"]*"/gi, '$1"[mascarado]"')
+      .replace(/((?:idToken|refreshToken|firebase_token|token|password|authorization|credential|secret)=)[^&\s]*/gi, "$1[mascarado]");
   }
 
   function redactHeaders(headers) {
     const redacted = {};
     for (const [key, value] of Object.entries(headers || {})) {
-      redacted[key] = /authorization|token|password|credential|secret/i.test(key) ? "[redacted]" : value;
+      redacted[key] = /authorization|token|password|credential|secret/i.test(key) ? "[mascarado]" : value;
     }
     return redacted;
   }
@@ -88,11 +88,11 @@
     if (body instanceof FormData) {
       const out = {};
       body.forEach((value, key) => {
-        out[key] = value instanceof File ? `[file:${value.name}]` : value;
+        out[key] = value instanceof File ? `[arquivo:${value.name}]` : value;
       });
       return JSON.stringify(out);
     }
-    if (body instanceof Blob) return `[blob:${body.type || "unknown"}:${body.size}]`;
+    if (body instanceof Blob) return `[blob:${body.type || "desconhecido"}:${body.size}]`;
     if (body instanceof ArrayBuffer) return `[arraybuffer:${body.byteLength}]`;
     try {
       return JSON.stringify(body);
@@ -128,7 +128,7 @@
       try {
         requestBody = init && "body" in init ? await bodyToText(init.body) : request ? await request.clone().text() : undefined;
       } catch (error) {
-        requestBody = `[unreadable request body: ${error instanceof Error ? error.message : String(error)}]`;
+        requestBody = `[corpo da requisição ilegível: ${error instanceof Error ? error.message : String(error)}]`;
       }
     }
 
@@ -139,7 +139,7 @@
         try {
           responseBody = await response.clone().text();
         } catch (error) {
-          responseBody = `[unreadable response body: ${error instanceof Error ? error.message : String(error)}]`;
+          responseBody = `[corpo da resposta ilegível: ${error instanceof Error ? error.message : String(error)}]`;
         }
         record({
           transport: "fetch",
@@ -160,7 +160,7 @@
           transport: "fetch",
           method,
           url,
-          status: "network-error",
+          status: "erro-de-rede",
           duration_ms: Math.round(performance.now() - started),
           request_headers: requestHeaders,
           request_body: requestBody,
@@ -197,15 +197,15 @@
           meta.request_body = text;
         })
         .catch((error) => {
-          meta.request_body = `[unreadable request body: ${error instanceof Error ? error.message : String(error)}]`;
+          meta.request_body = `[corpo da requisição ilegível: ${error instanceof Error ? error.message : String(error)}]`;
         });
 
       this.addEventListener("loadend", () => {
         let responseBody;
         try {
-          responseBody = this.responseType && this.responseType !== "text" ? `[responseType:${this.responseType}]` : this.responseText;
+          responseBody = this.responseType && this.responseType !== "text" ? `[tipoResposta:${this.responseType}]` : this.responseText;
         } catch (error) {
-          responseBody = `[unreadable response body: ${error instanceof Error ? error.message : String(error)}]`;
+          responseBody = `[corpo da resposta ilegível: ${error instanceof Error ? error.message : String(error)}]`;
         }
         record({
           transport: "xhr",
@@ -224,7 +224,7 @@
 
   function report() {
     return {
-      source: "despezzas-mcp DevTools request monitor",
+      source: "monitor de requisições DevTools do despezzas-mcp",
       started_at: startedAt,
       exported_at: nowIso(),
       page: window.location.href,
@@ -236,7 +236,7 @@
   async function copyReport() {
     const text = JSON.stringify(report(), null, 2);
     await navigator.clipboard.writeText(text);
-    console.info(`Copied ${entries.length} Despezzas API entries to clipboard.`);
+    console.info(`${entries.length} entradas da API Despezzas copiadas para a área de transferência.`);
   }
 
   function downloadReport(filename = "despezzas-api-report.json") {
@@ -254,7 +254,7 @@
     XMLHttpRequest.prototype.open = originalXhrOpen;
     XMLHttpRequest.prototype.send = originalXhrSend;
     XMLHttpRequest.prototype.setRequestHeader = originalXhrSetRequestHeader;
-    console.info("Despezzas MCP request monitor stopped.");
+    console.info("Monitor de requisições do Despezzas MCP interrompido.");
   }
 
   const startedAt = nowIso();
@@ -265,12 +265,12 @@
     download: downloadReport,
     clear: () => {
       entries.splice(0, entries.length);
-      console.info("Despezzas MCP request monitor cleared.");
+      console.info("Monitor de requisições do Despezzas MCP limpo.");
     },
     stop,
   };
 
   console.info(
-    "Despezzas MCP request monitor is recording api.despezzas.com calls. Run window.__despezzasMcpMonitor.download() to export JSON.",
+    "O monitor de requisições do Despezzas MCP está registrando chamadas para api.despezzas.com. Execute window.__despezzasMcpMonitor.download() para exportar JSON.",
   );
 })();

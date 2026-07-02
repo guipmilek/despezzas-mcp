@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { __test } from "../dist/tools.js";
 
-describe("transaction create preparation", () => {
-  it("builds the frontend-aligned default payload for a ready bank transaction", () => {
+describe("preparo de criação de transação", () => {
+  it("monta o payload padrão alinhado ao frontend para uma transação bancária pronta", () => {
     const prepared = __test.prepareCreateTransaction({
       title: "MCP TEST",
       amount_cents: 1234,
@@ -35,9 +35,9 @@ describe("transaction create preparation", () => {
     });
   });
 
-  it("refuses ambiguous or uncategorized create payloads by default", () => {
+  it("recusa por padrão payloads de criação ambíguos ou sem categoria", () => {
     const prepared = __test.prepareCreateTransaction({
-      title: "Bad create",
+      title: "Criacao invalida",
       amount_cents: 100,
       date: "2026-07-01",
       kind: "expense",
@@ -48,15 +48,15 @@ describe("transaction create preparation", () => {
 
     assert.equal(prepared.ready, false);
     assert.deepEqual(prepared.issues, [
-      "Provide either account_id or credit_card_id, not both.",
-      "category_id is required unless allow_uncategorized is true.",
-      "subcategory_id requires category_id.",
+      "Informe account_id ou credit_card_id, não ambos.",
+      "category_id é obrigatório, a menos que allow_uncategorized seja true.",
+      "subcategory_id exige category_id.",
     ]);
   });
 
-  it("requires at least two installments for parcelled transactions", () => {
+  it("exige pelo menos duas parcelas para transações parceladas", () => {
     const prepared = __test.prepareCreateTransaction({
-      title: "Parcelled",
+      title: "Parcelada",
       amount_cents: 100,
       date: "2026-07-01",
       kind: "expense",
@@ -67,12 +67,12 @@ describe("transaction create preparation", () => {
     });
 
     assert.equal(prepared.ready, false);
-    assert.ok(prepared.issues.includes("Parcelled transactions require installments >= 2."));
+    assert.ok(prepared.issues.includes("Transações parceladas exigem installments >= 2."));
   });
 
-  it("marks total parcelled amounts distinctly from per-installment amounts", () => {
+  it("diferencia valores totais parcelados de valores por parcela", () => {
     const prepared = __test.prepareCreateTransaction({
-      title: "Parcelled total",
+      title: "Parcelada total",
       amount_cents: 9000,
       date: "2026-07-01",
       kind: "expense",
@@ -91,8 +91,8 @@ describe("transaction create preparation", () => {
   });
 });
 
-describe("transaction update preparation", () => {
-  it("builds scoped update payloads without guessing untouched fields", () => {
+describe("preparo de edição de transação", () => {
+  it("monta payloads de edição com escopo sem adivinhar campos não alterados", () => {
     const prepared = __test.prepareUpdateTransaction("tx-1", 4995, "expense", "THIS", undefined, {
       date: "2026-07-02",
       category_id: "category-2",
@@ -111,22 +111,52 @@ describe("transaction update preparation", () => {
     });
   });
 
-  it("refuses empty and mixed account/card updates", () => {
+  it("recusa edições vazias e misturadas entre conta/cartão", () => {
     const empty = __test.prepareUpdateTransaction("tx-1", undefined, undefined, undefined, undefined, {});
     assert.equal(empty.ready, false);
-    assert.deepEqual(empty.issues, ["Provide at least one transaction field to update."]);
+    assert.deepEqual(empty.issues, ["Informe pelo menos um campo de transação para editar."]);
 
     const mixed = __test.prepareUpdateTransaction("tx-1", undefined, undefined, undefined, undefined, {
       account_id: "account-1",
       credit_card_id: "card-1",
     });
     assert.equal(mixed.ready, false);
-    assert.deepEqual(mixed.issues, ["Provide either account_id or credit_card_id, not both."]);
+    assert.deepEqual(mixed.issues, ["Informe account_id ou credit_card_id, não ambos."]);
+  });
+
+  it("prepara edições de transação em lote com validação por item", () => {
+    const batch = __test.prepareBatchUpdateTransactions([
+      {
+        id: "tx-1",
+        amount_cents: 1500,
+        kind: "expense",
+        scope: "THIS",
+        edition_date: "2026-07-02",
+      },
+      {
+        id: "tx-2",
+        account_id: "account-1",
+        credit_card_id: "card-1",
+      },
+    ]);
+
+    assert.equal(batch.length, 2);
+    assert.equal(batch[0].index, 0);
+    assert.equal(batch[0].ready, true);
+    assert.deepEqual(batch[0].payload, {
+      amount: 1500,
+      is_expense: true,
+      edition_type: "THIS",
+      edition_date: "2026-07-02",
+    });
+    assert.equal(batch[1].index, 1);
+    assert.equal(batch[1].ready, false);
+    assert.deepEqual(batch[1].issues, ["Informe account_id ou credit_card_id, não ambos."]);
   });
 });
 
-describe("transaction search diagnostics", () => {
-  it("reports local truncation and successful date sort checks", () => {
+describe("diagnósticos de busca de transações", () => {
+  it("informa truncamento local e valida ordenação por data com sucesso", () => {
     const transactions = [
       { id: "1", date: "2026-07-03T00:00:00.000Z", amount: 300, title: "C" },
       { id: "2", date: "2026-07-02T00:00:00.000Z", amount: 200, title: "B" },
@@ -146,11 +176,11 @@ describe("transaction search diagnostics", () => {
         checked_pairs: 1,
       },
       note:
-        "Despezzas currently returns a single matching list for these filters; this MCP applies limit locally and reports has_more/truncated_by_mcp_limit when the local limit hides rows.",
+        "O Despezzas atualmente retorna uma única lista correspondente para esses filtros; este MCP aplica limit localmente e informa has_more/truncated_by_mcp_limit quando o limite local oculta linhas.",
     });
   });
 
-  it("detects sort mismatches", () => {
+  it("detecta divergências de ordenação", () => {
     const diagnostics = __test.transactionSearchDiagnostics(
       [
         { id: "1", amount: 100 },
@@ -174,8 +204,8 @@ describe("transaction search diagnostics", () => {
   });
 });
 
-describe("export and profile helpers", () => {
-  it("summarizes nested transaction fields without returning full exports", () => {
+describe("helpers de exportação e perfil", () => {
+  it("resume campos aninhados de transação sem retornar exportações completas", () => {
     const summary = __test.summarizeFields([
       {
         id: "tx-1",
@@ -203,7 +233,7 @@ describe("export and profile helpers", () => {
     });
   });
 
-  it("normalizes profile context and warns on empty shared-profile collections", () => {
+  it("normaliza contexto de perfil e avisa em coleções vazias de perfil compartilhado", () => {
     const context = __test.profileContextFrom(
       { current_profile_access_id: "family-1", current_profile_role: "owner" },
       {
@@ -216,14 +246,14 @@ describe("export and profile helpers", () => {
     assert.equal(context.active_profile.name, "Familia");
     assert.equal(context.active_profile.is_personal_profile, false);
     assert.equal(context.owner_profile_count, 1);
-    assert.match(context.hint, /Using shared profile/);
+    assert.match(context.hint, /Usando perfil compartilhado/);
     assert.equal(
       __test.emptyProfileWarning("transactions", 0, context),
-      'No transactions were returned for active profile "Familia". Use despezzas_switch_profile with profile_id:null and confirm:true if you intended to query Perfil Principal personal finance data.',
+      'Nenhum resultado de transações foi retornado para o perfil ativo "Familia". Use despezzas_switch_profile com profile_id:null e confirm:true se a intenção era consultar dados financeiros pessoais do Perfil Principal.',
     );
   });
 
-  it("omits empty filter strings and maps min_amount_cents to Despezzas value", () => {
+  it("omite strings de filtro vazias e mapeia min_amount_cents para o value do Despezzas", () => {
     assert.deepEqual(
       __test.toTransactionFilters({
         account_type: "bank_account",

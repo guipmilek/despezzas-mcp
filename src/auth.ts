@@ -46,7 +46,7 @@ export interface DespezzasAuthProvider {
 }
 
 export class AuthRequiredError extends Error {
-  constructor(message = "Authentication is required. Open the MCP login page or configure DESPEZZAS_TOKEN/DESPEZZAS_EMAIL.") {
+  constructor(message = "Autenticação obrigatória. Abra a página de login do MCP ou configure DESPEZZAS_TOKEN/DESPEZZAS_EMAIL.") {
     super(message);
     this.name = "AuthRequiredError";
   }
@@ -86,7 +86,7 @@ export class DespezzasAuthManager {
 
   async loginWithPassword(email: string, password: string): Promise<string> {
     if (!email || !password) {
-      throw new AuthRequiredError("Email and password are required.");
+      throw new AuthRequiredError("Email e senha são obrigatórios.");
     }
 
     if (this.loginInFlight) {
@@ -144,7 +144,7 @@ export class DespezzasAuthManager {
         throw error;
       }
 
-      throw new AuthRequiredError("Saved Despezzas session expired. Open the MCP login page again.");
+      throw new AuthRequiredError("A sessão salva do Despezzas expirou. Abra a página de login do MCP novamente.");
     }
   }
 
@@ -182,7 +182,7 @@ export class DespezzasAuthManager {
 
 export async function createDespezzasSessionFromPassword(email: string, password: string): Promise<AuthSession> {
   if (!email || !password) {
-    throw new AuthRequiredError("Email and password are required.");
+    throw new AuthRequiredError("Email e senha são obrigatórios.");
   }
 
   const response = await fetch(new URL("/v2/auth", config.apiBaseUrl), {
@@ -199,11 +199,11 @@ export async function createDespezzasSessionFromPassword(email: string, password
 
   const data = (await readResponse(response)) as DespezzasAuthResponse;
   if (!response.ok) {
-    throw new Error(apiErrorMessage(response.status, data, "Despezzas login failed."));
+    throw new Error(apiErrorMessage(response.status, data, "Login no Despezzas falhou."));
   }
 
   if (!data.firebase_token || typeof data.firebase_token !== "string") {
-    throw new Error("Despezzas login did not return firebase_token.");
+    throw new Error("O login no Despezzas não retornou firebase_token.");
   }
 
   return exchangeCustomTokenForSession(data.firebase_token, data.user, email);
@@ -211,7 +211,7 @@ export async function createDespezzasSessionFromPassword(email: string, password
 
 export async function refreshDespezzasSession(session: AuthSession): Promise<AuthSession> {
   if (!session.refreshToken) {
-    throw new AuthRequiredError("Saved Despezzas session has no refresh token.");
+    throw new AuthRequiredError("A sessão salva do Despezzas não tem refresh token.");
   }
 
   const body = new URLSearchParams({
@@ -230,7 +230,7 @@ export async function refreshDespezzasSession(session: AuthSession): Promise<Aut
 
   const data = (await readResponse(response)) as FirebaseRefreshResponse;
   if (!response.ok) {
-    throw new AuthRequiredError("Saved Despezzas session expired. Open the MCP login page again.");
+    throw new AuthRequiredError("A sessão salva do Despezzas expirou. Abra a página de login do MCP novamente.");
   }
 
   return {
@@ -262,7 +262,7 @@ async function exchangeCustomTokenForSession(customToken: string, user?: unknown
 
   const data = (await readResponse(response)) as FirebaseCustomTokenResponse;
   if (!response.ok) {
-    throw new Error(apiErrorMessage(response.status, data, "Firebase custom token exchange failed."));
+    throw new Error(apiErrorMessage(response.status, data, "A troca do custom token do Firebase falhou."));
   }
 
   return {

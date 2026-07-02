@@ -1,4 +1,6 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, RegisteredTool, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { DespezzasClient } from "./client.js";
 import { config } from "./config.js";
@@ -24,16 +26,172 @@ import type {
   TransferPayload,
 } from "./types.js";
 
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.");
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato YYYY-MM-DD.");
 const idSchema = z.string().min(1);
 const idsSchema = z.array(idSchema).optional();
-const amountCentsSchema = z.number().int().positive().describe("Amount in cents. Example: 12345 = R$123.45.");
+const amountCentsSchema = z.number().int().positive().describe("Valor em centavos. Exemplo: 12345 = R$123.45.");
 const frequencySchema = z
   .enum(["DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "SEMIANNUAL", "YEARLY"])
   .optional();
 const transactionTypeSchema = z.enum(["unique", "recurring", "parcelled"]).optional();
 const scopeSchema = z.enum(["THIS", "THIS_AND_NEXT", "ALL"]).default("THIS");
 const rawJsonSchema: z.ZodType<JsonObject> = z.record(z.unknown());
+const toolOutputSchema = z.object({}).passthrough();
+const profileSummaryOutputSchema = z
+  .object({
+    id: z.string().nullable(),
+    name: z.string().optional(),
+    type: z.string().optional(),
+    role: z.string().nullable().optional(),
+    is_active: z.boolean(),
+  })
+  .passthrough();
+const profileContextOutputSchema = z.union([
+  z
+    .object({
+      active_profile: profileSummaryOutputSchema.extend({ is_personal_profile: z.boolean() }),
+      available_profiles: z.array(profileSummaryOutputSchema),
+      owner_profile_count: z.number().int().nonnegative(),
+      member_profile_count: z.number().int().nonnegative(),
+      hint: z.string(),
+    })
+    .passthrough(),
+  z.object({ error: z.string() }).passthrough(),
+]);
+const transactionFiltersOutputSchema = z
+  .object({
+    account_type: z.enum(["bank_account", "credit_card"]).optional(),
+    account_ids: z.array(z.string()).optional(),
+    credit_card_ids: z.array(z.string()).optional(),
+    category_ids: z.array(z.string()).optional(),
+    subcategory_ids: z.array(z.string()).optional(),
+    date_start: z.string().optional(),
+    date_end: z.string().optional(),
+    is_paid: z.boolean().optional(),
+    is_expense: z.boolean().optional(),
+    value: z.number().optional(),
+    search: z.string().optional(),
+    order_by: z.enum(["date", "title", "amount"]).optional(),
+    order: z.enum(["asc", "desc"]).optional(),
+  })
+  .passthrough();
+const compactTransactionOutputSchema = z
+  .object({
+    id: z.string().optional(),
+    date: z.string().optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    amount_cents: z.number(),
+    kind: z.enum(["expense", "income"]),
+    paid: z.boolean().optional(),
+    type: z.string().optional(),
+    installments: z.number().optional(),
+    installment_number: z.number().optional(),
+    account_id: z.string().optional(),
+    account_name: z.string().optional(),
+    credit_card_id: z.string().optional(),
+    credit_card_name: z.string().optional(),
+    category_id: z.string().optional(),
+    category_name: z.string().optional(),
+    subcategory_id: z.string().optional(),
+    subcategory_name: z.string().optional(),
+    profile_id: z.string().nullable().optional(),
+  })
+  .passthrough();
+const transactionSearchDiagnosticsOutputSchema = z
+  .object({
+    requested_limit: z.number().int().positive(),
+    api_returned_count: z.number().int().nonnegative(),
+    returned_count_after_limit: z.number().int().nonnegative(),
+    truncated_by_mcp_limit: z.boolean(),
+    sort_check: z
+      .object({
+        field: z.enum(["date", "title", "amount"]),
+        order: z.enum(["asc", "desc"]),
+        ok: z.boolean(),
+        checked_pairs: z.number().int().nonnegative(),
+        first_mismatch_index: z.number().int().nonnegative().optional(),
+      })
+      .passthrough(),
+    note: z.string(),
+  })
+  .passthrough();
+const transactionPayloadOutputSchema = z
+  .object({
+    title: z.string(),
+    description: z.string().optional(),
+    amount: z.number().int().positive(),
+    date: dateSchema,
+    is_expense: z.boolean(),
+    type: z.enum(["FIXED", "RECURRENT", "PARCELLED"]).optional(),
+    frequency: z
+      .enum(["DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "SEMIANNUAL", "YEARLY"])
+      .optional(),
+    installments: z.number().int().positive().optional(),
+    is_full_amount: z.boolean().optional(),
+    category_id: z.string().optional(),
+    subcategory_id: z.string().optional(),
+    account_id: z.string().optional(),
+    credit_card_id: z.string().optional(),
+    paid: z.boolean().optional(),
+  })
+  .passthrough();
+const transactionUpdatePayloadOutputSchema = transactionPayloadOutputSchema
+  .partial()
+  .extend({
+    amount: z.number().int().positive().optional(),
+    edition_type: z.enum(["THIS", "THIS_AND_NEXT", "ALL"]).optional(),
+    edition_date: dateSchema.optional(),
+  })
+  .passthrough();
+const preparedCreateTransactionOutputSchema = z
+  .object({
+    ready: z.boolean(),
+    issues: z.array(z.string()),
+    payload: transactionPayloadOutputSchema,
+    endpoint: z.literal("/v1/transactions"),
+    method: z.literal("POST"),
+    note: z.string(),
+  })
+  .passthrough();
+const preparedUpdateTransactionOutputSchema = z
+  .object({
+    ready: z.boolean(),
+    issues: z.array(z.string()),
+    id: z.string(),
+    payload: transactionUpdatePayloadOutputSchema,
+    endpoint: z.string(),
+    method: z.literal("PUT"),
+    note: z.string(),
+  })
+  .passthrough();
+const transactionSearchOutputSchema = z
+  .object({
+    profile_context: profileContextOutputSchema,
+    filters: transactionFiltersOutputSchema,
+    count: z.number().int().nonnegative(),
+    returned: z.number().int().nonnegative(),
+    has_more: z.boolean(),
+    diagnostics: transactionSearchDiagnosticsOutputSchema,
+    transactions: z.array(z.union([compactTransactionOutputSchema, z.record(z.unknown())])),
+    warning: z.string().optional(),
+  })
+  .passthrough();
+const createTransactionOutputSchema = z
+  .object({
+    created: z.literal(true),
+    payload: transactionPayloadOutputSchema,
+    transaction: z.record(z.unknown()),
+  })
+  .passthrough();
+const updateTransactionOutputSchema = z
+  .object({
+    updated: z.literal(true),
+    id: z.string(),
+    payload: transactionUpdatePayloadOutputSchema,
+    transaction: z.record(z.unknown()),
+  })
+  .passthrough();
 const extraProfileTypeSchema = z.enum(["pj", "family", "investments"]);
 const profileInviteSchema = z.object({
   email: z.string().email(),
@@ -59,7 +217,7 @@ const transactionCreateInputSchema = {
   allow_uncategorized: z
     .boolean()
     .default(false)
-    .describe("Set true only when you intentionally want to create a transaction without a category_id."),
+    .describe("Defina como true apenas quando quiser intencionalmente criar uma transação sem category_id."),
 };
 const transactionUpdateInputSchema = {
   id: idSchema,
@@ -73,9 +231,52 @@ const transactionUpdateInputSchema = {
   category_id: idSchema.optional(),
   subcategory_id: idSchema.optional(),
   paid: z.boolean().optional(),
-  scope: scopeSchema.optional().describe("Edition scope for recurring/installment transactions."),
-  edition_date: dateSchema.optional().describe("The occurrence date to edit. Defaults to date if provided."),
+  scope: scopeSchema.optional().describe("Escopo de edição para transações recorrentes/parceladas."),
+  edition_date: dateSchema.optional().describe("Data da ocorrência a editar. Por padrão, usa date quando informado."),
 };
+const transactionBatchUpdateItemInputSchema = z.object(transactionUpdateInputSchema);
+const preparedBatchUpdateTransactionOutputSchema = preparedUpdateTransactionOutputSchema
+  .extend({
+    index: z.number().int().nonnegative(),
+  })
+  .passthrough();
+const batchUpdateTransactionOutputSchema = z
+  .object({
+    confirmed: z.boolean(),
+    total: z.number().int().nonnegative(),
+    ready_count: z.number().int().nonnegative(),
+    all_ready: z.boolean(),
+    requires_confirm: z.boolean().optional(),
+    preview: z.array(preparedBatchUpdateTransactionOutputSchema),
+    updated_count: z.number().int().nonnegative().optional(),
+    results: z
+      .array(
+        z.union([
+          z
+            .object({
+              index: z.number().int().nonnegative(),
+              id: z.string(),
+              ok: z.literal(true),
+              payload: transactionUpdatePayloadOutputSchema,
+              transaction: z.record(z.unknown()),
+            })
+            .passthrough(),
+          z
+            .object({
+              index: z.number().int().nonnegative(),
+              id: z.string(),
+              ok: z.literal(false),
+              error: z.string(),
+            })
+            .passthrough(),
+        ]),
+      )
+      .optional(),
+    note: z.string(),
+  })
+  .passthrough();
+
+type TransactionBatchUpdateInput = z.infer<typeof transactionBatchUpdateItemInputSchema>;
 
 interface ProfileSummary {
   id: string | null;
@@ -95,12 +296,37 @@ interface ProfileContext {
 
 type ProfileContextResult = ProfileContext | { error: string };
 
+type ToolConfig<InputArgs extends undefined | ZodRawShapeCompat | AnySchema> = {
+  title?: string;
+  description?: string;
+  inputSchema?: InputArgs;
+  outputSchema?: ZodRawShapeCompat | AnySchema;
+  annotations?: ToolAnnotations;
+  _meta?: Record<string, unknown>;
+};
+
+function registerTool<InputArgs extends undefined | ZodRawShapeCompat | AnySchema = undefined>(
+  server: McpServer,
+  name: string,
+  config: ToolConfig<InputArgs>,
+  callback: ToolCallback<InputArgs>,
+): RegisteredTool {
+  return server.registerTool(
+    name,
+    {
+      ...config,
+      outputSchema: config.outputSchema ?? toolOutputSchema,
+    },
+    callback,
+  );
+}
+
 export function registerTools(server: McpServer, client = new DespezzasClient()) {
-  server.registerTool(
+  registerTool(server,
     "despezzas_status",
     {
-      title: "Despezzas MCP Status",
-      description: "Check whether the MCP server is configured with a Despezzas token.",
+      title: "Status do Despezzas MCP",
+      description: "Verifica se o servidor MCP está configurado com um token do Despezzas.",
       inputSchema: {},
     },
     async () => {
@@ -113,34 +339,34 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         profile_context,
         login_url: loginUrl(),
         note: configured
-          ? "Despezzas authentication is available."
-          : "Authentication is missing. Configure DESPEZZAS_TOKEN, DESPEZZAS_EMAIL/DESPEZZAS_PASSWORD, or run HTTP mode and open /login.",
+          ? "A autenticação do Despezzas está disponível."
+          : "Autenticação ausente. Configure DESPEZZAS_TOKEN, DESPEZZAS_EMAIL/DESPEZZAS_PASSWORD, ou execute o modo HTTP e abra /login.",
       });
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_profile",
     {
-      title: "Get Despezzas Profile",
-      description: "Fetch the authenticated Despezzas profile. Sensitive fields are redacted.",
+      title: "Obter Perfil do Despezzas",
+      description: "Busca o perfil autenticado do Despezzas. Campos sensíveis são mascarados.",
       inputSchema: {},
     },
     async () => {
       try {
         return jsonResponse(await client.getProfile());
       } catch (error) {
-        return errorResponse(error, "get profile");
+        return errorResponse(error, "obter perfil");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_list_profiles",
     {
-      title: "List Despezzas Profiles",
+      title: "Listar Perfis do Despezzas",
       description:
-        "List owner and member Despezzas profiles. Use this before switching profile context or managing shared profiles.",
+        "Lista perfis Despezzas de proprietário e membro. Use antes de trocar o contexto de perfil ou gerenciar perfis compartilhados.",
       inputSchema: {},
     },
     async () => {
@@ -151,29 +377,29 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           ...withProfileLimits(access),
         });
       } catch (error) {
-        return errorResponse(error, "list profiles");
+        return errorResponse(error, "listar perfis");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_switch_profile",
     {
-      title: "Switch Active Profile",
+      title: "Trocar Perfil Ativo",
       description:
-        "Write operation. Switch the active Despezzas profile for future account/card/transaction calls. Requires confirm: true.",
+        "Operação de escrita. Troca o perfil Despezzas ativo para chamadas futuras de contas, cartões e transações. Exige confirm: true.",
       inputSchema: {
         profile_id: z
           .string()
           .min(1)
           .nullable()
-          .describe("Profile ID from despezzas_list_profiles. Use null for the personal/root profile."),
+          .describe("ID do perfil em despezzas_list_profiles. Use null para o perfil pessoal/raiz."),
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
     async ({ profile_id, confirm }) => {
-      const refusal = requireConfirmation(confirm, "switch the active profile");
+      const refusal = requireConfirmation(confirm, "trocar o perfil ativo");
       if (refusal) return refusal;
 
       try {
@@ -182,30 +408,30 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           switched: true,
           active_profile_id: profile_id,
           result,
-          note: "Future Despezzas API calls in this session should use this active profile context.",
+          note: "Chamadas futuras à API Despezzas nesta sessão devem usar este contexto de perfil ativo.",
         });
       } catch (error) {
-        return errorResponse(error, "switch active profile");
+        return errorResponse(error, "trocar perfil ativo");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_create_profile",
     {
-      title: "Create Shared Profile",
+      title: "Criar Perfil Compartilhado",
       description:
-        "Write operation. Create one of the three extra Despezzas profiles (PJ, family, or investments). Requires confirm: true.",
+        "Operação de escrita. Cria um dos três perfis extras do Despezzas (PJ, família ou investimentos). Exige confirm: true.",
       inputSchema: {
         name: z.string().min(1).max(60),
-        type: extraProfileTypeSchema.describe("Despezzas extra profile type. Only one of each type is normally allowed."),
-        invites: profileInvitesSchema.describe("Optional invite list. Roles are editor or viewer."),
+        type: extraProfileTypeSchema.describe("Tipo de perfil extra do Despezzas. Normalmente só é permitido um de cada tipo."),
+        invites: profileInvitesSchema.describe("Lista opcional de convites. Os papéis são editor ou viewer."),
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
     async ({ name, type, invites, confirm }) => {
-      const refusal = requireConfirmation(confirm, "create a shared profile");
+      const refusal = requireConfirmation(confirm, "criar um perfil compartilhado");
       if (refusal) return refusal;
 
       try {
@@ -220,19 +446,19 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         };
         return jsonResponse(await client.createAccessProfile(payload));
       } catch (error) {
-        return errorResponse(error, "create shared profile");
+        return errorResponse(error, "criar perfil compartilhado");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_update_profile_access",
     {
-      title: "Update Shared Profile",
+      title: "Editar Perfil Compartilhado",
       description:
-        "Write operation. Update a shared profile. If invites is provided, it is sent as the replacement invite/member list. Requires confirm: true.",
+        "Operação de escrita. Edita um perfil compartilhado. Se invites for informado, ele substitui a lista de convites/membros. Exige confirm: true.",
       inputSchema: {
-        id: idSchema.describe("Shared profile ID from despezzas_list_profiles."),
+        id: idSchema.describe("ID do perfil compartilhado em despezzas_list_profiles."),
         name: z.string().min(1).max(60).optional(),
         type: extraProfileTypeSchema.optional(),
         invites: z.array(profileInviteSchema).max(5).optional(),
@@ -241,7 +467,7 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ id, name, type, invites, confirm }) => {
-      const refusal = requireConfirmation(confirm, "update a shared profile");
+      const refusal = requireConfirmation(confirm, "editar um perfil compartilhado");
       if (refusal) return refusal;
 
       const payload: ProfileAccessUpdatePayload = dropUndefined({
@@ -251,85 +477,85 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       });
 
       if (Object.keys(payload).length === 0) {
-        return errorResponse(new Error("Provide at least one of name, type, or invites."), "update shared profile");
+        return errorResponse(new Error("Informe pelo menos um dos campos name, type ou invites."), "editar perfil compartilhado");
       }
 
       try {
         return jsonResponse(await client.updateAccessProfile(id, payload));
       } catch (error) {
-        return errorResponse(error, "update shared profile");
+        return errorResponse(error, "editar perfil compartilhado");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_delete_profile",
     {
-      title: "Delete Shared Profile",
-      description: "Destructive write operation. Delete a shared profile you own. Requires confirm: true.",
+      title: "Excluir Perfil Compartilhado",
+      description: "Operação de escrita destrutiva. Exclui um perfil compartilhado de sua propriedade. Exige confirm: true.",
       inputSchema: {
-        id: idSchema.describe("Shared profile ID from despezzas_list_profiles."),
+        id: idSchema.describe("ID do perfil compartilhado em despezzas_list_profiles."),
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
     async ({ id, confirm }) => {
-      const refusal = requireConfirmation(confirm, "delete a shared profile");
+      const refusal = requireConfirmation(confirm, "excluir um perfil compartilhado");
       if (refusal) return refusal;
 
       try {
         await client.deleteAccessProfile(id);
         return jsonResponse({ deleted: true, id });
       } catch (error) {
-        return errorResponse(error, "delete shared profile");
+        return errorResponse(error, "excluir perfil compartilhado");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_leave_profile",
     {
-      title: "Leave Shared Profile",
-      description: "Write operation. Leave a shared profile where you are a member. Requires confirm: true.",
+      title: "Sair de Perfil Compartilhado",
+      description: "Operação de escrita. Sai de um perfil compartilhado em que você é membro. Exige confirm: true.",
       inputSchema: {
-        profile_id: idSchema.describe("Member profile ID from despezzas_list_profiles."),
+        profile_id: idSchema.describe("ID do perfil de membro em despezzas_list_profiles."),
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
     async ({ profile_id, confirm }) => {
-      const refusal = requireConfirmation(confirm, "leave a shared profile");
+      const refusal = requireConfirmation(confirm, "sair de um perfil compartilhado");
       if (refusal) return refusal;
 
       try {
         return jsonResponse(await client.leaveAccessProfile(profile_id));
       } catch (error) {
-        return errorResponse(error, "leave shared profile");
+        return errorResponse(error, "sair de perfil compartilhado");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_personal_config",
     {
-      title: "Get Personal Config",
-      description: "Fetch finance visibility preferences such as whether transfers, bills, or investments are included.",
+      title: "Obter Configuração Pessoal",
+      description: "Busca preferências de visibilidade financeira, como inclusão de transferências, contas ou investimentos.",
       inputSchema: {},
     },
     async () => {
       try {
         return jsonResponse(await client.getPersonalConfig());
       } catch (error) {
-        return errorResponse(error, "get personal config");
+        return errorResponse(error, "obter configuração pessoal");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_list_accounts",
     {
-      title: "List Accounts",
-      description: "List Despezzas bank/cash accounts. Use this first to discover account IDs for transaction filters.",
+      title: "Listar Contas",
+      description: "Lista contas bancárias/dinheiro do Despezzas. Use primeiro para descobrir IDs de conta para filtros de transação.",
       inputSchema: {},
     },
     async () => {
@@ -337,35 +563,35 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         const [accounts, profile_context] = await Promise.all([client.getAccounts(), safeProfileContext(client)]);
         return jsonResponse(withProfileAwareCollection("accounts", accounts, profile_context));
       } catch (error) {
-        return errorResponse(error, "list accounts");
+        return errorResponse(error, "listar contas");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_list_banks",
     {
-      title: "List Account Logos/Banks",
-      description: "List bank/logo options used when creating manual Despezzas accounts.",
+      title: "Listar Bancos/Logos de Conta",
+      description: "Lista opções de bancos/logos usadas ao criar contas manuais no Despezzas.",
       inputSchema: {},
     },
     async () => {
       try {
         return jsonResponse(await client.getBanks());
       } catch (error) {
-        return errorResponse(error, "list banks");
+        return errorResponse(error, "listar bancos");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_create_account",
     {
-      title: "Create Manual Account",
-      description: "Write operation. Create a manual account in Despezzas. Requires confirm: true.",
+      title: "Criar Conta Manual",
+      description: "Operação de escrita. Cria uma conta manual no Despezzas. Exige confirm: true.",
       inputSchema: {
         name: z.string().min(1),
-        logo: z.string().min(1).describe("Logo URL or Despezzas bank logo value from despezzas_list_banks."),
+        logo: z.string().min(1).describe("URL do logo ou valor de logo de banco do Despezzas vindo de despezzas_list_banks."),
         initial_balance_cents: z.number().int().optional(),
         include_total_balance: z.boolean().default(true),
         confirm: z.boolean().optional(),
@@ -373,7 +599,7 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ name, logo, initial_balance_cents, include_total_balance, confirm }) => {
-      const refusal = requireConfirmation(confirm, "create an account");
+      const refusal = requireConfirmation(confirm, "criar uma conta");
       if (refusal) return refusal;
 
       try {
@@ -385,18 +611,18 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         };
         return jsonResponse(await client.createAccount(payload));
       } catch (error) {
-        return errorResponse(error, "create account");
+        return errorResponse(error, "criar conta");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_update_account",
     {
-      title: "Update Account",
-      description: "Write operation. Update a manual Despezzas account. Requires confirm: true.",
+      title: "Editar Conta",
+      description: "Operação de escrita. Edita uma conta manual do Despezzas. Exige confirm: true.",
       inputSchema: {
-        id: idSchema.describe("Account ID from despezzas_list_accounts."),
+        id: idSchema.describe("ID da conta em despezzas_list_accounts."),
         name: z.string().min(1).optional(),
         logo: z.string().min(1).optional(),
         balance_cents: z.number().int().optional(),
@@ -406,47 +632,47 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ id, balance_cents, confirm, ...rest }) => {
-      const refusal = requireConfirmation(confirm, "update an account");
+      const refusal = requireConfirmation(confirm, "editar uma conta");
       if (refusal) return refusal;
 
       try {
         const payload: Partial<AccountPayload> = { ...rest, balance: balance_cents };
         return jsonResponse(await client.updateAccount(id, dropUndefined(payload)));
       } catch (error) {
-        return errorResponse(error, "update account");
+        return errorResponse(error, "editar conta");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_delete_account",
     {
-      title: "Delete Account",
-      description: "Destructive write operation. Delete a Despezzas account. Requires confirm: true.",
+      title: "Excluir Conta",
+      description: "Operação de escrita destrutiva. Exclui uma conta do Despezzas. Exige confirm: true.",
       inputSchema: {
-        id: idSchema.describe("Account ID from despezzas_list_accounts."),
+        id: idSchema.describe("ID da conta em despezzas_list_accounts."),
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
     async ({ id, confirm }) => {
-      const refusal = requireConfirmation(confirm, "delete an account");
+      const refusal = requireConfirmation(confirm, "excluir uma conta");
       if (refusal) return refusal;
 
       try {
         await client.deleteAccount(id);
         return jsonResponse({ deleted: true, id });
       } catch (error) {
-        return errorResponse(error, "delete account");
+        return errorResponse(error, "excluir conta");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_list_credit_cards",
     {
-      title: "List Credit Cards",
-      description: "List Despezzas credit cards. Use this to discover card IDs for transaction filters.",
+      title: "Listar Cartões de Crédito",
+      description: "Lista cartões de crédito do Despezzas. Use para descobrir IDs de cartão para filtros de transação.",
       inputSchema: {},
     },
     async () => {
@@ -454,31 +680,31 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         const [credit_cards, profile_context] = await Promise.all([client.getCreditCards(), safeProfileContext(client)]);
         return jsonResponse(withProfileAwareCollection("credit_cards", credit_cards, profile_context));
       } catch (error) {
-        return errorResponse(error, "list credit cards");
+        return errorResponse(error, "listar cartões de crédito");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_create_credit_card",
     {
-      title: "Create Credit Card",
-      description: "Write operation. Create a manual Despezzas credit card. Requires confirm: true.",
+      title: "Criar Cartão de Crédito",
+      description: "Operação de escrita. Cria um cartão de crédito manual no Despezzas. Exige confirm: true.",
       inputSchema: {
         name: z.string().min(1),
         logo: z.string().optional(),
         limit_cents: z.number().int().optional(),
         available_limit_cents: z.number().int().optional(),
         is_unlimited: z.boolean().optional(),
-        expiring_date: z.string().optional().describe("Due day/month field as Despezzas expects, usually a day string."),
-        closing_date: z.string().optional().describe("Closing day string."),
+        expiring_date: z.string().optional().describe("Campo de dia/mês de vencimento como o Despezzas espera, geralmente uma string de dia."),
+        closing_date: z.string().optional().describe("String com o dia de fechamento."),
         account_id: idSchema.optional(),
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
     async ({ limit_cents, available_limit_cents, confirm, ...rest }) => {
-      const refusal = requireConfirmation(confirm, "create a credit card");
+      const refusal = requireConfirmation(confirm, "criar um cartão de crédito");
       if (refusal) return refusal;
 
       try {
@@ -489,18 +715,18 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         };
         return jsonResponse(await client.createCreditCard(dropUndefined(payload)));
       } catch (error) {
-        return errorResponse(error, "create credit card");
+        return errorResponse(error, "criar cartão de crédito");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_update_credit_card",
     {
-      title: "Update Credit Card",
-      description: "Write operation. Update a manual Despezzas credit card. Requires confirm: true.",
+      title: "Editar Cartão de Crédito",
+      description: "Operação de escrita. Edita um cartão de crédito manual do Despezzas. Exige confirm: true.",
       inputSchema: {
-        id: idSchema.describe("Credit card ID from despezzas_list_credit_cards."),
+        id: idSchema.describe("ID do cartão de crédito em despezzas_list_credit_cards."),
         name: z.string().min(1).optional(),
         logo: z.string().optional(),
         limit_cents: z.number().int().optional(),
@@ -514,7 +740,7 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ id, limit_cents, available_limit_cents, confirm, ...rest }) => {
-      const refusal = requireConfirmation(confirm, "update a credit card");
+      const refusal = requireConfirmation(confirm, "editar um cartão de crédito");
       if (refusal) return refusal;
 
       try {
@@ -525,40 +751,40 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         };
         return jsonResponse(await client.updateCreditCard(id, dropUndefined(payload)));
       } catch (error) {
-        return errorResponse(error, "update credit card");
+        return errorResponse(error, "editar cartão de crédito");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_delete_credit_card",
     {
-      title: "Delete Credit Card",
-      description: "Destructive write operation. Delete a Despezzas credit card. Requires confirm: true.",
+      title: "Excluir Cartão de Crédito",
+      description: "Operação de escrita destrutiva. Exclui um cartão de crédito do Despezzas. Exige confirm: true.",
       inputSchema: {
-        id: idSchema.describe("Credit card ID from despezzas_list_credit_cards."),
+        id: idSchema.describe("ID do cartão de crédito em despezzas_list_credit_cards."),
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
     async ({ id, confirm }) => {
-      const refusal = requireConfirmation(confirm, "delete a credit card");
+      const refusal = requireConfirmation(confirm, "excluir um cartão de crédito");
       if (refusal) return refusal;
 
       try {
         await client.deleteCreditCard(id);
         return jsonResponse({ deleted: true, id });
       } catch (error) {
-        return errorResponse(error, "delete credit card");
+        return errorResponse(error, "excluir cartão de crédito");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_list_categories",
     {
-      title: "List Categories",
-      description: "List default and optionally user-created Despezzas categories.",
+      title: "Listar Categorias",
+      description: "Lista categorias padrão e, opcionalmente, categorias criadas pelo usuário no Despezzas.",
       inputSchema: {
         include_user: z.boolean().default(true),
       },
@@ -567,16 +793,16 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       try {
         return jsonResponse(await client.getCategories(include_user));
       } catch (error) {
-        return errorResponse(error, "list categories");
+        return errorResponse(error, "listar categorias");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_list_subcategories",
     {
-      title: "List Subcategories",
-      description: "List default and optionally user-created Despezzas subcategories. Use category_id in the result to pair them with categories.",
+      title: "Listar Subcategorias",
+      description: "Lista subcategorias padrão e, opcionalmente, subcategorias criadas pelo usuário no Despezzas. Use category_id no resultado para vinculá-las às categorias.",
       inputSchema: {
         include_user: z.boolean().default(true),
       },
@@ -585,25 +811,25 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       try {
         return jsonResponse(await client.getSubcategories(include_user));
       } catch (error) {
-        return errorResponse(error, "list subcategories");
+        return errorResponse(error, "listar subcategorias");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_search_transactions",
     {
-      title: "Search Transactions",
+      title: "Buscar Transações",
       description:
-        "List Despezzas transactions with filters. Defaults to the current month and bank-account cash-flow view. Amounts are returned in cents.",
+        "Lista transações do Despezzas com filtros. Por padrão usa o mês atual e a visão de fluxo de caixa de contas bancárias. Valores retornam em centavos.",
       inputSchema: {
         date_start: dateSchema.optional(),
         date_end: dateSchema.optional(),
         account_type: z.enum(["bank_account", "credit_card"]).optional(),
-        account_ids: idsSchema.describe("Account IDs from despezzas_list_accounts."),
-        credit_card_ids: idsSchema.describe("Credit card IDs from despezzas_list_credit_cards."),
-        category_ids: idsSchema.describe("Category IDs from despezzas_list_categories."),
-        subcategory_ids: idsSchema.describe("Subcategory IDs from despezzas_list_subcategories."),
+        account_ids: idsSchema.describe("IDs de conta em despezzas_list_accounts."),
+        credit_card_ids: idsSchema.describe("IDs de cartão de crédito em despezzas_list_credit_cards."),
+        category_ids: idsSchema.describe("IDs de categoria em despezzas_list_categories."),
+        subcategory_ids: idsSchema.describe("IDs de subcategoria em despezzas_list_subcategories."),
         is_paid: z.boolean().optional(),
         is_expense: z.boolean().optional(),
         min_amount_cents: z.number().int().positive().optional(),
@@ -611,8 +837,9 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         order_by: z.enum(["date", "title", "amount"]).default("date"),
         order: z.enum(["asc", "desc"]).default("desc"),
         limit: z.number().int().min(1).max(500).default(100),
-        include_raw: z.boolean().default(false).describe("Return full Despezzas transaction objects instead of compact rows."),
+        include_raw: z.boolean().default(false).describe("Retorna objetos completos de transação do Despezzas em vez de linhas compactas."),
       },
+      outputSchema: transactionSearchOutputSchema,
     },
     async (args) => {
       try {
@@ -639,16 +866,16 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           warning: emptyProfileWarning("transactions", transactions.length, profile_context),
         });
       } catch (error) {
-        return errorResponse(error, "search transactions");
+        return errorResponse(error, "buscar transações");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_transaction_overview",
     {
-      title: "Transaction Overview",
-      description: "Get Despezzas overview totals and account balances for a date. Amounts are in cents.",
+      title: "Visão Geral de Transações",
+      description: "Obtém totais da visão geral do Despezzas e saldos de conta para uma data. Valores em centavos.",
       inputSchema: {
         date: dateSchema.default(formatDate(new Date())),
       },
@@ -657,17 +884,17 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       try {
         return jsonResponse(await client.getOverview(date));
       } catch (error) {
-        return errorResponse(error, "get transaction overview");
+        return errorResponse(error, "obter visão geral de transações");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_finance_summary",
     {
-      title: "Finance Summary",
+      title: "Resumo Financeiro",
       description:
-        "Summarize revenue, expenses, paid/unpaid totals, and top categories for a date range. Defaults to the current month.",
+        "Resume receitas, despesas, totais pagos/não pagos e principais categorias em um intervalo de datas. Por padrão usa o mês atual.",
       inputSchema: {
         date_start: dateSchema.optional(),
         date_end: dateSchema.optional(),
@@ -699,18 +926,19 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           warning: emptyProfileWarning("transactions", transactions.length, profile_context),
         });
       } catch (error) {
-        return errorResponse(error, "summarize finances");
+        return errorResponse(error, "resumir finanças");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_prepare_create_transaction",
     {
-      title: "Prepare Transaction Create",
+      title: "Preparar Criação de Transação",
       description:
-        "Dry-run helper. Build and validate the payload for a new transaction without calling Despezzas. Use this before despezzas_create_transaction.",
+        "Auxiliar de pré-visualização. Monta e valida o payload de uma nova transação sem chamar o Despezzas. Use antes de despezzas_create_transaction.",
       inputSchema: transactionCreateInputSchema,
+      outputSchema: preparedCreateTransactionOutputSchema,
       annotations: { readOnlyHint: true },
     },
     async ({ amount_cents, kind, transaction_type, amount_mode, allow_uncategorized, ...rest }) => {
@@ -726,20 +954,21 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_create_transaction",
     {
-      title: "Create Transaction",
+      title: "Criar Transação",
       description:
-        "Write operation. Create a real Despezzas transaction. Requires confirm: true. Use despezzas_prepare_create_transaction first, and never guess account/card/category IDs.",
+        "Operação de escrita. Cria uma transação real no Despezzas. Exige confirm: true. Use despezzas_prepare_create_transaction primeiro e nunca adivinhe IDs de conta/cartão/categoria.",
       inputSchema: {
         ...transactionCreateInputSchema,
         confirm: z.boolean().optional(),
       },
+      outputSchema: createTransactionOutputSchema,
       annotations: { destructiveHint: true },
     },
     async ({ amount_cents, kind, transaction_type, amount_mode, allow_uncategorized, confirm, ...rest }) => {
-      const refusal = requireConfirmation(confirm, "create a transaction");
+      const refusal = requireConfirmation(confirm, "criar uma transação");
       if (refusal) return refusal;
 
       const prepared = prepareCreateTransaction({
@@ -752,8 +981,8 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       });
       if (!prepared.ready) {
         return errorResponse(
-          new Error(`Transaction create payload is not ready: ${prepared.issues.join(" ")}`),
-          "create transaction",
+          new Error(`Payload de criação de transação não está pronto: ${prepared.issues.join(" ")}`),
+          "criar transação",
         );
       }
 
@@ -765,18 +994,19 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           transaction,
         });
       } catch (error) {
-        return errorResponse(error, "create transaction");
+        return errorResponse(error, "criar transação");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_prepare_update_transaction",
     {
-      title: "Prepare Transaction Update",
+      title: "Preparar Edição de Transação",
       description:
-        "Dry-run helper. Build and validate the payload for updating a transaction without calling Despezzas. Use before despezzas_update_transaction.",
+        "Auxiliar de pré-visualização. Monta e valida o payload para editar uma transação sem chamar o Despezzas. Use antes de despezzas_update_transaction.",
       inputSchema: transactionUpdateInputSchema,
+      outputSchema: preparedUpdateTransactionOutputSchema,
       annotations: { readOnlyHint: true },
     },
     async ({ id, amount_cents, kind, scope, edition_date, ...rest }) => {
@@ -784,28 +1014,29 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_update_transaction",
     {
-      title: "Update Transaction",
+      title: "Editar Transação",
       description:
-        "Write operation. Update a real Despezzas transaction. Requires confirm: true. Use despezzas_prepare_update_transaction first.",
+        "Operação de escrita. Edita uma transação real no Despezzas. Exige confirm: true. Use despezzas_prepare_update_transaction primeiro.",
       inputSchema: {
         ...transactionUpdateInputSchema,
         confirm: z.boolean().optional(),
       },
+      outputSchema: updateTransactionOutputSchema,
       annotations: { destructiveHint: true },
     },
     async ({ id, amount_cents, kind, scope, edition_date, confirm, ...rest }) => {
-      const refusal = requireConfirmation(confirm, "update a transaction");
+      const refusal = requireConfirmation(confirm, "editar uma transação");
       if (refusal) return refusal;
 
       try {
         const prepared = prepareUpdateTransaction(id, amount_cents, kind, scope, edition_date, rest);
         if (!prepared.ready) {
           return errorResponse(
-            new Error(`Transaction update payload is not ready: ${prepared.issues.join(" ")}`),
-            "update transaction",
+            new Error(`Payload de edição de transação não está pronto: ${prepared.issues.join(" ")}`),
+            "editar transação",
           );
         }
 
@@ -817,17 +1048,110 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           transaction,
         });
       } catch (error) {
-        return errorResponse(error, "update transaction");
+        return errorResponse(error, "editar transação");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
+    "despezzas_batch_update_transactions",
+    {
+      title: "Editar Transações em Lote",
+      description:
+        "Operação de escrita. Pré-visualiza e depois edita várias transações do Despezzas com uma chamada confirm:true. Chame uma vez sem confirm para inspecionar os payloads; repita com confirm:true apenas depois de verificar cada id e payload.",
+      inputSchema: {
+        updates: z
+          .array(transactionBatchUpdateItemInputSchema)
+          .min(1)
+          .max(50)
+          .describe("Edições de transação. Cada item usa os mesmos campos de despezzas_update_transaction, incluindo id."),
+        confirm: z.boolean().optional(),
+        stop_on_error: z.boolean().default(true).describe("Para após o primeiro erro de API. A validação sempre roda para todos os itens antes de qualquer escrita."),
+      },
+      outputSchema: batchUpdateTransactionOutputSchema,
+      annotations: { destructiveHint: true },
+    },
+    async ({ updates, confirm, stop_on_error }) => {
+      const preview = prepareBatchUpdateTransactions(updates);
+      const readyCount = preview.filter((item) => item.ready).length;
+      const allReady = readyCount === preview.length;
+
+      if (!confirm) {
+        return jsonResponse({
+          confirmed: false,
+          total: preview.length,
+          ready_count: readyCount,
+          all_ready: allReady,
+          requires_confirm: true,
+          preview,
+          note: "Nenhuma chamada de API foi feita. Se all_ready for true, chame esta ferramenta novamente com as mesmas edições e confirm:true.",
+        });
+      }
+
+      if (!allReady) {
+        return jsonResponse({
+          confirmed: false,
+          total: preview.length,
+          ready_count: readyCount,
+          all_ready: false,
+          requires_confirm: true,
+          preview,
+          note: "Nenhuma chamada de API foi feita porque pelo menos uma edição não está pronta. Corrija os problemas e pré-visualize novamente antes de confirmar.",
+        });
+      }
+
+      const results: Array<
+        | { index: number; id: string; ok: true; payload: TransactionUpdatePayload; transaction: JsonObject }
+        | { index: number; id: string; ok: false; error: string }
+      > = [];
+
+      for (const item of preview) {
+        const result = await captureApiResult(() => client.updateTransaction(item.id, item.payload));
+        if (result.ok) {
+          results.push({
+            index: item.index,
+            id: item.id,
+            ok: true,
+            payload: item.payload,
+            transaction: result.value,
+          });
+          continue;
+        }
+
+        results.push({
+          index: item.index,
+          id: item.id,
+          ok: false,
+          error: result.error,
+        });
+        if (stop_on_error) {
+          break;
+        }
+      }
+
+      const updatedCount = results.filter((item) => item.ok).length;
+      return jsonResponse({
+        confirmed: true,
+        total: preview.length,
+        ready_count: readyCount,
+        all_ready: true,
+        preview,
+        updated_count: updatedCount,
+        results,
+        note:
+          updatedCount === preview.length
+            ? "Todas as edições de transação foram concluídas."
+            : "Algumas edições de transação não foram concluídas. Revise os resultados antes de tentar novamente apenas os itens com falha.",
+      });
+    },
+  );
+
+  registerTool(server,
     "despezzas_prepare_delete_transaction",
     {
-      title: "Prepare Transaction Delete",
+      title: "Preparar Exclusão de Transação",
       description:
-        "Dry-run helper. Show the delete target and scope without deleting anything. Use before despezzas_delete_transaction.",
+        "Auxiliar de pré-visualização. Mostra o alvo e o escopo da exclusão sem excluir nada. Use antes de despezzas_delete_transaction.",
       inputSchema: {
         id: idSchema,
         scope: scopeSchema,
@@ -842,17 +1166,17 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         endpoint: `/v1/transactions/${id}`,
         method: "DELETE",
         body: { type: scope },
-        note: "No API call was made. To delete this transaction, call despezzas_delete_transaction with this id, scope, and confirm:true.",
+        note: "Nenhuma chamada de API foi feita. Para excluir esta transação, chame despezzas_delete_transaction com este id, scope e confirm:true.",
       });
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_delete_transaction",
     {
-      title: "Delete Transaction",
+      title: "Excluir Transação",
       description:
-        "Destructive write operation. Delete a transaction. Requires confirm: true. Use despezzas_prepare_delete_transaction first.",
+        "Operação de escrita destrutiva. Exclui uma transação. Exige confirm: true. Use despezzas_prepare_delete_transaction primeiro.",
       inputSchema: {
         id: idSchema,
         scope: scopeSchema,
@@ -861,23 +1185,23 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ id, scope, confirm }) => {
-      const refusal = requireConfirmation(confirm, "delete a transaction");
+      const refusal = requireConfirmation(confirm, "excluir uma transação");
       if (refusal) return refusal;
 
       try {
         await client.deleteTransaction(id, scope);
         return jsonResponse({ deleted: true, id, scope });
       } catch (error) {
-        return errorResponse(error, "delete transaction");
+        return errorResponse(error, "excluir transação");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_duplicate_transaction",
     {
-      title: "Duplicate Transaction",
-      description: "Write operation. Duplicate a Despezzas transaction. Requires confirm: true.",
+      title: "Duplicar Transação",
+      description: "Operação de escrita. Duplica uma transação do Despezzas. Exige confirm: true.",
       inputSchema: {
         id: idSchema,
         confirm: z.boolean().optional(),
@@ -885,22 +1209,22 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ id, confirm }) => {
-      const refusal = requireConfirmation(confirm, "duplicate a transaction");
+      const refusal = requireConfirmation(confirm, "duplicar uma transação");
       if (refusal) return refusal;
 
       try {
         return jsonResponse(await client.duplicateTransaction(id));
       } catch (error) {
-        return errorResponse(error, "duplicate transaction");
+        return errorResponse(error, "duplicar transação");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_toggle_transaction_paid",
     {
-      title: "Toggle Transaction Paid",
-      description: "Write operation. Toggle or mark transaction paid for a date. Requires confirm: true.",
+      title: "Alternar Pagamento da Transação",
+      description: "Operação de escrita. Alterna ou marca uma transação como paga em uma data. Exige confirm: true.",
       inputSchema: {
         id: idSchema,
         date: dateSchema.default(formatDate(new Date())),
@@ -909,27 +1233,27 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ id, date, confirm }) => {
-      const refusal = requireConfirmation(confirm, "toggle transaction paid status");
+      const refusal = requireConfirmation(confirm, "alternar status de pagamento da transação");
       if (refusal) return refusal;
 
       try {
         return jsonResponse(await client.togglePaid(id, date));
       } catch (error) {
-        return errorResponse(error, "toggle transaction paid status");
+        return errorResponse(error, "alternar status de pagamento da transação");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_create_transfer",
     {
-      title: "Create Transfer",
-      description: "Write operation. Create a transfer between two Despezzas accounts. Requires confirm: true.",
+      title: "Criar Transferência",
+      description: "Operação de escrita. Cria uma transferência entre duas contas do Despezzas. Exige confirm: true.",
       inputSchema: {
         amount_cents: amountCentsSchema,
         date: dateSchema,
-        sent_account_id: idSchema.describe("Source account ID."),
-        received_account_id: idSchema.describe("Destination account ID."),
+        sent_account_id: idSchema.describe("ID da conta de origem."),
+        received_account_id: idSchema.describe("ID da conta de destino."),
         paid: z.boolean().default(true),
         title: z.string().optional(),
         description: z.string().optional(),
@@ -938,24 +1262,24 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       annotations: { destructiveHint: true },
     },
     async ({ amount_cents, confirm, ...rest }) => {
-      const refusal = requireConfirmation(confirm, "create a transfer");
+      const refusal = requireConfirmation(confirm, "criar uma transferência");
       if (refusal) return refusal;
 
       try {
         const payload: TransferPayload = { ...rest, amount: amount_cents };
         return jsonResponse(await client.createTransfer(payload));
       } catch (error) {
-        return errorResponse(error, "create transfer");
+        return errorResponse(error, "criar transferência");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_export_transactions",
     {
-      title: "Export Transactions",
+      title: "Exportar Transações",
       description:
-        "Inspect/export Despezzas transactions for a date range. Defaults to a safe count plus field summary; set count_only:false to call the export endpoint.",
+        "Inspeciona/exporta transações do Despezzas em um intervalo de datas. Por padrão faz uma contagem segura com resumo de campos; defina count_only:false para chamar o endpoint de exportação.",
       inputSchema: {
         date_start: dateSchema,
         date_end: dateSchema,
@@ -992,20 +1316,20 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
 
         return jsonResponse(dropUndefined(result));
       } catch (error) {
-        return errorResponse(error, "export transactions");
+        return errorResponse(error, "exportar transações");
       }
     },
   );
 
-  server.registerTool(
+  registerTool(server,
     "despezzas_raw_api",
     {
-      title: "Raw Despezzas API Call",
+      title: "Chamada Bruta à API Despezzas",
       description:
-        "Escape hatch for endpoints discovered later. Safe GET calls are allowed. POST/PUT/PATCH/DELETE require allow_destructive: true.",
+        "Saída de emergência para endpoints descobertos depois. Chamadas GET seguras são permitidas. POST/PUT/PATCH/DELETE exigem allow_destructive: true.",
       inputSchema: {
         method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("GET"),
-        path: z.string().regex(/^\/v\d+\//, "Use an API path such as /v1/transactions."),
+        path: z.string().regex(/^\/v\d+\//, "Use um caminho de API como /v1/transactions."),
         query: rawJsonSchema.optional(),
         body: z.unknown().optional(),
         allow_destructive: z.boolean().optional(),
@@ -1014,21 +1338,18 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     },
     async ({ method, path, query, body, allow_destructive }) => {
       if (method !== "GET" && !allow_destructive) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Refusing to ${method} ${path} because allow_destructive was not true. Re-run this tool only after verifying the endpoint and payload.`,
-            },
-          ],
-          isError: true,
-        };
+        return errorResponse(
+          new Error(
+            `Recusando ${method} ${path} porque allow_destructive não foi true. Execute esta ferramenta novamente apenas depois de verificar o endpoint e o payload.`,
+          ),
+          `${method} ${path}`,
+        );
       }
 
       try {
         return jsonResponse(await client.raw(method, path, query, body));
       } catch (error) {
-        return errorResponse(error, "call raw Despezzas API");
+        return errorResponse(error, "chamar API bruta do Despezzas");
       }
     },
   );
@@ -1051,6 +1372,10 @@ interface PreparedUpdateTransaction {
   endpoint: string;
   method: "PUT";
   note: string;
+}
+
+interface PreparedBatchUpdateTransaction extends PreparedUpdateTransaction {
+  index: number;
 }
 
 function prepareCreateTransaction(args: {
@@ -1079,7 +1404,7 @@ function prepareCreateTransaction(args: {
     payload,
     endpoint: "/v1/transactions",
     method: "POST",
-    note: "No API call was made. If ready is true, call despezzas_create_transaction with the same fields plus confirm:true.",
+    note: "Nenhuma chamada de API foi feita. Se ready for true, chame despezzas_create_transaction com os mesmos campos e confirm:true.",
   };
 }
 
@@ -1104,11 +1429,11 @@ function prepareUpdateTransaction(
   const issues: string[] = [];
 
   if (Object.keys(payload).length === 0) {
-    issues.push("Provide at least one transaction field to update.");
+    issues.push("Informe pelo menos um campo de transação para editar.");
   }
 
   if (rest.account_id && rest.credit_card_id) {
-    issues.push("Provide either account_id or credit_card_id, not both.");
+    issues.push("Informe account_id ou credit_card_id, não ambos.");
   }
 
   return {
@@ -1118,8 +1443,18 @@ function prepareUpdateTransaction(
     payload,
     endpoint: `/v1/transactions/${id}`,
     method: "PUT",
-    note: "No API call was made. If ready is true, call despezzas_update_transaction with the same fields plus confirm:true.",
+    note: "Nenhuma chamada de API foi feita. Se ready for true, chame despezzas_update_transaction com os mesmos campos e confirm:true.",
   };
+}
+
+function prepareBatchUpdateTransactions(updates: TransactionBatchUpdateInput[]): PreparedBatchUpdateTransaction[] {
+  return updates.map((update, index) => {
+    const { id, amount_cents, kind, scope, edition_date, ...rest } = update;
+    return {
+      index,
+      ...prepareUpdateTransaction(id, amount_cents, kind, scope, edition_date, rest),
+    };
+  });
 }
 
 function createTransactionIssues(args: {
@@ -1134,23 +1469,23 @@ function createTransactionIssues(args: {
   const issues: string[] = [];
 
   if (!args.account_id && !args.credit_card_id) {
-    issues.push("Either account_id or credit_card_id is required.");
+    issues.push("account_id ou credit_card_id é obrigatório.");
   }
 
   if (args.account_id && args.credit_card_id) {
-    issues.push("Provide either account_id or credit_card_id, not both.");
+    issues.push("Informe account_id ou credit_card_id, não ambos.");
   }
 
   if (!args.category_id && !args.allow_uncategorized) {
-    issues.push("category_id is required unless allow_uncategorized is true.");
+    issues.push("category_id é obrigatório, a menos que allow_uncategorized seja true.");
   }
 
   if (args.subcategory_id && !args.category_id) {
-    issues.push("subcategory_id requires category_id.");
+    issues.push("subcategory_id exige category_id.");
   }
 
   if (args.transaction_type === "parcelled" && (!args.installments || args.installments < 2)) {
-    issues.push("Parcelled transactions require installments >= 2.");
+    issues.push("Transações parceladas exigem installments >= 2.");
   }
 
   return issues;
@@ -1234,7 +1569,7 @@ function transactionSearchDiagnostics(
     truncated_by_mcp_limit: transactions.length > limit,
     sort_check: verifySort(returnedTransactions, filters.order_by, filters.order),
     note:
-      "Despezzas currently returns a single matching list for these filters; this MCP applies limit locally and reports has_more/truncated_by_mcp_limit when the local limit hides rows.",
+      "O Despezzas atualmente retorna uma única lista correspondente para esses filtros; este MCP aplica limit localmente e informa has_more/truncated_by_mcp_limit quando o limite local oculta linhas.",
   };
 }
 
@@ -1396,7 +1731,7 @@ async function safeProfileContext(client: DespezzasClient): Promise<ProfileConte
     return profileContextFrom(profile, access);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { error: `Unable to load active profile context: ${message}` };
+    return { error: `Não foi possível carregar o contexto do perfil ativo: ${message}` };
   }
 }
 
@@ -1428,8 +1763,8 @@ function profileContextFrom(profileValue: unknown, access: JsonObject): ProfileC
     member_profile_count: memberProfiles.length,
     hint:
       active.id === null
-        ? "Using Perfil Principal. Account, card, and transaction tools should return personal finance data."
-        : `Using shared profile${active.name ? ` "${active.name}"` : ""}. Empty account/card/transaction results can mean this profile has no data; switch to profile_id:null for Perfil Principal when you want personal finance data.`,
+        ? "Usando Perfil Principal. Ferramentas de conta, cartão e transação devem retornar dados financeiros pessoais."
+        : `Usando perfil compartilhado${active.name ? ` "${active.name}"` : ""}. Resultados vazios de contas/cartões/transações podem indicar que este perfil não tem dados; troque para profile_id:null para consultar o Perfil Principal quando quiser dados financeiros pessoais.`,
   };
 }
 
@@ -1463,7 +1798,17 @@ function emptyProfileWarning(resource: string, count: number, profileContext: Pr
   }
 
   const name = profileContext.active_profile.name ?? profileContext.active_profile.id;
-  return `No ${resource} were returned for active profile "${name}". Use despezzas_switch_profile with profile_id:null and confirm:true if you intended to query Perfil Principal personal finance data.`;
+  return `Nenhum resultado de ${profileResourceLabel(resource)} foi retornado para o perfil ativo "${name}". Use despezzas_switch_profile com profile_id:null e confirm:true se a intenção era consultar dados financeiros pessoais do Perfil Principal.`;
+}
+
+function profileResourceLabel(resource: string): string {
+  return (
+    {
+      accounts: "contas",
+      credit_cards: "cartões de crédito",
+      transactions: "transações",
+    }[resource] ?? resource
+  );
 }
 
 function normalizedProfileId(value: unknown): string | null {
@@ -1488,15 +1833,15 @@ function validateCreateProfile(access: JsonObject, type: ExtraProfileAccessType)
 
   if (extraProfiles.length >= MAX_EXTRA_PROFILES) {
     return errorResponse(
-      new Error(`Despezzas allows at most ${MAX_EXTRA_PROFILES} extra profiles. Delete or edit an existing profile instead.`),
-      "create shared profile",
+      new Error(`O Despezzas permite no máximo ${MAX_EXTRA_PROFILES} perfis extras. Exclua ou edite um perfil existente em vez disso.`),
+      "criar perfil compartilhado",
     );
   }
 
   if (extraProfiles.some((profile) => profileType(profile) === type)) {
     return errorResponse(
-      new Error(`A ${type} profile already exists. Despezzas normally allows one extra profile per type.`),
-      "create shared profile",
+      new Error(`Um perfil ${type} já existe. O Despezzas normalmente permite um perfil extra por tipo.`),
+      "criar perfil compartilhado",
     );
   }
 
@@ -1621,7 +1966,7 @@ function categoryName(item: Record<string, unknown>): string {
   if (category && typeof category === "object" && "name" in category) {
     return String((category as { name: unknown }).name);
   }
-  return typeof item.category_id === "string" ? item.category_id : "uncategorized";
+  return typeof item.category_id === "string" ? item.category_id : "sem categoria";
 }
 
 function numberValue(value: unknown): number {
@@ -1657,6 +2002,7 @@ export const __test = {
   compactTransactions,
   createTransactionIssues,
   emptyProfileWarning,
+  prepareBatchUpdateTransactions,
   prepareCreateTransaction,
   prepareUpdateTransaction,
   profileContextFrom,

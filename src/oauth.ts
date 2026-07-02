@@ -32,7 +32,25 @@ export interface AccessToken {
   expiresAt: number;
 }
 
+export interface RefreshToken {
+  token: string;
+  clientId: string;
+  scope: string;
+  resource: string;
+  sessionId?: string;
+  expiresAt: number;
+}
+
 interface AccessTokenClaims {
+  v: 1;
+  clientId: string;
+  scope: string;
+  resource: string;
+  sessionId?: string;
+  exp: number;
+}
+
+interface RefreshTokenClaims {
   v: 1;
   clientId: string;
   scope: string;
@@ -184,6 +202,24 @@ class OAuthStore {
     return token;
   }
 
+  issueRefreshToken(input: Omit<RefreshToken, "token" | "expiresAt">): RefreshToken {
+    const expiresAt = Date.now() + config.oauthRefreshTokenTtlSeconds * 1000;
+    const claims: RefreshTokenClaims = {
+      v: 1,
+      clientId: input.clientId,
+      scope: input.scope,
+      resource: input.resource,
+      sessionId: input.sessionId,
+      exp: Math.floor(expiresAt / 1000),
+    };
+
+    return {
+      ...input,
+      token: signEnvelope("refresh", claims),
+      expiresAt,
+    };
+  }
+
   verifyAccessToken(token: string | undefined, requiredScopes = SCOPES): AccessToken | undefined {
     if (!token) {
       return undefined;
@@ -196,6 +232,26 @@ class OAuthStore {
 
     const granted = new Set(claims.scope.split(/\s+/).filter(Boolean));
     if (!requiredScopes.every((scope) => granted.has(scope))) {
+      return undefined;
+    }
+
+    return {
+      token,
+      clientId: claims.clientId,
+      scope: claims.scope,
+      resource: claims.resource,
+      sessionId: claims.sessionId,
+      expiresAt: claims.exp * 1000,
+    };
+  }
+
+  verifyRefreshToken(token: string | undefined): RefreshToken | undefined {
+    if (!token) {
+      return undefined;
+    }
+
+    const claims = verifyEnvelope<RefreshTokenClaims>("refresh", token);
+    if (!isRefreshTokenClaims(claims) || claims.exp * 1000 < Date.now()) {
       return undefined;
     }
 
@@ -252,7 +308,7 @@ export function authorizationServerMetadata(req: HttpRequestLike) {
     token_endpoint: `${base}/oauth/token`,
     registration_endpoint: `${base}/oauth/register`,
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code"],
+    grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
     scopes_supported: SCOPES,
@@ -274,7 +330,7 @@ export function registerOAuthClient(body: Record<string, unknown>) {
     client_id_issued_at: Math.floor(client.createdAt / 1000),
     redirect_uris: client.redirectUris,
     token_endpoint_auth_method: "none",
-    grant_types: ["authorization_code"],
+    grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],
   };
 }
@@ -289,19 +345,19 @@ export function validateAuthorizeParams(query: Record<string, unknown>) {
   const state = stringParam(query.state);
   const resource = stringParam(query.resource);
 
-  if (responseType !== "code") throw new Error("Unsupported response_type.");
-  if (!clientId) throw new Error("Missing client_id.");
-  if (!redirectUri) throw new Error("Missing redirect_uri.");
-  if (!codeChallenge) throw new Error("Missing code_challenge.");
-  if (codeChallengeMethod !== "S256") throw new Error("Only S256 PKCE is supported.");
+  if (responseType !== "code") throw new Error("response_type não suportado.");
+  if (!clientId) throw new Error("client_id ausente.");
+  if (!redirectUri) throw new Error("redirect_uri ausente.");
+  if (!codeChallenge) throw new Error("code_challenge ausente.");
+  if (codeChallengeMethod !== "S256") throw new Error("Apenas PKCE S256 é suportado.");
 
   const client = oauthStore.getClient(clientId);
-  if (!client) throw new Error("Unknown OAuth client.");
+  if (!client) throw new Error("Cliente OAuth desconhecido.");
   if (client.redirectUris.length > 0 && !client.redirectUris.includes(redirectUri)) {
-    throw new Error("redirect_uri is not registered for this client.");
+    throw new Error("redirect_uri não está registrado para este cliente.");
   }
   if (!isAllowedRedirectUri(redirectUri)) {
-    throw new Error("redirect_uri is not allowed.");
+    throw new Error("redirect_uri não é permitido.");
   }
 
   return {
@@ -365,28 +421,67 @@ export function exchangeAuthorizationCode(body: Record<string, unknown>, req: Ht
   const codeVerifier = stringParam(body.code_verifier);
   const resource = stringParam(body.resource) || mcpResource(req);
 
-  if (grantType !== "authorization_code") throw new Error("Unsupported grant_type.");
-  if (!code || !redirectUri || !clientId || !codeVerifier) throw new Error("Missing token request parameter.");
+  if (grantType !== "authorization_code") throw new Error("grant_type não suportado.");
+  if (!code || !redirectUri || !clientId || !codeVerifier) throw new Error("Parâmetro ausente na requisição de token.");
 
   const stored = oauthStore.consumeCode(code);
-  if (!stored) throw new Error("Authorization code is invalid or expired.");
-  if (stored.clientId !== clientId) throw new Error("client_id mismatch.");
-  if (stored.redirectUri !== redirectUri) throw new Error("redirect_uri mismatch.");
-  if (stored.resource && stored.resource !== resource) throw new Error("resource mismatch.");
-  if (pkceChallenge(codeVerifier) !== stored.codeChallenge) throw new Error("PKCE verification failed.");
+  if (!stored) throw new Error("Código de autorização inválido ou expirado.");
+  if (stored.clientId !== clientId) throw new Error("client_id divergente.");
+  if (stored.redirectUri !== redirectUri) throw new Error("redirect_uri divergente.");
+  if (stored.resource && stored.resource !== resource) throw new Error("resource divergente.");
+  if (pkceChallenge(codeVerifier) !== stored.codeChallenge) throw new Error("Verificação PKCE falhou.");
 
-  const token = oauthStore.issueAccessToken({
+  return issueOAuthTokenResponse({
     clientId,
     scope: stored.scope,
     resource,
     sessionId: stored.sessionId,
   });
+}
 
+export function exchangeRefreshToken(body: Record<string, unknown>, req: HttpRequestLike) {
+  const grantType = stringParam(body.grant_type);
+  const refreshToken = stringParam(body.refresh_token);
+  const clientId = stringParam(body.client_id);
+  const resource = stringParam(body.resource);
+
+  if (grantType !== "refresh_token") throw new Error("grant_type não suportado.");
+  if (!refreshToken) throw new Error("Parâmetro ausente na requisição de refresh token.");
+
+  const stored = oauthStore.verifyRefreshToken(refreshToken);
+  if (!stored) throw new Error("Refresh token inválido ou expirado.");
+  if (clientId && stored.clientId !== clientId) throw new Error("client_id divergente.");
+  if (resource && stored.resource !== resource) throw new Error("resource divergente.");
+
+  return issueOAuthTokenResponse({
+    clientId: stored.clientId,
+    scope: stored.scope,
+    resource: stored.resource || mcpResource(req),
+    sessionId: stored.sessionId,
+  });
+}
+
+export function exchangeOAuthToken(body: Record<string, unknown>, req: HttpRequestLike) {
+  const grantType = stringParam(body.grant_type);
+  if (grantType === "authorization_code") {
+    return exchangeAuthorizationCode(body, req);
+  }
+  if (grantType === "refresh_token") {
+    return exchangeRefreshToken(body, req);
+  }
+  throw new Error("grant_type não suportado.");
+}
+
+function issueOAuthTokenResponse(input: Omit<AccessToken, "token" | "expiresAt">) {
+  const accessToken = oauthStore.issueAccessToken(input);
+  const refreshToken = oauthStore.issueRefreshToken(input);
   return {
-    access_token: token.token,
+    access_token: accessToken.token,
     token_type: "Bearer",
     expires_in: config.oauthAccessTokenTtlSeconds,
-    scope: token.scope,
+    refresh_token: refreshToken.token,
+    refresh_token_expires_in: config.oauthRefreshTokenTtlSeconds,
+    scope: accessToken.scope,
   };
 }
 
@@ -397,6 +492,17 @@ function normalizeScope(scope: string | undefined): string {
 }
 
 function isAccessTokenClaims(value: AccessTokenClaims | undefined): value is AccessTokenClaims {
+  return (
+    value?.v === 1 &&
+    typeof value.clientId === "string" &&
+    typeof value.scope === "string" &&
+    typeof value.resource === "string" &&
+    (value.sessionId === undefined || typeof value.sessionId === "string") &&
+    typeof value.exp === "number"
+  );
+}
+
+function isRefreshTokenClaims(value: RefreshTokenClaims | undefined): value is RefreshTokenClaims {
   return (
     value?.v === 1 &&
     typeof value.clientId === "string" &&

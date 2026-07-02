@@ -1,7 +1,7 @@
-"""Prefect Horizon / FastMCP proxy entrypoint.
+"""Entrypoint de proxy Prefect Horizon / FastMCP.
 
-Horizon deploys Python FastMCP servers. This file lets Horizon expose the
-TypeScript Despezzas MCP backend through a managed FastMCP gateway.
+O Horizon publica servidores Python FastMCP. Este arquivo permite que o Horizon
+exponha o backend Despezzas MCP em TypeScript por um gateway FastMCP gerenciado.
 """
 
 import os
@@ -15,7 +15,7 @@ backend_url = os.environ.get("DESPEZZAS_MCP_BACKEND_URL")
 backend_token = os.environ.get("DESPEZZAS_MCP_BACKEND_TOKEN")
 
 if not backend_url:
-    raise RuntimeError("DESPEZZAS_MCP_BACKEND_URL must point to the deployed Node backend /mcp URL.")
+    raise RuntimeError("DESPEZZAS_MCP_BACKEND_URL deve apontar para a URL /mcp do backend Node publicado.")
 
 backend = (
     Client(backend_url, auth=BearerAuth(token=backend_token))

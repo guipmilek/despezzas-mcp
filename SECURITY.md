@@ -1,14 +1,14 @@
-# Security
+# Segurança
 
-This MCP can read and mutate personal finance data. Treat it as sensitive infrastructure.
+Este MCP pode ler e alterar dados financeiros pessoais. Trate-o como infraestrutura sensível.
 
-- Never commit `.env` or bearer tokens.
-- Treat Despezzas passwords as exposed if pasted into chats, logs, shell history, screenshots, or committed files. Rotate the password after accidental exposure.
-- Prefer private GitHub repositories unless you intentionally want the code public.
-- Use `MCP_HTTP_BEARER_TOKEN` when running HTTP mode outside localhost.
-- Put HTTPS, authentication, and IP/mTLS restrictions in front of any remotely hosted MCP endpoint.
-- The HTTP `/login` page accepts your Despezzas password. Use it on localhost or behind strong access control only.
-- For ChatGPT, prefer OAuth mode. ChatGPT should receive only an opaque MCP access token, never your Despezzas password, Firebase refresh token, or Despezzas bearer token.
-- Review every write tool call before passing `confirm: true`.
+- Nunca faça commit de `.env` ou tokens bearer.
+- Considere senhas do Despezzas expostas se forem coladas em chats, logs, histórico de shell, screenshots ou arquivos versionados. Troque a senha depois de qualquer exposição acidental.
+- Prefira repositórios privados no GitHub, a menos que você queira intencionalmente tornar o código público.
+- Use `MCP_HTTP_BEARER_TOKEN` ao rodar o modo HTTP fora do localhost.
+- Coloque HTTPS, autenticação e restrições por IP/mTLS na frente de qualquer endpoint MCP hospedado remotamente.
+- A página HTTP `/login` aceita sua senha do Despezzas. Use-a apenas no localhost ou atrás de um controle de acesso forte.
+- Para ChatGPT, prefira o modo OAuth. O ChatGPT deve receber apenas um token de acesso MCP opaco, nunca sua senha do Despezzas, refresh token do Firebase ou bearer token do Despezzas.
+- Revise toda chamada de ferramenta de escrita antes de passar `confirm: true`.
 
-If a Despezzas token is exposed, sign out of Despezzas sessions and rotate credentials where possible.
+Se um token do Despezzas for exposto, encerre sessões do Despezzas e troque credenciais quando possível.

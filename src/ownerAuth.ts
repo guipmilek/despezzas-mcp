@@ -7,11 +7,11 @@ export function ownerAuthCodeConfigured(): boolean {
 
 export function requireOwnerAuthCode(input: string | undefined): void {
   if (!config.ownerAuthCode) {
-    throw new Error("MCP_OWNER_AUTH_CODE is not configured on this deployment.");
+    throw new Error("MCP_OWNER_AUTH_CODE não está configurado neste deploy.");
   }
 
   if (!timingSafeStringEqual(input ?? "", config.ownerAuthCode)) {
-    throw new Error("Invalid MCP owner access code.");
+    throw new Error("Código de acesso MCP do proprietário inválido.");
   }
 }
 

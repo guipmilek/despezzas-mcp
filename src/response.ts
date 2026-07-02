@@ -23,7 +23,7 @@ export function redact(value: unknown): unknown {
 
   const redacted: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
-    redacted[key] = isSensitiveKey(key) ? "[redacted]" : redact(child);
+    redacted[key] = isSensitiveKey(key) ? "[mascarado]" : redact(child);
   }
   return redacted;
 }
@@ -52,7 +52,7 @@ export function errorResponse(error: unknown, action: string) {
     content: [
       {
         type: "text" as const,
-        text: `Failed to ${action}: ${message}`,
+        text: `Falha ao ${action}: ${message}`,
       },
     ],
     isError: true,
@@ -64,7 +64,7 @@ export function requireConfirmation(confirm: boolean | undefined, action: string
     return undefined;
   }
 
-  const message = `Refusing to ${action} because confirm was not true. Re-run this tool with confirm: true after verifying the target IDs and payload.`;
+  const message = `Recusando ${action} porque confirm não foi true. Execute a ferramenta novamente com confirm: true depois de verificar os IDs de destino e o payload.`;
   return {
     structuredContent: {
       refused: true,

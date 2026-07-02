@@ -1,12 +1,12 @@
-# Despezzas API Notes
+# Notas da API Despezzas
 
-These notes come from the captured HAR and public frontend bundle inspection.
+Estas notas vêm de um HAR capturado e da inspeção do bundle frontend público.
 
-## Base URL
+## URL Base
 
 `https://api.despezzas.com`
 
-The web app sends:
+O app web envia:
 
 - `Authorization: Bearer <Firebase ID token>`
 - `Accept: application/json, text/plain, */*`
@@ -15,34 +15,34 @@ The web app sends:
 - `Referer: https://despezzas.com/`
 - `lang: pt-BR`
 
-## Auth Flow
+## Fluxo de Autenticação
 
-The Despezzas login page at `https://despezzas.com/auth/login` calls:
+A página de login do Despezzas em `https://despezzas.com/auth/login` chama:
 
-- `POST /v2/auth` with `{ "email": "...", "password": "..." }`
-- Response includes `firebase_token` and `user`
-- Frontend calls Firebase `accounts:signInWithCustomToken`
-- Firebase returns `idToken`, `refreshToken`, and `expiresIn`
-- Despezzas API calls use `Authorization: Bearer <idToken>`
+- `POST /v2/auth` com `{ "email": "...", "password": "..." }`
+- A resposta inclui `firebase_token` e `user`
+- O frontend chama o Firebase `accounts:signInWithCustomToken`
+- O Firebase retorna `idToken`, `refreshToken` e `expiresIn`
+- Chamadas para a API Despezzas usam `Authorization: Bearer <idToken>`
 
-The MCP implements the same flow and refreshes through:
+O MCP implementa o mesmo fluxo e renova a sessão por:
 
 - `POST https://securetoken.googleapis.com/v1/token?key=<firebase-api-key>`
-- Form body: `grant_type=refresh_token&refresh_token=<refresh-token>`
+- Corpo de formulário: `grant_type=refresh_token&refresh_token=<refresh-token>`
 
-## MCP OAuth Wrapper
+## Wrapper OAuth do MCP
 
-For ChatGPT Apps & Connectors, the MCP server also acts as a small OAuth 2.1 authorization server around the Despezzas session:
+Para ChatGPT Apps & Connectors, o servidor MCP também atua como um pequeno servidor de autorização OAuth 2.1 ao redor da sessão Despezzas:
 
-- Protected resource metadata: `GET /.well-known/oauth-protected-resource`
-- OAuth metadata: `GET /.well-known/oauth-authorization-server`
-- Dynamic client registration: `POST /oauth/register`
-- Authorization endpoint: `GET|POST /oauth/authorize`
-- Token endpoint: `POST /oauth/token`
+- Metadados do recurso protegido: `GET /.well-known/oauth-protected-resource`
+- Metadados OAuth: `GET /.well-known/oauth-authorization-server`
+- Registro dinâmico de cliente: `POST /oauth/register`
+- Endpoint de autorização: `GET|POST /oauth/authorize`
+- Endpoint de token: `POST /oauth/token`
 
-The OAuth access token is opaque and authorizes access to `/mcp`. It is not a Despezzas token. The server-side Despezzas session is obtained through `/v2/auth` and Firebase custom-token exchange.
+O token de acesso OAuth é opaco e autoriza acesso ao `/mcp`. Ele não é um token do Despezzas. A sessão Despezzas no lado do servidor é obtida por `/v2/auth` e pela troca de custom token do Firebase.
 
-## Captured Read Endpoints
+## Endpoints de Leitura Capturados
 
 - `GET /v1/profile`
 - `PUT /v1/profile`
@@ -58,31 +58,31 @@ The OAuth access token is opaque and authorizes access to `/mcp`. It is not a De
 - `GET /v1/transactions`
 - `GET /v1/transactions/overview?date=YYYY-MM-DD`
 
-## Frontend-Discovered Transaction Endpoints
+## Endpoints de Transação Descobertos no Frontend
 
 - `POST /v1/transactions`
 - `PUT /v1/transactions/{id}`
-- `DELETE /v1/transactions/{id}` with body `{ "type": "THIS" | "THIS_AND_NEXT" | "ALL" }`
+- `DELETE /v1/transactions/{id}` com corpo `{ "type": "THIS" | "THIS_AND_NEXT" | "ALL" }`
 - `POST /v1/transactions/{id}/duplicate`
-- `POST /v1/transactions/{id}/installments` with body `{ "quantity": number }`
-- `POST /v1/transactions/{id}/paid` with body `{ "date": "YYYY-MM-DD" }`
+- `POST /v1/transactions/{id}/installments` com corpo `{ "quantity": number }`
+- `POST /v1/transactions/{id}/paid` com corpo `{ "date": "YYYY-MM-DD" }`
 - `POST /v1/transactions/create-transfer`
 - `GET /v1/transactions/subscriptions`
 - `GET /v1/export-transactions/count`
 - `GET /v1/export-transactions`
 
-## Frontend-Discovered Profile Access Endpoints
+## Endpoints de Acesso a Perfil Descobertos no Frontend
 
-Despezzas supports a personal/root profile plus up to 3 extra profile types (`pj`, `family`, `investments`). The frontend lists profile access state and switches the active profile through:
+O Despezzas oferece um perfil pessoal/raiz e até 3 tipos de perfis extras (`pj`, `family`, `investments`). O frontend lista o estado de acesso a perfis e troca o perfil ativo por:
 
 - `GET /v1/profile-access`
-- `PUT /v1/profile-access/change` with `{ "profileId": "uuid-or-null" }`
+- `PUT /v1/profile-access/change` com `{ "profileId": "uuid-or-null" }`
 - `POST /v1/profile-access`
 - `PUT /v1/profile-access/{id}`
 - `DELETE /v1/profile-access/{id}`
-- `PUT /v1/profile-access/leave` with `{ "profileId": "uuid" }`
+- `PUT /v1/profile-access/leave` com `{ "profileId": "uuid" }`
 
-Create/update payloads use:
+Payloads de criação/edição usam:
 
 ```json
 {
@@ -94,31 +94,31 @@ Create/update payloads use:
 }
 ```
 
-Invite roles observed in the web form are `editor` and `viewer`.
+Os papéis de convite observados no formulário web são `editor` e `viewer`.
 
-## Transaction Filters
+## Filtros de Transação
 
-The frontend passes these directly as query parameters:
+O frontend envia estes campos diretamente como parâmetros de query:
 
-- `account_type`: `bank_account` or `credit_card`
-- `account_ids`: repeated UUID value
-- `credit_card_ids`: repeated UUID value
-- `category_ids`: repeated UUID value
-- `subcategory_ids`: repeated UUID value
+- `account_type`: `bank_account` ou `credit_card`
+- `account_ids`: valor UUID repetido
+- `credit_card_ids`: valor UUID repetido
+- `category_ids`: valor UUID repetido
+- `subcategory_ids`: valor UUID repetido
 - `date_start`: `YYYY-MM-DD`
 - `date_end`: `YYYY-MM-DD`
-- `is_paid`: `true` or `false`
-- `is_expense`: `true` or `false`
-- `value`: minimum amount in cents
-- `search`: text query
-- `order_by`: `date`, `title`, or `amount`
-- `order`: `asc` or `desc`
+- `is_paid`: `true` ou `false`
+- `is_expense`: `true` ou `false`
+- `value`: valor mínimo em centavos
+- `search`: consulta de texto
+- `order_by`: `date`, `title` ou `amount`
+- `order`: `asc` ou `desc`
 
-## Transaction Payload Shape
+## Formato do Payload de Transação
 
-The web form sends amounts in integer cents and positive values. Expense/income is represented by `is_expense`.
+O formulário web envia valores positivos em centavos inteiros. Despesa/receita é representada por `is_expense`.
 
-Create payload fields observed from the frontend:
+Campos de payload de criação observados no frontend:
 
 ```json
 {
@@ -139,4 +139,4 @@ Create payload fields observed from the frontend:
 }
 ```
 
-`type` can be `FIXED`, `RECURRENT`, or `PARCELLED`.
+`type` pode ser `FIXED`, `RECURRENT` ou `PARCELLED`.

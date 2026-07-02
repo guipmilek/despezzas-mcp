@@ -1,69 +1,69 @@
-# Koyeb Free Deployment
+# Deploy Gratuito no Koyeb
 
-Koyeb Free is the fallback free host for this repo. It runs the existing `Dockerfile`, so the Node/Express HTTP server is deployed without a Worker-specific build.
+O Koyeb Free é a hospedagem gratuita alternativa para este repositório. Ele executa o `Dockerfile` existente, então o servidor HTTP Node/Express é publicado sem etapa de build específica de Worker.
 
-## Fit
+## Adequação
 
-Koyeb Free is good for testing and hobby use:
+O Koyeb Free é bom para testes e uso pessoal:
 
-- 512 MB RAM, 0.1 vCPU, and 2 GB SSD.
-- One Free Instance per organization.
-- Free Instance region is Frankfurt or Washington, D.C.
-- Free Instances cannot use volumes, custom scaling, or Koyeb Worker Services.
-- Free Instances scale down to zero after 1 hour without traffic.
+- 512 MB de RAM, 0,1 vCPU e 2 GB de SSD.
+- Uma instância `Free` por organização.
+- A região da instância `Free` é Frankfurt ou Washington, D.C.
+- Instâncias `Free` não podem usar volumes, escalonamento customizado ou Koyeb Worker Services.
+- Instâncias `Free` escalam para zero depois de 1 hora sem tráfego.
 
-Because it scales down and cannot attach persistent volumes, use Despezzas env credentials and disable session-file persistence.
+Como ele escala para zero e não aceita volumes persistentes, use credenciais do Despezzas em variáveis de ambiente e desative a persistência em arquivo de sessão.
 
-## Deploy From GitHub
+## Deploy Pelo GitHub
 
-1. Push this repo to GitHub.
-2. In Koyeb, create an App.
-3. Choose GitHub as the deployment method.
-4. Select `guipmilek/despezzas-mcp`.
-5. Builder: `Dockerfile`.
-6. Dockerfile path: `Dockerfile`.
-7. Instance type: `Free`.
-8. Region: Washington, D.C. or Frankfurt.
-9. Exposed port: `8787`.
-10. HTTP route: `/`.
-11. Health check path: `/health`.
+1. Envie este repositório para o GitHub.
+2. No Koyeb, crie um App.
+3. Escolha GitHub como método de deploy.
+4. Selecione `guipmilek/despezzas-mcp`.
+5. Construtor: `Dockerfile`.
+6. Caminho do Dockerfile: `Dockerfile`.
+7. Tipo de instância: `Free`.
+8. Região: Washington, D.C. ou Frankfurt.
+9. Porta exposta: `8787`.
+10. Rota HTTP: `/`.
+11. Caminho de verificação de saúde: `/health`.
 
-## Environment Variables
+## Variáveis de Ambiente
 
-Set these in Koyeb:
+Defina estas variáveis no Koyeb:
 
 ```dotenv
 MCP_TRANSPORT=http
 HOST=0.0.0.0
 PORT=8787
-MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
+MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
+MCP_OWNER_AUTH_CODE=<codigo-de-proprietario-digitado>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
-DESPEZZAS_EMAIL=<your-email>
-DESPEZZAS_PASSWORD=<your-password>
+DESPEZZAS_EMAIL=<seu-email>
+DESPEZZAS_PASSWORD=<sua-senha>
 DESPEZZAS_SESSION_FILE=none
 ```
 
-After Koyeb gives you the public domain, set:
+Depois que o Koyeb fornecer o domínio público, defina:
 
 ```dotenv
-MCP_PUBLIC_BASE_URL=https://<your-app>-<your-org>.koyeb.app
+MCP_PUBLIC_BASE_URL=https://<seu-app>-<sua-org>.koyeb.app
 ```
 
-If Koyeb's forwarded headers are correct, the server can infer this URL. Setting it explicitly makes OAuth discovery less surprising.
+Se os cabeçalhos encaminhados pelo Koyeb estiverem corretos, o servidor consegue inferir essa URL. Defini-la explicitamente torna a descoberta OAuth menos surpreendente.
 
-Generate the OAuth secret locally:
+Gere o segredo OAuth localmente:
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-## Connect ChatGPT
+## Conectar ao ChatGPT
 
-In ChatGPT Apps / Custom Tool:
+Em ChatGPT Apps / Custom Tool:
 
-- Name: `Despezzas`
-- Server URL: `https://<your-app>-<your-org>.koyeb.app/mcp`
-- Authentication: `OAuth`
+- Nome: `Despezzas`
+- URL do servidor: `https://<seu-app>-<sua-org>.koyeb.app/mcp`
+- Autenticação: `OAuth`
 
-Expect the first request after idle time to be slower because the Free Instance scales down to zero.
+Espere que a primeira requisição depois de um período ocioso seja mais lenta, porque a instância `Free` escala para zero.

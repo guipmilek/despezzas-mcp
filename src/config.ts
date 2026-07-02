@@ -14,6 +14,7 @@ export interface Config {
   host: string;
   httpBearerToken: string | undefined;
   oauthAccessTokenTtlSeconds: number;
+  oauthRefreshTokenTtlSeconds: number;
   oauthTokenSecret: string | undefined;
   ownerAuthCode: string | undefined;
 }
@@ -41,6 +42,7 @@ export const config: Config = {
   host: process.env.HOST ?? "127.0.0.1",
   httpBearerToken: process.env.MCP_HTTP_BEARER_TOKEN,
   oauthAccessTokenTtlSeconds: normalizePositiveInt(process.env.MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS, 3600),
+  oauthRefreshTokenTtlSeconds: normalizePositiveInt(process.env.MCP_OAUTH_REFRESH_TOKEN_TTL_SECONDS, 60 * 60 * 24 * 90),
   oauthTokenSecret: process.env.MCP_OAUTH_TOKEN_SECRET,
   ownerAuthCode: process.env.MCP_OWNER_AUTH_CODE,
 };
@@ -69,7 +71,7 @@ function normalizeAllowedHosts(value: string | undefined, publicBaseUrl: string 
     try {
       hosts.add(new URL(publicBaseUrl).hostname);
     } catch {
-      // Ignore malformed public URLs here; OAuth metadata will still use the raw value.
+      // Ignora URLs públicas malformadas aqui; os metadados OAuth ainda usarão o valor bruto.
     }
   }
 

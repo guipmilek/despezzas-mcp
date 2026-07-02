@@ -1,7 +1,7 @@
 {
   "name": "despezzas-mcp",
   "version": "0.1.0",
-  "description": "MCP server for a personal Despezzas finance account.",
+  "description": "Servidor MCP para uma conta financeira pessoal do Despezzas.",
   "type": "module",
   "private": true,
   "keywords": [

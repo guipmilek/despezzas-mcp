@@ -1,112 +1,112 @@
-# Deployment Notes
+# Notas de Deploy
 
-This MCP server needs a public HTTPS URL, outbound HTTPS access to Despezzas and Firebase, and secret environment variables. It is a poor fit for static hosting. It can run on long-running Node services, containers, serverless Express functions, or behind a Python FastMCP proxy on Prefect Horizon when OAuth state is signed with a stable `MCP_OAUTH_TOKEN_SECRET`.
+Este servidor MCP precisa de uma URL HTTPS pública, acesso HTTPS de saída para Despezzas e Firebase, e variáveis de ambiente secretas. Ele não combina bem com hospedagem estática. Pode rodar em serviços Node de longa duração, containers, funções Express serverless ou atrás de um proxy Python FastMCP no Prefect Horizon quando o estado OAuth é assinado com um `MCP_OAUTH_TOKEN_SECRET` estável.
 
-## Required Runtime Settings
+## Configurações Obrigatórias de Runtime
 
-Use these settings on every remote provider:
+Use estas configurações em todo provedor remoto:
 
 ```dotenv
 MCP_TRANSPORT=http
 HOST=0.0.0.0
-MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
+MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
 ```
 
-For public multi-user Cloudflare Workers deployments, also configure:
+Para deploys públicos multiusuário em Cloudflare Workers, configure também:
 
 ```dotenv
 DESPEZZAS_SESSIONS=<Cloudflare KV binding>
-SESSION_ENCRYPTION_KEY=<long-random-secret>
+SESSION_ENCRYPTION_KEY=<segredo-longo-aleatorio>
 ```
 
-For private single-account deployments, use:
+Para deploys privados de conta única, use:
 
 ```dotenv
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
+MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 ```
 
-Set `MCP_PUBLIC_BASE_URL=https://your-public-host` if OAuth discovery returns the wrong host or protocol behind the provider proxy. Otherwise the server can infer the public base URL from forwarded request headers.
+Defina `MCP_PUBLIC_BASE_URL=https://seu-host-publico` se a descoberta OAuth retornar host ou protocolo incorreto atrás do proxy do provedor. Caso contrário, o servidor consegue inferir a URL pública a partir dos cabeçalhos encaminhados da requisição.
 
-For Despezzas authentication, choose one:
+Para autenticação no Despezzas, escolha uma opção:
 
-- Ephemeral/scale-to-zero hosting: set `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, and `DESPEZZAS_SESSION_FILE=none`.
-- Durable hosting with a mounted volume: set `DESPEZZAS_SESSION_FILE` to a path on the mounted volume, then use `/login` once.
+- Hospedagem efêmera/escala para zero: defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_SESSION_FILE=none`.
+- Hospedagem durável com volume montado: defina `DESPEZZAS_SESSION_FILE` para um caminho no volume montado e use `/login` uma vez.
 
-Do not commit Despezzas credentials. Add them only in the provider secrets UI.
+Não faça commit de credenciais do Despezzas. Adicione-as apenas na tela de segredos do provedor.
 
-## Current Repo Support
+## Suporte Atual do Repositório
 
-- Native Node deploys can use `npm ci --include=dev && npm run build`, then `node dist/index.js`.
-- `wrangler.jsonc` and `src/cloudflare.ts` are included for Cloudflare Workers.
-- `render.yaml` is included for Render Blueprints.
-- `railway.json` is included for Railway.
-- `vercel.json` plus `api/index.js` is included for Vercel Functions.
-- `Dockerfile` is included for Koyeb, Cloud Run, Fly.io, Northflank, Railway Docker deploys, or a VM.
-- `horizon_proxy.py` plus `requirements.txt` is included for Prefect Horizon as a FastMCP proxy in front of a deployed Node backend.
-- `/health` is ready for provider health checks.
-- `/mcp` is the ChatGPT MCP server URL.
-- OAuth discovery endpoints are exposed under `/.well-known/*`.
+- Deploys Node nativos podem usar `npm ci --include=dev && npm run build` e depois `node dist/index.js`.
+- `wrangler.jsonc` e `src/cloudflare.ts` estão incluídos para Cloudflare Workers.
+- `render.yaml` está incluído para Render Blueprints.
+- `railway.json` está incluído para Railway.
+- `vercel.json` com `api/index.js` está incluído para Vercel Functions.
+- `Dockerfile` está incluído para Koyeb, Cloud Run, Fly.io, Northflank, deploys Docker no Railway ou uma VM.
+- `horizon_proxy.py` com `requirements.txt` está incluído para Prefect Horizon como proxy FastMCP na frente de um backend Node já publicado.
+- `/health` está pronto para verificações de saúde de provedores.
+- `/mcp` é a URL do servidor MCP para o ChatGPT.
+- Endpoints de descoberta OAuth são expostos em `/.well-known/*`.
 
-## Best Free Choices For This MCP
+## Melhores Opções Gratuitas Para Este MCP
 
 1. Cloudflare Workers Free
-   Best first choice for this repo now. It gives HTTPS, no container sleep, a generous free request tier for personal use, and official remote MCP guidance for Streamable HTTP. This repo uses `src/cloudflare.ts` with the raw web-standard MCP transport, so no Durable Object is required for the current stateless tools. See [cloudflare-workers.md](cloudflare-workers.md).
+   Melhor primeira escolha para este repositório agora. Oferece HTTPS, sem suspensão de container, um plano gratuito generoso para uso pessoal e orientação oficial de MCP remoto via Streamable HTTP. Este repositório usa `src/cloudflare.ts` com o transporte MCP web-standard bruto, então não precisa de Durable Object para as ferramentas sem estado atuais. Veja [cloudflare-workers.md](cloudflare-workers.md).
 
 2. Koyeb Free Instance
-   Best free container fallback. It runs the included Dockerfile from GitHub and gives a public HTTPS domain. The catch is scale-to-zero after 1 hour idle and no persistent volumes on the Free Instance, so use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD` and `DESPEZZAS_SESSION_FILE=none`. See [koyeb.md](koyeb.md).
+   Melhor alternativa gratuita em container. Roda o Dockerfile incluído a partir do GitHub e fornece um domínio HTTPS público. O ponto de atenção é a escala para zero depois de 1 hora ociosa e a ausência de volumes persistentes na Free Instance; use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD` e `DESPEZZAS_SESSION_FILE=none`. Veja [koyeb.md](koyeb.md).
 
 3. Oracle Cloud Always Free VM
-   Best "actually free and stable" option if you are comfortable managing a small VM. It gives persistent disk and an always-on process, so the MCP login/session model behaves most naturally. Tradeoff: more ops work, SSH, firewall, Docker/systemd, and TLS setup.
+   Melhor opção "realmente gratuita e estável" se você aceita gerenciar uma VM pequena. Oferece disco persistente e processo sempre ativo, então o modelo de login/sessão do MCP funciona de forma mais natural. Ponto de atenção: mais trabalho de operação, SSH, firewall, Docker/systemd e configuração de TLS.
 
 4. Vercel Hobby
-   Good free Git-based option with Vercel's MCP-specific guidance for Functions, OAuth metadata, and MCP hosts. This repo uses an Express function adapter instead of the `mcp-handler` example because the server already exists in `@modelcontextprotocol/sdk`.
+   Boa opção gratuita baseada em Git, com orientação específica da Vercel para Functions, metadados OAuth e hosts MCP. Este repositório usa um adaptador de função Express em vez do exemplo com `mcp-handler`, porque o servidor já existe em `@modelcontextprotocol/sdk`.
 
 5. Prefect Horizon
-   Best MCP-native gateway option if you want managed hosting, auth, access control, registry, Inspector, and ChatMCP testing. Horizon expects a Python FastMCP entrypoint, so this repo includes a proxy that forwards to a Node backend already deployed on Koyeb, Vercel, Render, Cloudflare, or similar.
+   Melhor opção de gateway nativo para MCP se você quer hospedagem gerenciada, autenticação, controle de acesso, registro, Inspector e testes com ChatMCP. O Horizon espera um ponto de entrada Python FastMCP, então este repositório inclui um proxy que encaminha para um backend Node já publicado em Koyeb, Vercel, Render, Cloudflare ou similar.
 
 6. Render Free Web Service
-   Easiest GitHub-to-URL path and good for MVP testing. The catch is that free web services spin down after 15 minutes and lose local filesystem changes on restarts/spin-downs. Use the included `render.yaml`, set Despezzas credentials as secrets, and keep `DESPEZZAS_SESSION_FILE=none`.
+   Caminho GitHub-para-URL mais simples e bom para testar MVP. O ponto de atenção é que serviços web gratuitos entram em suspensão depois de 15 minutos e perdem alterações no sistema de arquivos local em reinícios/suspensões. Use o `render.yaml` incluído, defina credenciais Despezzas como segredos e mantenha `DESPEZZAS_SESSION_FILE=none`.
 
 7. Railway Free
-   Very smooth developer experience and can attach a small volume, but the free plan is usage-credit based. Good for testing and short-lived personal use, less ideal as a forever-free always-on service.
+   Experiência de desenvolvimento muito fluida e permite anexar um volume pequeno, mas o plano gratuito é baseado em créditos de uso. Bom para testes e uso pessoal de curta duração; menos ideal como serviço sempre ligado e gratuito para sempre.
 
 8. Northflank Developer Sandbox
-   Solid container platform for experimentation. The free sandbox is explicitly for testing/hobby exploration, not production. Good fallback if you like its dashboard.
+   Plataforma de container sólida para experimentação. O sandbox gratuito é explicitamente para testes/exploração pessoal, não produção. Boa alternativa se você gosta do painel.
 
-Google Cloud Run remains technically supported through the Dockerfile, but we are not using it as the current path.
+Google Cloud Run continua tecnicamente suportado pelo Dockerfile, mas não é o caminho atual.
 
-Community discussion also points to AWS, Supabase, Zapier, and purpose-built MCP platforms. Those are worth watching, but this repo is not currently adapted for low-code MCP builders.
+Discussões da comunidade também apontam para AWS, Supabase, Zapier e plataformas MCP especializadas. Vale acompanhar essas opções, mas este repositório não está adaptado hoje para builders MCP low-code.
 
-Avoid Netlify/static hosts for this repo as-is. The current server is an Express MCP service with OAuth routes and cannot be served as static files.
+Evite Netlify/hosts estáticos para este repositório como está. O servidor atual é um serviço MCP Express com rotas OAuth e não pode ser servido como arquivos estáticos.
 
 ## Cloudflare Workers
 
-Cloudflare is the preferred deploy target for this MCP.
+Cloudflare é o alvo de deploy preferido para este MCP.
 
-Included support:
+Suporte incluído:
 
-- `src/cloudflare.ts`: Hono Worker app with OAuth discovery, login, health, and `/mcp`.
-- `wrangler.jsonc`: Worker config with `nodejs_compat` and safe default vars.
-- `npm run check:cloudflare`: Wrangler bundle dry-run.
-- `npm run deploy:cloudflare`: deploy to Workers.
+- `src/cloudflare.ts`: app Hono Worker com descoberta OAuth, login, health e `/mcp`.
+- `wrangler.jsonc`: configuração do Worker com `nodejs_compat` e variáveis padrão seguras.
+- `npm run check:cloudflare`: validação do bundle pelo Wrangler sem publicar.
+- `npm run deploy:cloudflare`: deploy para Workers.
 
-Set secrets:
+Defina secrets:
 
 ```powershell
 npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
 npx wrangler secret put SESSION_ENCRYPTION_KEY
 ```
 
-Create and bind the KV namespace:
+Crie e associe o namespace KV:
 
 ```powershell
 npx wrangler kv namespace create DESPEZZAS_SESSIONS
 ```
 
-Paste the generated namespace id into `wrangler.jsonc` under the `DESPEZZAS_SESSIONS` binding. Do not set global `DESPEZZAS_EMAIL` / `DESPEZZAS_PASSWORD` for multi-user mode; each user logs in with their own Despezzas account during ChatGPT OAuth.
+Cole o namespace id gerado em `wrangler.jsonc` no binding `DESPEZZAS_SESSIONS`. Não defina `DESPEZZAS_EMAIL` / `DESPEZZAS_PASSWORD` globais no modo multiusuário; cada usuário entra com a própria conta Despezzas durante o OAuth do ChatGPT.
 
-For private single-account mode instead, set `MCP_OWNER_AUTH_CODE`, `DESPEZZAS_EMAIL`, and `DESPEZZAS_PASSWORD` as secrets.
+Para modo privado de conta única, defina `MCP_OWNER_AUTH_CODE`, `DESPEZZAS_EMAIL` e `DESPEZZAS_PASSWORD` como secrets.
 
 Deploy:
 
@@ -115,63 +115,63 @@ npm run check:cloudflare
 npm run deploy:cloudflare
 ```
 
-Then connect in ChatGPT:
+Depois conecte no ChatGPT:
 
-- Server URL: `https://despezzas-mcp.<your-account>.workers.dev/mcp`
-- Authentication: OAuth
+- URL do servidor: `https://despezzas-mcp.<sua-conta>.workers.dev/mcp`
+- Autenticação: OAuth
 
-Full guide: [cloudflare-workers.md](cloudflare-workers.md).
+Guia completo: [cloudflare-workers.md](cloudflare-workers.md).
 
 ## Render
 
-The included `render.yaml` configures:
+O `render.yaml` incluído configura:
 
-- Free web service
-- Node runtime
-- Build: `npm ci --include=dev && npm run build`
-- Start: `node dist/index.js`
-- Health check: `/health`
+- Web service gratuito
+- Runtime: Node
+- Comando de build: `npm ci --include=dev && npm run build`
+- Comando de start: `node dist/index.js`
+- Verificação de saúde: `/health`
 - `MCP_TRANSPORT=http`
 - `HOST=0.0.0.0`
-- Generated `MCP_OAUTH_TOKEN_SECRET`
+- `MCP_OAUTH_TOKEN_SECRET` gerado
 
-After creating the Blueprint, fill these Render secret placeholders:
+Depois de criar o Blueprint, preencha estes placeholders de secrets no Render:
 
 ```dotenv
-DESPEZZAS_EMAIL=<your-email>
-DESPEZZAS_PASSWORD=<your-password>
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
-MCP_PUBLIC_BASE_URL=https://your-service.onrender.com
+DESPEZZAS_EMAIL=<seu-email>
+DESPEZZAS_PASSWORD=<sua-senha>
+MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
+MCP_PUBLIC_BASE_URL=https://seu-servico.onrender.com
 ```
 
-Then connect in ChatGPT:
+Depois conecte no ChatGPT:
 
-- Server URL: `https://your-service.onrender.com/mcp`
-- Authentication: OAuth
+- URL do servidor: `https://seu-servico.onrender.com/mcp`
+- Autenticação: OAuth
 
 ## Railway
 
-The included `railway.json` uses the Dockerfile and `/health`.
+O `railway.json` incluído usa o Dockerfile e `/health`.
 
-Set variables:
+Defina variáveis:
 
 ```dotenv
 MCP_TRANSPORT=http
 HOST=0.0.0.0
-MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
-DESPEZZAS_EMAIL=<your-email>
-DESPEZZAS_PASSWORD=<your-password>
+MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
+MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
+DESPEZZAS_EMAIL=<seu-email>
+DESPEZZAS_PASSWORD=<sua-senha>
 DESPEZZAS_SESSION_FILE=none
 ```
 
-Generate a Railway public domain, then optionally set:
+Gere um domínio público no Railway e, opcionalmente, defina:
 
 ```dotenv
-MCP_PUBLIC_BASE_URL=https://your-service.up.railway.app
+MCP_PUBLIC_BASE_URL=https://seu-servico.up.railway.app
 ```
 
-If you add a Railway volume, mount it at `/data` and use:
+Se adicionar um volume no Railway, monte em `/data` e use:
 
 ```dotenv
 DESPEZZAS_SESSION_FILE=/data/session.json
@@ -179,170 +179,170 @@ DESPEZZAS_SESSION_FILE=/data/session.json
 
 ## Vercel
 
-The included `vercel.json` routes every request to `api/index.js`, which imports the built Express app from `dist/index.js`.
+O `vercel.json` incluído roteia todas as requisições para `api/index.js`, que importa o app Express compilado de `dist/index.js`.
 
-Vercel's MCP guide shows `mcp-handler` with a Next.js route such as `/api/mcp`. This repo keeps the existing Express MCP server and rewrites all paths to the Vercel Function, so the deployed MCP endpoint remains `/mcp`. Keeping `/mcp` at the root also keeps OAuth protected-resource discovery simple for ChatGPT.
+O guia MCP da Vercel mostra `mcp-handler` com uma rota Next.js como `/api/mcp`. Este repositório mantém o servidor MCP Express existente e reescreve todos os caminhos para a Vercel Function, então o endpoint MCP publicado continua sendo `/mcp`. Manter `/mcp` na raiz também simplifica a descoberta de protected-resource OAuth para o ChatGPT.
 
-Recommended project settings:
+Configurações recomendadas do projeto:
 
-- Framework Preset: Other
-- Install Command: `npm ci`
-- Build Command: `npm run build`
-- Output Directory: leave empty
+- Preset de framework: Other
+- Comando de instalação: `npm ci`
+- Comando de build: `npm run build`
+- Diretório de saída: deixar vazio
 
-Set variables:
+Defina variáveis:
 
 ```dotenv
-MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
+MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
+MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
-DESPEZZAS_EMAIL=<your-email>
-DESPEZZAS_PASSWORD=<your-password>
+DESPEZZAS_EMAIL=<seu-email>
+DESPEZZAS_PASSWORD=<sua-senha>
 DESPEZZAS_SESSION_FILE=none
-MCP_PUBLIC_BASE_URL=https://your-project.vercel.app
+MCP_PUBLIC_BASE_URL=https://seu-projeto.vercel.app
 ```
 
-`MCP_TRANSPORT` and `HOST` are not required for Vercel because Vercel imports the Express app instead of starting `node dist/index.js`. You may still set `MCP_TRANSPORT=http` for consistency.
+`MCP_TRANSPORT` e `HOST` não são obrigatórios na Vercel, porque a Vercel importa o app Express em vez de iniciar `node dist/index.js`. Você ainda pode definir `MCP_TRANSPORT=http` por consistência.
 
-Then connect in ChatGPT:
+Depois conecte no ChatGPT:
 
-- Server URL: `https://your-project.vercel.app/mcp`
-- Authentication: OAuth
+- URL do servidor: `https://seu-projeto.vercel.app/mcp`
+- Autenticação: OAuth
 
-Vercel Functions are stateless and scale down to zero, so do not rely on the `/login` session file there. Use Despezzas env credentials or add durable storage later.
+Vercel Functions são sem estado e escalam para zero, então não dependa do arquivo de sessão de `/login` ali. Use credenciais Despezzas em variáveis de ambiente ou adicione armazenamento durável depois.
 
 ## Prefect Horizon
 
-Horizon is an MCP-native deployment platform from the FastMCP team. It provides managed hosting, authentication, access control, registry, Inspector, and ChatMCP testing, with a free personal tier described in the FastMCP docs.
+Horizon é uma plataforma de deploy nativa para MCP da equipe FastMCP. Ela oferece hospedagem gerenciada, autenticação, controle de acesso, registro, Inspector e testes com ChatMCP, com um plano pessoal gratuito descrito na documentação do FastMCP.
 
-Important fit note: Horizon deploys Python FastMCP servers. This project is a TypeScript/Node MCP server, so `horizon_proxy.py` is a small FastMCP proxy that forwards Horizon traffic to a Node backend hosted elsewhere.
+Nota importante de adequação: o Horizon publica servidores Python FastMCP. Este projeto é um servidor MCP TypeScript/Node, então `horizon_proxy.py` é um pequeno proxy FastMCP que encaminha tráfego do Horizon para um backend Node hospedado em outro lugar.
 
-Deploy flow:
+Fluxo de deploy:
 
-1. Deploy the Node backend to Cloud Run, Vercel, Render, Koyeb, Railway, or a VM.
-2. Protect that backend with a static bearer token:
-
-   ```dotenv
-   MCP_HTTP_BEARER_TOKEN=<long-random-backend-secret>
-   ```
-
-3. In Horizon, select this GitHub repository and configure:
-
-   - Entrypoint: `horizon_proxy.py:mcp`
-   - Authentication: enabled
-
-4. Add Horizon environment variables:
+1. Publique o backend Node no Cloud Run, Vercel, Render, Koyeb, Railway ou em uma VM.
+2. Proteja esse backend com um bearer token estático:
 
    ```dotenv
-   DESPEZZAS_MCP_BACKEND_URL=https://your-node-backend.example.com/mcp
-   DESPEZZAS_MCP_BACKEND_TOKEN=<same-long-random-backend-secret>
+   MCP_HTTP_BEARER_TOKEN=<segredo-longo-do-backend>
    ```
 
-5. Use the Horizon MCP URL, typically:
+3. No Horizon, selecione este repositório GitHub e configure:
+
+   - Ponto de entrada: `horizon_proxy.py:mcp`
+   - Autenticação: habilitada
+
+4. Adicione variáveis de ambiente no Horizon:
+
+   ```dotenv
+   DESPEZZAS_MCP_BACKEND_URL=https://seu-backend-node.example.com/mcp
+   DESPEZZAS_MCP_BACKEND_TOKEN=<mesmo-segredo-longo-do-backend>
+   ```
+
+5. Use a URL MCP do Horizon, geralmente:
 
    ```text
-   https://your-server-name.fastmcp.app/mcp
+   https://nome-do-seu-servidor.fastmcp.app/mcp
    ```
 
-For this path, Horizon is the public MCP auth layer and the Node backend is the private implementation layer. Do not put Despezzas credentials in Horizon unless you intentionally port the actual Despezzas MCP implementation to Python later.
+Nesse caminho, o Horizon é a camada pública de autenticação MCP e o backend Node é a camada privada de implementação. Não coloque credenciais Despezzas no Horizon, a menos que você decida portar a implementação real do Despezzas MCP para Python depois.
 
 ## Koyeb
 
-Use the Dockerfile from this repository. Koyeb Free is suitable for hobby testing, but it scales down to zero after idle time and does not support volumes, so configure env credentials and disable session persistence.
+Use o Dockerfile deste repositório. Koyeb Free é adequado para testes hobby, mas escala para zero depois de tempo ocioso e não suporta volumes, então configure credenciais por ambiente e desative persistência de sessão.
 
-Recommended Koyeb settings:
+Configurações recomendadas no Koyeb:
 
-- Deployment method: GitHub.
-- Builder: Dockerfile.
-- Dockerfile location: `Dockerfile`.
-- Instance type: Free.
-- Exposed port: `8787`.
-- Health check path: `/health`.
+- Método de deploy: GitHub.
+- Construtor: Dockerfile.
+- Local do Dockerfile: `Dockerfile`.
+- Tipo de instância: Free.
+- Porta exposta: `8787`.
+- Caminho de verificação de saúde: `/health`.
 
-Required variables:
+Variáveis obrigatórias:
 
 ```dotenv
 MCP_TRANSPORT=http
 HOST=0.0.0.0
 PORT=8787
-MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
+MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
+MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
 MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=3600
-DESPEZZAS_EMAIL=<your-email>
-DESPEZZAS_PASSWORD=<your-password>
+DESPEZZAS_EMAIL=<seu-email>
+DESPEZZAS_PASSWORD=<sua-senha>
 DESPEZZAS_SESSION_FILE=none
-MCP_PUBLIC_BASE_URL=https://your-app-your-org.koyeb.app
+MCP_PUBLIC_BASE_URL=https://seu-app-sua-org.koyeb.app
 ```
 
-Koyeb exposes a public domain through `KOYEB_PUBLIC_DOMAIN`, so you can also set `MCP_PUBLIC_BASE_URL` to `https://{{ KOYEB_PUBLIC_DOMAIN }}` if using Koyeb variable interpolation.
+O Koyeb expõe um domínio público por `KOYEB_PUBLIC_DOMAIN`, então você também pode definir `MCP_PUBLIC_BASE_URL` como `https://{{ KOYEB_PUBLIC_DOMAIN }}` se estiver usando interpolação de variáveis do Koyeb.
 
-Then connect in ChatGPT:
+Depois conecte no ChatGPT:
 
-- Server URL: `https://your-app-your-org.koyeb.app/mcp`
-- Authentication: OAuth
+- URL do servidor: `https://seu-app-sua-org.koyeb.app/mcp`
+- Autenticação: OAuth
 
-Full guide: [koyeb.md](koyeb.md).
+Guia completo: [koyeb.md](koyeb.md).
 
 ## Cloud Run
 
-Use the Dockerfile. Cloud Run is stateless by default, so use env credentials and no session file:
+Use o Dockerfile. Cloud Run é sem estado por padrão, então use credenciais em variáveis de ambiente e sem arquivo de sessão:
 
 ```dotenv
 MCP_TRANSPORT=http
 HOST=0.0.0.0
-MCP_OAUTH_TOKEN_SECRET=<long-random-secret>
-MCP_OWNER_AUTH_CODE=<human-entered-owner-code>
-DESPEZZAS_EMAIL=<your-email>
-DESPEZZAS_PASSWORD=<your-password>
+MCP_OAUTH_TOKEN_SECRET=<segredo-longo-aleatorio>
+MCP_OWNER_AUTH_CODE=<codigo-de-proprietario>
+DESPEZZAS_EMAIL=<seu-email>
+DESPEZZAS_PASSWORD=<sua-senha>
 DESPEZZAS_SESSION_FILE=none
-MCP_PUBLIC_BASE_URL=https://your-cloud-run-url
+MCP_PUBLIC_BASE_URL=https://sua-url-cloud-run
 ```
 
-For direct ChatGPT custom-app use, Cloud Run must be reachable by ChatGPT, so deploy the service publicly and rely on the MCP OAuth layer for `/mcp`:
+Para uso direto como app personalizado do ChatGPT, o Cloud Run precisa ser acessível pelo ChatGPT; publique o serviço publicamente e conte com a camada OAuth do MCP para proteger `/mcp`:
 
 ```powershell
 gcloud run deploy despezzas-mcp --source . --region=us-central1 --allow-unauthenticated
 ```
 
-For internal/local MCP clients, Google's MCP guidance recommends IAM-protected Cloud Run services:
+Para clientes MCP internos/locais, a orientação de MCP do Google recomenda serviços Cloud Run protegidos por IAM:
 
 ```powershell
 gcloud run deploy despezzas-mcp --source . --region=us-central1 --no-allow-unauthenticated
 gcloud run services proxy despezzas-mcp --region=us-central1 --port=3000
 ```
 
-That IAM-protected mode is stronger for local clients, but it is not suitable for direct ChatGPT connection unless ChatGPT can provide a Google-issued ID token for your Cloud Run service. For ChatGPT, use public Cloud Run plus MCP OAuth, or put Prefect Horizon in front of the backend.
+Esse modo protegido por IAM é mais forte para clientes locais, mas não serve para conexão direta do ChatGPT, a menos que o ChatGPT consiga fornecer um ID token emitido pelo Google para seu serviço Cloud Run. Para ChatGPT, use Cloud Run público com OAuth MCP, ou coloque o Prefect Horizon na frente do backend.
 
-## Generate Secrets
+## Gerar Secrets
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-## Sources
+## Fontes
 
-- OpenAI Apps SDK deployment docs: https://developers.openai.com/apps-sdk/deploy
-- Cloudflare remote MCP server guide: https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/
-- Cloudflare Workers pricing and free limits: https://developers.cloudflare.com/workers/platform/pricing/
-- Render free service limits: https://render.com/docs/free
-- Render Node/Express deployment docs: https://render.com/docs/deploy-node-express-app
-- Render Blueprint docs: https://render.com/docs/blueprint-spec
-- Railway Express deployment docs: https://docs.railway.com/guides/express
-- Railway pricing/docs: https://docs.railway.com/pricing
-- Railway public networking docs: https://docs.railway.com/networking/public-networking
-- Koyeb Express deployment docs: https://www.koyeb.com/docs/deploy/express
-- Koyeb Free Instance reference: https://www.koyeb.com/docs/reference/instances
-- Koyeb GitHub deployment docs: https://www.koyeb.com/docs/build-and-deploy/deploy-with-git
-- Koyeb scale-to-zero docs: https://www.koyeb.com/docs/run-and-scale/scale-to-zero
-- Google Cloud Run pricing/free tier: https://cloud.google.com/run/pricing
-- Oracle Always Free resources: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
-- Northflank free sandbox docs: https://northflank.com/docs/v1/application/billing/pricing-on-northflank
-- Vercel Express deployment docs: https://vercel.com/docs/frameworks/backend/express
-- Vercel Functions docs: https://vercel.com/docs/functions
-- Vercel Functions limits: https://vercel.com/docs/functions/limitations
-- Vercel MCP deployment docs: https://vercel.com/docs/mcp/deploy-mcp-servers-to-vercel
-- Google Cloud Run MCP hosting docs: https://cloud.google.com/run/docs/host-mcp-servers
-- Google Cloud MCP on Cloud Run blog: https://cloud.google.com/blog/topics/developers-practitioners/build-and-deploy-a-remote-mcp-server-to-google-cloud-run-in-under-10-minutes
-- Prefect Horizon / FastMCP deployment docs: https://gofastmcp.com/deployment/prefect-horizon
-- FastMCP proxy provider docs: https://gofastmcp.com/servers/providers/proxy
-- Community discussion on MCP deployment platforms: https://www.reddit.com/r/mcp/comments/1qh1tlt/platforms_for_easy_mcp_deployment/
+- Documentação de deploy do OpenAI Apps SDK: https://developers.openai.com/apps-sdk/deploy
+- Guia de servidor MCP remoto da Cloudflare: https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/
+- Preços e limites gratuitos do Cloudflare Workers: https://developers.cloudflare.com/workers/platform/pricing/
+- Limites do serviço gratuito do Render: https://render.com/docs/free
+- Documentação de deploy Node/Express no Render: https://render.com/docs/deploy-node-express-app
+- Documentação de Blueprint do Render: https://render.com/docs/blueprint-spec
+- Documentação de deploy Express no Railway: https://docs.railway.com/guides/express
+- Preços/documentação do Railway: https://docs.railway.com/pricing
+- Documentação de rede pública do Railway: https://docs.railway.com/networking/public-networking
+- Documentação de deploy Express no Koyeb: https://www.koyeb.com/docs/deploy/express
+- Referência de Koyeb Free Instance: https://www.koyeb.com/docs/reference/instances
+- Documentação de deploy GitHub no Koyeb: https://www.koyeb.com/docs/build-and-deploy/deploy-with-git
+- Documentação de escala para zero do Koyeb: https://www.koyeb.com/docs/run-and-scale/scale-to-zero
+- Preços/plano gratuito do Google Cloud Run: https://cloud.google.com/run/pricing
+- Recursos Oracle Always Free: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
+- Documentação do sandbox gratuito Northflank: https://northflank.com/docs/v1/application/billing/pricing-on-northflank
+- Documentação de deploy Express na Vercel: https://vercel.com/docs/frameworks/backend/express
+- Documentação de Vercel Functions: https://vercel.com/docs/functions
+- Limites de Vercel Functions: https://vercel.com/docs/functions/limitations
+- Documentação de deploy MCP na Vercel: https://vercel.com/docs/mcp/deploy-mcp-servers-to-vercel
+- Documentação de hospedagem MCP no Google Cloud Run: https://cloud.google.com/run/docs/host-mcp-servers
+- Blog Google Cloud MCP no Cloud Run: https://cloud.google.com/blog/topics/developers-practitioners/build-and-deploy-a-remote-mcp-server-to-google-cloud-run-in-under-10-minutes
+- Documentação Prefect Horizon / FastMCP: https://gofastmcp.com/deployment/prefect-horizon
+- Documentação de provedor proxy FastMCP: https://gofastmcp.com/servers/providers/proxy
+- Discussão da comunidade sobre plataformas de deploy MCP: https://www.reddit.com/r/mcp/comments/1qh1tlt/platforms_for_easy_mcp_deployment/

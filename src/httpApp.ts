@@ -8,7 +8,7 @@ import { renderLoginPage, renderLoginSuccessPage } from "./loginPage.js";
 import {
   authorizationServerMetadata,
   completeAuthorization,
-  exchangeAuthorizationCode,
+  exchangeOAuthToken,
   mcpResource,
   oauthStore,
   protectedResourceMetadata,
@@ -41,14 +41,14 @@ export function createHttpApp() {
 
   app.get("/docs/oauth", (req, res) => {
     res.type("html").send(`<!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head><meta charset="utf-8"><title>Despezzas MCP OAuth</title></head>
   <body>
     <h1>Despezzas MCP OAuth</h1>
-    <p>This MCP server uses OAuth 2.1 authorization code with PKCE to authorize ChatGPT access to the MCP endpoint.</p>
-    <p>Resource: <code>${escapeHtml(mcpResource(req))}</code></p>
-    <p>Scopes: <code>despezzas:read despezzas:write</code></p>
-    <p>ChatGPT receives an opaque MCP access token. Despezzas credentials and Firebase session tokens remain server-side.</p>
+    <p>Este servidor MCP usa código de autorização OAuth 2.1 com PKCE para autorizar o acesso do ChatGPT ao endpoint MCP.</p>
+    <p>Recurso: <code>${escapeHtml(mcpResource(req))}</code></p>
+    <p>Escopos: <code>despezzas:read despezzas:write</code></p>
+    <p>O ChatGPT recebe um token de acesso MCP opaco. Credenciais do Despezzas e tokens de sessão Firebase permanecem no lado do servidor.</p>
   </body>
 </html>`);
   });
@@ -94,7 +94,7 @@ export function createHttpApp() {
         }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Invalid authorization request.";
+      const message = error instanceof Error ? error.message : "Requisição de autorização inválida.";
       res.status(400).type("html").send(renderLoginPage({ error: message }));
     }
   });
@@ -118,7 +118,7 @@ export function createHttpApp() {
       });
       res.redirect(302, redirect);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Authorization failed.";
+      const message = error instanceof Error ? error.message : "Autorização falhou.";
       res.status(401).type("html").send(
         renderLoginPage({
           error: message,
@@ -141,9 +141,9 @@ export function createHttpApp() {
 
   app.post("/oauth/token", (req, res) => {
     try {
-      res.json(exchangeAuthorizationCode(req.body as Record<string, unknown>, req));
+      res.json(exchangeOAuthToken(req.body as Record<string, unknown>, req));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Token request failed.";
+      const message = error instanceof Error ? error.message : "Requisição de token falhou.";
       res.status(400).json({ error: "invalid_grant", error_description: message });
     }
   });
@@ -171,7 +171,7 @@ export function createHttpApp() {
       await authManager.loginWithPassword(email, password);
       res.type("html").send(renderLoginSuccessPage(await authManager.getStatus()));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Login failed.";
+      const message = error instanceof Error ? error.message : "Login falhou.";
       res.status(401).type("html").send(
         renderLoginPage({
           status: await authManager.getStatus(),
@@ -185,7 +185,7 @@ export function createHttpApp() {
 
   app.get("/logout", async (_req, res) => {
     await authManager.clearSession();
-    res.type("html").send(renderLoginPage({ status: await authManager.getStatus(), success: "Sessao MCP removida." }));
+    res.type("html").send(renderLoginPage({ status: await authManager.getStatus(), success: "Sessão MCP removida." }));
   });
 
   app.use("/mcp", requireHttpBearer);
@@ -200,11 +200,11 @@ export function createHttpApp() {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
-      console.error("Error handling MCP request:", error);
+      console.error("Erro ao processar requisição MCP:", error);
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: "2.0",
-          error: { code: -32603, message: "Internal server error" },
+          error: { code: -32603, message: "Erro interno do servidor" },
           id: null,
         });
       }
@@ -226,11 +226,11 @@ export function listenHttp() {
   const app = createHttpApp();
   app.listen(config.port, config.host, (error?: Error) => {
     if (error) {
-      console.error("Failed to start HTTP MCP server:", error);
+      console.error("Falha ao iniciar o servidor HTTP MCP:", error);
       process.exit(1);
     }
 
-    console.error(`Despezzas MCP HTTP server listening at http://${config.host}:${config.port}/mcp`);
+    console.error(`Servidor HTTP do Despezzas MCP ouvindo em http://${config.host}:${config.port}/mcp`);
   });
 }
 
@@ -245,7 +245,7 @@ function requireHttpBearer(req: Request, res: Response, next: NextFunction) {
     res.setHeader("WWW-Authenticate", wwwAuthenticate(req));
     res.status(401).json({
       jsonrpc: "2.0",
-      error: { code: -32001, message: "Unauthorized" },
+      error: { code: -32001, message: "Não autorizado" },
       id: null,
     });
     return;
@@ -260,7 +260,7 @@ function requireHttpBearer(req: Request, res: Response, next: NextFunction) {
   res.setHeader("WWW-Authenticate", wwwAuthenticate(req));
   res.status(401).json({
     jsonrpc: "2.0",
-    error: { code: -32001, message: "Unauthorized" },
+    error: { code: -32001, message: "Não autorizado" },
     id: null,
   });
 }
@@ -284,7 +284,7 @@ function escapeHtml(value: string): string {
 function methodNotAllowed(_req: Request, res: Response) {
   res.status(405).json({
     jsonrpc: "2.0",
-    error: { code: -32000, message: "Method not allowed" },
+    error: { code: -32000, message: "Método não permitido" },
     id: null,
   });
 }

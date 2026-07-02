@@ -37,6 +37,8 @@ Login to Cloudflare:
 npx wrangler login
 ```
 
+If this is the first Worker in the Cloudflare account, open Workers & Pages in the Cloudflare dashboard and register a `workers.dev` subdomain before deploying. Wrangler cannot choose that subdomain in non-interactive CI/CD builds.
+
 ## Configure Secrets
 
 Create a stable OAuth signing secret:
@@ -85,6 +87,8 @@ Check health:
 Invoke-RestMethod https://despezzas-mcp.<your-account>.workers.dev/health
 ```
 
+If deploy fails with `You need to register a workers.dev subdomain before publishing to workers.dev`, finish the Workers onboarding in Cloudflare, then rerun `npm run deploy:cloudflare`.
+
 Open the login page if you want to test the Despezzas auth screen directly:
 
 ```text
@@ -131,4 +135,3 @@ npm run deploy:cloudflare
 - For reliability, keep `DESPEZZAS_EMAIL` and `DESPEZZAS_PASSWORD` configured as secrets so the Worker can re-login after isolate restarts.
 - The `/login` page still works, but without durable storage it should be treated as a test/manual authorization path.
 - If a future version needs durable per-user sessions, migrate `src/cloudflare.ts` to Cloudflare `McpAgent` plus Durable Objects or store sessions in KV/D1 with encryption.
-

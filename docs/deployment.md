@@ -51,7 +51,7 @@ Não faça commit de credenciais do Despezzas. Adicione-as apenas como secrets/v
 ## Melhores Opções Gratuitas Para Este MCP
 
 1. Cloudflare Workers Free
-   Melhor escolha atual. Oferece HTTPS, sem hibernação de container, plano gratuito generoso e suporte oficial para MCP remoto via Streamable HTTP. O worker usa o transporte web-standard diretamente, sem Durable Objects — as ferramentas atuais são stateless. Veja [cloudflare-workers.md](cloudflare-workers.md).
+   Melhor escolha. HTTPS, sem hibernação de container, plano gratuito generoso e suporte oficial para MCP remoto via Streamable HTTP. O worker usa o transporte web-standard, sem Durable Objects — as ferramentas atuais são stateless. Veja [cloudflare-workers.md](cloudflare-workers.md).
 
 2. Koyeb Free Instance
    Melhor alternativa gratuita em container. Roda o Dockerfile incluído a partir do GitHub e fornece um domínio HTTPS público. A Free Instance escala para zero após 1 hora ociosa e não oferece volumes persistentes; use `DESPEZZAS_EMAIL`/`DESPEZZAS_PASSWORD`/`DESPEZZAS_FIREBASE_API_KEY` e `DESPEZZAS_SESSION_FILE=none`. Veja [koyeb.md](koyeb.md).
@@ -63,7 +63,7 @@ Não faça commit de credenciais do Despezzas. Adicione-as apenas como secrets/v
    Boa opção gratuita baseada em Git. A Vercel tem documentação específica para Functions, metadados OAuth e hosts MCP. Este repositório usa um adaptador Express em vez do `mcp-handler` dos exemplos oficiais.
 
 5. Prefect Horizon
-   Melhor gateway nativo MCP para quem quer hospedagem gerenciada com autenticação, controle de acesso, logs, Inspector e ChatMCP. O Horizon espera um ponto de entrada Python FastMCP, então este repositório inclui um proxy que encaminha para um backend Node já publicado em Koyeb, Vercel, Render, Cloudflare ou similar.
+   Melhor gateway nativo para MCP: hospedagem gerenciada com autenticação, controle de acesso, logs, Inspector e ChatMCP. O Horizon espera um ponto de entrada Python FastMCP, então este repositório inclui um proxy que encaminha para um backend Node já publicado em Koyeb, Vercel, Render, Cloudflare ou similar.
 
 6. Render Free Web Service
    Caminho GitHub-para-URL mais simples e bom para testar MVP. Serviços web gratuitos hibernam após 15 minutos e perdem alterações no sistema de arquivos em reinícios. Use o `render.yaml` incluído, defina credenciais Despezzas como segredos e mantenha `DESPEZZAS_SESSION_FILE=none`.

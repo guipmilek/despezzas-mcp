@@ -320,7 +320,7 @@ O servidor expõe os endpoints de descoberta esperados pelo ChatGPT:
 - `GET|POST /oauth/authorize`
 - `POST /oauth/token`
 
-Essa camada OAuth protege a conexão MCP. Durante a autorização, a página de login troca email/senha do Despezzas por uma sessão Despezzas/Firebase no lado do servidor. O botão final é `Entrar e autorizar`, e o ChatGPT recebe apenas um token de acesso MCP opaco.
+Essa camada OAuth protege a conexão. Durante a autorização, a página de login troca email/senha do Despezzas por uma sessão Despezzas/Firebase no servidor. O botão final é `Entrar e autorizar`, e o ChatGPT recebe apenas um token de acesso MCP opaco.
 
 `MCP_HTTP_BEARER_TOKEN` ainda é útil para scripts fora do ChatGPT. Quando omitido, o `/mcp` exige um token OAuth válido.
 

@@ -167,9 +167,9 @@ Em ChatGPT Apps / Custom Tool:
 - URL do servidor: `https://despezzas-mcp.<sua-conta>.workers.dev/mcp`
 - Autenticação: `OAuth`
 
-No modo multiusuário, cada pessoa verá o formulário de autorização durante o OAuth e informa as próprias credenciais do Despezzas. A tela usa a identidade visual do Despezzas, acompanha tema claro/escuro e contém apenas os campos necessários. O token OAuth do ChatGPT fica vinculado à sessão criptografada desse usuário no KV.
+No modo multiusuário, cada pessoa vê o formulário de autorização durante o OAuth e informa as próprias credenciais do Despezzas. A tela usa a identidade visual do Despezzas, acompanha tema claro/escuro e contém apenas os campos necessários. O token OAuth do ChatGPT fica vinculado à sessão criptografada no KV.
 
-O Worker expõe os endpoints de descoberta esperados pelo ChatGPT:
+O Worker expõe os endpoints que o ChatGPT espera:
 
 - `GET /.well-known/oauth-protected-resource`
 - `GET /.well-known/oauth-authorization-server`
@@ -179,7 +179,7 @@ O Worker expõe os endpoints de descoberta esperados pelo ChatGPT:
 
 ## Domínio Personalizado
 
-O Worker normalmente infere sua URL pública pela requisição recebida. Se você anexar um domínio personalizado e a descoberta OAuth retornar a URL base errada, defina `MCP_PUBLIC_BASE_URL` em `wrangler.jsonc`:
+O Worker normalmente infere a URL pública pela requisição recebida. Se você anexar um domínio personalizado e a descoberta OAuth retornar a URL errada, defina `MCP_PUBLIC_BASE_URL` em `wrangler.jsonc`:
 
 ```jsonc
 {

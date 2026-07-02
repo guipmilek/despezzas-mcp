@@ -152,94 +152,29 @@ As principais ferramentas usadas neste projeto:
 ### Servidor MCP
 
 <p>
-  <a href="https://www.typescriptlang.org/">
-    <img
-      src="https://img.shields.io/badge/TypeScript-white?style=for-the-badge&logo=TypeScript"
-      alt="TypeScript"
-    />
-  </a>
-  <a href="https://nodejs.org/">
-    <img
-      src="https://img.shields.io/badge/Node.js-233056?style=for-the-badge&logo=node.js"
-      alt="Node.js"
-    />
-  </a>
-  <a href="https://modelcontextprotocol.io/">
-    <img
-      src="https://img.shields.io/badge/Model_Context_Protocol-202024?style=for-the-badge"
-      alt="Model Context Protocol"
-    />
-  </a>
-  <a href="https://expressjs.com/">
-    <img
-      src="https://img.shields.io/badge/Express-111111?style=for-the-badge&logo=express"
-      alt="Express"
-    />
-  </a>
-  <a href="https://hono.dev/">
-    <img
-      src="https://img.shields.io/badge/Hono-e36002?style=for-the-badge"
-      alt="Hono"
-    />
-  </a>
-  <a href="https://github.com/colinhacks/zod">
-    <img
-      src="https://img.shields.io/badge/Zod-3068b7?style=for-the-badge&logo=zod"
-      alt="Zod"
-    />
-  </a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-white?style=for-the-badge&amp;logo=TypeScript" alt="TypeScript" /></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-233056?style=for-the-badge&amp;logo=node.js" alt="Node.js" /></a>
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/Model_Context_Protocol-202024?style=for-the-badge" alt="Model Context Protocol" /></a>
+  <a href="https://expressjs.com/"><img src="https://img.shields.io/badge/Express-111111?style=for-the-badge&amp;logo=express" alt="Express" /></a>
+  <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-e36002?style=for-the-badge" alt="Hono" /></a>
+  <a href="https://github.com/colinhacks/zod"><img src="https://img.shields.io/badge/Zod-3068b7?style=for-the-badge&amp;logo=zod" alt="Zod" /></a>
 </p>
 
 ### Deploy
 
 <p>
-  <a href="https://workers.cloudflare.com/">
-    <img
-      src="https://img.shields.io/badge/Cloudflare_Workers-f38020?style=for-the-badge&logo=cloudflare"
-      alt="Cloudflare Workers"
-    />
-  </a>
-  <a href="https://www.docker.com/">
-    <img
-      src="https://img.shields.io/badge/Docker-white?style=for-the-badge&logo=docker"
-      alt="Docker"
-    />
-  </a>
-  <a href="https://vercel.com/">
-    <img
-      src="https://img.shields.io/badge/Vercel-0a0a0a?style=for-the-badge&logo=vercel"
-      alt="Vercel"
-    />
-  </a>
-  <a href="https://render.com/">
-    <img
-      src="https://img.shields.io/badge/Render-111111?style=for-the-badge&logo=render"
-      alt="Render"
-    />
-  </a>
+  <a href="https://workers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare_Workers-f38020?style=for-the-badge&amp;logo=cloudflare" alt="Cloudflare Workers" /></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-white?style=for-the-badge&amp;logo=docker" alt="Docker" /></a>
+  <a href="https://vercel.com/"><img src="https://img.shields.io/badge/Vercel-0a0a0a?style=for-the-badge&amp;logo=vercel" alt="Vercel" /></a>
+  <a href="https://render.com/"><img src="https://img.shields.io/badge/Render-111111?style=for-the-badge&amp;logo=render" alt="Render" /></a>
 </p>
 
 ### Ferramentas
 
 <p>
-  <a href="https://git-scm.com/">
-    <img
-      src="https://img.shields.io/badge/Git-f1f1e9?style=for-the-badge&logo=git"
-      alt="Git"
-    />
-  </a>
-  <a href="https://www.npmjs.com/">
-    <img
-      src="https://img.shields.io/badge/npm-cb3837?style=for-the-badge&logo=npm"
-      alt="npm"
-    />
-  </a>
-  <a href="https://developers.cloudflare.com/workers/wrangler/">
-    <img
-      src="https://img.shields.io/badge/Wrangler-f38020?style=for-the-badge&logo=cloudflare"
-      alt="Wrangler"
-    />
-  </a>
+  <a href="https://git-scm.com/"><img src="https://img.shields.io/badge/Git-f1f1e9?style=for-the-badge&amp;logo=git" alt="Git" /></a>
+  <a href="https://www.npmjs.com/"><img src="https://img.shields.io/badge/npm-cb3837?style=for-the-badge&amp;logo=npm" alt="npm" /></a>
+  <a href="https://developers.cloudflare.com/workers/wrangler/"><img src="https://img.shields.io/badge/Wrangler-f38020?style=for-the-badge&amp;logo=cloudflare" alt="Wrangler" /></a>
 </p>
 
 _* Veja o arquivo [<kbd>package.json</kbd>](./package.json) para a lista completa de dependências._

@@ -53,7 +53,7 @@ Quando o Koyeb gerar o domínio público, defina:
 MCP_PUBLIC_BASE_URL=https://<seu-app>-<sua-org>.koyeb.app
 ```
 
-Se os cabeçalhos encaminhados pelo Koyeb estiverem corretos, o servidor consegue inferir essa URL. Defini-la explicitamente torna a descoberta OAuth menos surpreendente.
+Se os cabeçalhos encaminhados pelo Koyeb estiverem corretos, o servidor descobre a URL sozinho. Defina manualmente para evitar surpresas na descoberta OAuth.
 
 Gere o segredo OAuth localmente:
 

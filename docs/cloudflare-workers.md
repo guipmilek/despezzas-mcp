@@ -61,7 +61,7 @@ npx wrangler secret put MCP_OAUTH_TOKEN_SECRET
 
 ## Modo Multiusuário
 
-Use este modo se mais de uma pessoa deve conectar a própria conta Despezzas ao próprio ChatGPT.
+Use este modo se mais de uma pessoa for conectar a própria conta Despezzas ao ChatGPT.
 
 Crie um namespace KV:
 
@@ -69,7 +69,7 @@ Crie um namespace KV:
 npx wrangler kv namespace create DESPEZZAS_SESSIONS
 ```
 
-O comando retorna um bloco `kv_namespaces`. Cole o `id` gerado no bloco `kv_namespaces` comentado em `wrangler.jsonc` e mantenha o nome do binding exatamente:
+O comando retorna um bloco `kv_namespaces`. Cole o `id` gerado no `wrangler.jsonc`, no binding `DESPEZZAS_SESSIONS`:
 
 ```jsonc
 {
@@ -197,13 +197,13 @@ npm run deploy:cloudflare
 
 ## Notas de Runtime
 
-- `DESPEZZAS_SESSION_FILE=none` é definido em `wrangler.jsonc`; Workers não fornecem um sistema de arquivos persistente normal.
+- `DESPEZZAS_SESSION_FILE=none` está fixo no `wrangler.jsonc` — Workers não têm sistema de arquivos persistente.
 - O modo multiusuário exige KV `DESPEZZAS_SESSIONS` e `SESSION_ENCRYPTION_KEY`.
 - Conta única exige `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, `DESPEZZAS_FIREBASE_API_KEY` e `MCP_OWNER_AUTH_CODE`.
 - `MCP_OWNER_AUTH_CODE` é ignorado quando o armazenamento KV multiusuário está configurado.
-- A página `/login` é principalmente um caminho de teste/autorização manual. Ela não oferece criação de conta, recuperação de senha ou "lembrar de mim"; esses fluxos continuam no app/site oficial do Despezzas. Usuários do ChatGPT devem conectar pelo OAuth do ChatGPT.
+- A página `/login` é para testes e autorização manual. Não oferece criação de conta, recuperação de senha nem "lembrar de mim" — esses fluxos são do app oficial do Despezzas. Usuários do ChatGPT devem conectar pelo OAuth do ChatGPT.
 - Uma versão futura poderia migrar de KV para `McpAgent` com Durable Objects se precisarmos de estado por sessão mais rico.
 
 ## Nota de Confiança
 
-O Despezzas não fornece OAuth oficial. No modo multiusuário, usuários informam a senha do Despezzas na página de login deste MCP. Use apenas com pessoas que confiam em quem opera o Worker. O Worker não armazena senhas — apenas as recebe momentaneamente para trocar por tokens de sessão.
+O Despezzas não tem OAuth oficial. No modo multiusuário, cada pessoa digita a própria senha na página de login deste MCP. Use apenas com pessoas que confiam em quem opera o Worker. O Worker não armazena senhas — apenas as recebe momentaneamente para trocar por tokens de sessão.

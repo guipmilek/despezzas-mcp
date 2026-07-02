@@ -223,7 +223,7 @@ Opções preferenciais:
 2. Defina `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD` e `DESPEZZAS_FIREBASE_API_KEY` (chave pública — veja [.env.example](.env.example)) no `.env`.
 3. Copie o `DESPEZZAS_TOKEN` pelas DevTools do navegador.
 
-A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: email, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha continuam pertencendo ao app/site oficial do Despezzas.
+A página `/login` usa a identidade visual do Despezzas, acompanha os temas claro/escuro do sistema e contém apenas os campos necessários para este MCP: email, senha e, quando configurado, código de acesso do proprietário. Criação de conta e recuperação de senha ficam no app oficial do Despezzas.
 
 O fluxo de login espelha o frontend do Despezzas:
 
@@ -287,7 +287,7 @@ Abra a página local de autorização:
 Start-Process http://127.0.0.1:8787/login
 ```
 
-Se expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso na frente. A página `/login` aceita sua senha do Despezzas para autorizar este MCP.
+Se expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso na frente. A página `/login` aceita sua senha do Despezzas para autorizar o MCP.
 
 ## 🤖 Conexão OAuth Com ChatGPT
 

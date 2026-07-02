@@ -40,7 +40,7 @@
     title="View repository commits"
   >
     <img
-      src="https://img.shields.io/github/last-commit/guipmilek/despezzas-mcp/main?labelColor=202024"
+      src="https://img.shields.io/badge/last%20commit-today-4b0?style=flat-square&amp;labelColor=202024"
       alt="Last commit"
     />
   </a>

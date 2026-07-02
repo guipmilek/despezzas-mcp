@@ -1,0 +1,168 @@
+# Despezzas MCP
+
+Despezzas MCP is an unofficial TypeScript MCP server for connecting personal financial data from Despezzas to MCP-compatible clients, including ChatGPT.
+
+This project can read and change personal financial data. Agents must treat all credentials, sessions, API responses, HAR files, and transaction data as sensitive. Never commit `.env`, bearer tokens, passwords, Firebase session files, unredacted HARs, or real personal finance data.
+
+## Core Context
+
+- Package: `despezzas-mcp`
+- Runtime: Node.js `>=20`
+- Language: TypeScript, ESM
+- License: MIT
+- Default API base URL: `https://api.despezzas.com`
+- Transports: local stdio, Node HTTP at `/mcp`, Cloudflare Workers HTTP at `/mcp`
+- Authentication: manual Despezzas bearer token, email/password with Firebase token exchange, or MCP OAuth for ChatGPT
+- Recommended remote deployment: Cloudflare Workers
+
+Despezzas does not publish an official API for this integration. Endpoints, payloads, and login details were inferred from web traffic and may change without notice.
+
+## Development Provenance
+
+This project was largely AI-assisted, or "vibecoded": most implementation work was generated, refactored, or iterated with AI agents, guided by Guilherme Milek's coding knowledge, product judgment, and manual review. Agents should treat the codebase as intentional but still verify behavior from source, tests, and runtime checks instead of assuming generated code is correct.
+
+## Important Files
+
+- [README.md](README.md): main Portuguese user documentation.
+- [README.en.md](README.en.md): English user documentation.
+- [CONTRIBUTING.md](CONTRIBUTING.md): contribution rules and safety notes.
+- [.env.example](.env.example): supported environment variables.
+- [package.json](package.json): scripts, dependencies, package metadata.
+- [src/index.ts](src/index.ts): CLI entrypoint; selects stdio or HTTP transport.
+- [src/server.ts](src/server.ts): creates the MCP server and registers tools.
+- [src/tools.ts](src/tools.ts): MCP tool schemas, handlers, validation, and write guards.
+- [src/client.ts](src/client.ts): Despezzas API client and request helper.
+- [src/auth.ts](src/auth.ts): Despezzas/Firebase authentication and session handling.
+- [src/httpApp.ts](src/httpApp.ts): Express HTTP app, `/login`, OAuth discovery, `/oauth/*`, and `/mcp`.
+- [src/cloudflare.ts](src/cloudflare.ts): Cloudflare Workers app, OAuth, multi-user session handling, and Worker logging.
+- [src/oauth.ts](src/oauth.ts): MCP OAuth token, client, and authorization helpers.
+- [src/cloudflareSessions.ts](src/cloudflareSessions.ts): encrypted Worker KV session storage.
+- [src/config.ts](src/config.ts): environment-driven runtime configuration.
+- [src/response.ts](src/response.ts): MCP JSON/error responses and confirmation guard.
+- [src/types.ts](src/types.ts): shared TypeScript payload types.
+- [test](test): Node test suite.
+- [docs/cloudflare-workers.md](docs/cloudflare-workers.md): Cloudflare Workers deployment.
+- [docs/deployment.md](docs/deployment.md): deployment options.
+- [docs/chatgpt-app-setup.md](docs/chatgpt-app-setup.md): ChatGPT app/connector setup.
+
+## Local Commands
+
+Use these from the repository root:
+
+```powershell
+npm install
+npm run build
+npm run typecheck
+npm test
+```
+
+Development:
+
+```powershell
+npm run dev
+npm run dev:http
+npm run dev:cloudflare
+```
+
+Runtime:
+
+```powershell
+npm run start
+npm run start:http
+```
+
+Smoke testing:
+
+```powershell
+npm run smoke:readonly
+```
+
+`npm run smoke:readonly` requires working Despezzas authentication and calls only read-only endpoints.
+
+## Environment Variables
+
+Key variables:
+
+- `DESPEZZAS_TOKEN`: optional manual bearer token.
+- `DESPEZZAS_EMAIL`, `DESPEZZAS_PASSWORD`, `DESPEZZAS_FIREBASE_API_KEY`: optional email/password login and Firebase token exchange.
+- `DESPEZZAS_SESSION_FILE`: persisted session path; use `none` to disable.
+- `DESPEZZAS_API_BASE_URL`: Despezzas API base URL.
+- `MCP_TRANSPORT`: `stdio` or `http`; default is `stdio`.
+- `HOST`, `PORT`: HTTP bind address.
+- `MCP_HTTP_BEARER_TOKEN`: optional shared bearer token for HTTP clients outside OAuth.
+- `MCP_PUBLIC_BASE_URL`: public HTTPS base URL for OAuth metadata.
+- `MCP_ALLOWED_HOSTS`: optional allowed Host header list.
+- `MCP_OAUTH_TOKEN_SECRET`: stable signing secret for MCP OAuth access tokens.
+- `MCP_OWNER_AUTH_CODE`: owner authorization code for private public deployments.
+- `SESSION_ENCRYPTION_KEY`: required for multi-user Cloudflare Worker sessions.
+
+Do not add real values for these variables to committed files.
+
+## MCP Tools
+
+Registered tool names:
+
+- `despezzas_status`
+- `despezzas_profile`
+- `despezzas_list_profiles`
+- `despezzas_switch_profile`
+- `despezzas_create_profile`
+- `despezzas_update_profile_access`
+- `despezzas_delete_profile`
+- `despezzas_leave_profile`
+- `despezzas_personal_config`
+- `despezzas_list_accounts`
+- `despezzas_list_banks`
+- `despezzas_create_account`
+- `despezzas_update_account`
+- `despezzas_delete_account`
+- `despezzas_list_credit_cards`
+- `despezzas_create_credit_card`
+- `despezzas_update_credit_card`
+- `despezzas_delete_credit_card`
+- `despezzas_list_categories`
+- `despezzas_list_subcategories`
+- `despezzas_search_transactions`
+- `despezzas_transaction_overview`
+- `despezzas_finance_summary`
+- `despezzas_prepare_create_transaction`
+- `despezzas_create_transaction`
+- `despezzas_prepare_update_transaction`
+- `despezzas_update_transaction`
+- `despezzas_batch_update_transactions`
+- `despezzas_prepare_delete_transaction`
+- `despezzas_delete_transaction`
+- `despezzas_duplicate_transaction`
+- `despezzas_toggle_transaction_paid`
+- `despezzas_create_transfer`
+- `despezzas_export_transactions`
+- `despezzas_raw_api`
+
+Write or destructive tools must keep requiring `confirm: true`. Transaction writes should continue to prefer prepare tools first, then confirmed write tools after payload review.
+
+## Agent Guidelines
+
+- Keep changes small and reviewable because this integration touches financial data and undocumented APIs.
+- Preserve the `confirm: true` safety requirement for every write or destructive operation.
+- Add focused tests for new tool payload validation, dangerous write paths, and ambiguous transaction/account/card behavior.
+- Prefer existing helpers in `src/response.ts`, `src/client.ts`, `src/auth.ts`, and `src/tools.ts` over introducing parallel patterns.
+- Use integer cents for money values. Example: `12345` means `R$123.45`.
+- Use `YYYY-MM-DD` dates for tool inputs.
+- Do not pass Despezzas passwords as MCP tool arguments. Use `.env` or the `/login` page.
+- Do not log secrets, raw Authorization headers, Firebase refresh tokens, full sessions, or unredacted API responses.
+- When capturing new endpoints, use `npm run inspect:har -- path/to/file.har` and still manually review redaction before sharing.
+
+## Deployment Notes
+
+- Local stdio clients should run the built `dist/index.js`.
+- Node HTTP mode exposes `/health`, `/auth/status`, `/login`, OAuth discovery endpoints, `/oauth/register`, `/oauth/authorize`, `/oauth/token`, and `/mcp`.
+- ChatGPT OAuth requires a public HTTPS URL and `MCP_PUBLIC_BASE_URL`.
+- Cloudflare Workers deployment is configured by `wrangler.jsonc` and `src/cloudflare.ts`.
+- Cloudflare multi-user mode requires Workers KV binding `DESPEZZAS_SESSIONS` plus `SESSION_ENCRYPTION_KEY`.
+- Single-account public deployments should set `MCP_OWNER_AUTH_CODE`.
+
+## Useful References
+
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Despezzas](https://despezzas.com/)
+- [Cloudflare Workers](https://workers.cloudflare.com/)

@@ -48,6 +48,7 @@
   </summary>
 
 - [📍 Visão Geral](#-visão-geral)
+- [Desenvolvimento com IA e agentes](#desenvolvimento-com-ia-e-agentes)
 - [⚡ Início Rápido](#-início-rápido)
 - [✨ Funcionalidades](#-funcionalidades)
 - [🧰 Catálogo de Ferramentas](#-catálogo-de-ferramentas)
@@ -84,6 +85,12 @@ Projeto open-source (MIT), construído analisando as requisições de rede e o c
 
 > [!IMPORTANT]
 > Este MCP pode ler e alterar dados financeiros pessoais. Nunca faça commit de `.env`, tokens, senhas, sessões, HARs não mascarados ou respostas reais da API.
+
+## Desenvolvimento com IA e agentes
+
+Este projeto foi desenvolvido de forma majoritariamente assistida por IA ("vibecoded"): grande parte da implementação foi gerada, refatorada ou iterada com agentes de IA, com direção técnica, conhecimento de programação e revisão manual de Guilherme Milek.
+
+Para agentes de IA trabalhando neste repositório, use [`llms.txt`](llms.txt) como contexto inicial. Ele resume a arquitetura, arquivos principais, comandos, ferramentas MCP, regras de segurança e notas de deploy.
 
 | Item | Valor |
 | --- | --- |
@@ -411,6 +418,7 @@ Contribuições são bem-vindas. Antes de abrir um pull request:
 2. Rode `npm run typecheck` e `npm test`.
 3. Não inclua credenciais, tokens, sessões, HARs não mascarados ou dados financeiros reais.
 4. Mantenha `confirm: true` obrigatório para toda ferramenta de escrita/destrutiva.
+5. Atualize [`llms.txt`](llms.txt) quando mudar arquitetura, comandos, ferramentas MCP ou regras importantes para agentes.
 
 ## 📄 Licença
 

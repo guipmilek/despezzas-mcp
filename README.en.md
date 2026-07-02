@@ -48,6 +48,7 @@
   </summary>
 
 - [📍 Overview](#-overview)
+- [AI-assisted development and agents](#ai-assisted-development-and-agents)
 - [⚡ Quick Start](#-quick-start)
 - [✨ Features](#-features)
 - [🧰 Tool Catalog](#-tool-catalog)
@@ -84,6 +85,12 @@ This is an open-source MIT-licensed project built from observed Despezzas Web tr
 
 > [!IMPORTANT]
 > This MCP can read and change personal financial data. Never commit `.env`, tokens, passwords, sessions, unredacted HARs, or real API responses.
+
+## AI-assisted development and agents
+
+This project was largely AI-assisted, or "vibecoded": most implementation work was generated, refactored, or iterated with AI agents, guided by Guilherme Milek's coding knowledge, technical direction, and manual review.
+
+AI agents working in this repository should use [`llms.txt`](llms.txt) as their starting context. It summarizes the architecture, key files, commands, MCP tools, safety rules, and deployment notes.
 
 | Item | Value |
 | --- | --- |
@@ -411,6 +418,7 @@ Contributions are welcome. Before opening a pull request:
 2. Run `npm run typecheck` and `npm test`.
 3. Do not include credentials, tokens, sessions, unredacted HARs, or real financial data.
 4. Keep `confirm: true` mandatory for every write/destructive tool.
+5. Update [`llms.txt`](llms.txt) when changing architecture, commands, MCP tools, or important agent-facing rules.
 
 ## 📄 License
 

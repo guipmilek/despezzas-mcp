@@ -41,6 +41,41 @@ const profileInviteSchema = z.object({
 });
 const profileInvitesSchema = z.array(profileInviteSchema).max(5).default([]);
 const MAX_EXTRA_PROFILES = 3;
+const transactionCreateInputSchema = {
+  title: z.string().min(1),
+  description: z.string().optional(),
+  amount_cents: amountCentsSchema,
+  date: dateSchema,
+  kind: z.enum(["expense", "income"]).default("expense"),
+  account_id: idSchema.optional(),
+  credit_card_id: idSchema.optional(),
+  category_id: idSchema.optional(),
+  subcategory_id: idSchema.optional(),
+  paid: z.boolean().default(true),
+  transaction_type: transactionTypeSchema.default("unique"),
+  frequency: frequencySchema,
+  installments: z.number().int().min(1).optional(),
+  amount_mode: z.enum(["per_installment", "total"]).default("per_installment"),
+  allow_uncategorized: z
+    .boolean()
+    .default(false)
+    .describe("Set true only when you intentionally want to create a transaction without a category_id."),
+};
+const transactionUpdateInputSchema = {
+  id: idSchema,
+  title: z.string().min(1).optional(),
+  description: z.string().optional(),
+  amount_cents: z.number().int().positive().optional(),
+  date: dateSchema.optional(),
+  kind: z.enum(["expense", "income"]).optional(),
+  account_id: idSchema.optional(),
+  credit_card_id: idSchema.optional(),
+  category_id: idSchema.optional(),
+  subcategory_id: idSchema.optional(),
+  paid: z.boolean().optional(),
+  scope: scopeSchema.optional().describe("Edition scope for recurring/installment transactions."),
+  edition_date: dateSchema.optional().describe("The occurrence date to edit. Defaults to date if provided."),
+};
 
 interface ProfileSummary {
   id: string | null;
@@ -576,6 +611,7 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
         order_by: z.enum(["date", "title", "amount"]).default("date"),
         order: z.enum(["asc", "desc"]).default("desc"),
         limit: z.number().int().min(1).max(500).default(100),
+        include_raw: z.boolean().default(false).describe("Return full Despezzas transaction objects instead of compact rows."),
       },
     },
     async (args) => {
@@ -591,12 +627,15 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           client.getTransactions(filters),
           safeProfileContext(client),
         ]);
+        const returnedTransactions = transactions.slice(0, args.limit);
         return jsonResponse({
           profile_context,
           filters,
           count: transactions.length,
-          returned: transactions.slice(0, args.limit).length,
-          transactions: transactions.slice(0, args.limit),
+          returned: returnedTransactions.length,
+          has_more: transactions.length > args.limit,
+          diagnostics: transactionSearchDiagnostics(transactions, returnedTransactions, args.limit, filters),
+          transactions: args.include_raw ? returnedTransactions : compactTransactions(returnedTransactions),
           warning: emptyProfileWarning("transactions", transactions.length, profile_context),
         });
       } catch (error) {
@@ -656,7 +695,7 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
           profile_context,
           filters,
           ...summary,
-          transactions: args.include_transactions ? transactions.slice(0, args.limit) : undefined,
+          transactions: args.include_transactions ? compactTransactions(transactions.slice(0, args.limit)) : undefined,
           warning: emptyProfileWarning("transactions", transactions.length, profile_context),
         });
       } catch (error) {
@@ -666,50 +705,82 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
   );
 
   server.registerTool(
+    "despezzas_prepare_create_transaction",
+    {
+      title: "Prepare Transaction Create",
+      description:
+        "Dry-run helper. Build and validate the payload for a new transaction without calling Despezzas. Use this before despezzas_create_transaction.",
+      inputSchema: transactionCreateInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async ({ amount_cents, kind, transaction_type, amount_mode, allow_uncategorized, ...rest }) => {
+      const prepared = prepareCreateTransaction({
+        ...rest,
+        amount_cents,
+        kind,
+        transaction_type,
+        amount_mode,
+        allow_uncategorized,
+      });
+      return jsonResponse(prepared);
+    },
+  );
+
+  server.registerTool(
     "despezzas_create_transaction",
     {
       title: "Create Transaction",
       description:
-        "Write operation. Create a real Despezzas transaction. Requires confirm: true. Use positive amount_cents and kind=expense/income.",
+        "Write operation. Create a real Despezzas transaction. Requires confirm: true. Use despezzas_prepare_create_transaction first, and never guess account/card/category IDs.",
       inputSchema: {
-        title: z.string().min(1),
-        description: z.string().optional(),
-        amount_cents: amountCentsSchema,
-        date: dateSchema,
-        kind: z.enum(["expense", "income"]).default("expense"),
-        account_id: idSchema.optional(),
-        credit_card_id: idSchema.optional(),
-        category_id: idSchema.optional(),
-        subcategory_id: idSchema.optional(),
-        paid: z.boolean().default(true),
-        transaction_type: transactionTypeSchema.default("unique"),
-        frequency: frequencySchema,
-        installments: z.number().int().min(1).optional(),
-        amount_mode: z.enum(["per_installment", "total"]).default("per_installment"),
+        ...transactionCreateInputSchema,
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
     },
-    async ({ amount_cents, kind, transaction_type, amount_mode, confirm, ...rest }) => {
+    async ({ amount_cents, kind, transaction_type, amount_mode, allow_uncategorized, confirm, ...rest }) => {
       const refusal = requireConfirmation(confirm, "create a transaction");
       if (refusal) return refusal;
 
-      if (!rest.account_id && !rest.credit_card_id) {
-        return errorResponse(new Error("Either account_id or credit_card_id is required."), "create transaction");
+      const prepared = prepareCreateTransaction({
+        ...rest,
+        amount_cents,
+        kind,
+        transaction_type,
+        amount_mode,
+        allow_uncategorized,
+      });
+      if (!prepared.ready) {
+        return errorResponse(
+          new Error(`Transaction create payload is not ready: ${prepared.issues.join(" ")}`),
+          "create transaction",
+        );
       }
 
       try {
-        const payload = buildTransactionPayload({
-          ...rest,
-          amount_cents,
-          kind,
-          transaction_type,
-          amount_mode,
+        const transaction = await client.createTransaction(prepared.payload);
+        return jsonResponse({
+          created: true,
+          payload: prepared.payload,
+          transaction,
         });
-        return jsonResponse(await client.createTransaction(payload));
       } catch (error) {
         return errorResponse(error, "create transaction");
       }
+    },
+  );
+
+  server.registerTool(
+    "despezzas_prepare_update_transaction",
+    {
+      title: "Prepare Transaction Update",
+      description:
+        "Dry-run helper. Build and validate the payload for updating a transaction without calling Despezzas. Use before despezzas_update_transaction.",
+      inputSchema: transactionUpdateInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async ({ id, amount_cents, kind, scope, edition_date, ...rest }) => {
+      return jsonResponse(prepareUpdateTransaction(id, amount_cents, kind, scope, edition_date, rest));
     },
   );
 
@@ -718,21 +789,9 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     {
       title: "Update Transaction",
       description:
-        "Write operation. Update a real Despezzas transaction. Requires confirm: true. For recurring/installments, set scope.",
+        "Write operation. Update a real Despezzas transaction. Requires confirm: true. Use despezzas_prepare_update_transaction first.",
       inputSchema: {
-        id: idSchema,
-        title: z.string().min(1).optional(),
-        description: z.string().optional(),
-        amount_cents: z.number().int().positive().optional(),
-        date: dateSchema.optional(),
-        kind: z.enum(["expense", "income"]).optional(),
-        account_id: idSchema.optional(),
-        credit_card_id: idSchema.optional(),
-        category_id: idSchema.optional(),
-        subcategory_id: idSchema.optional(),
-        paid: z.boolean().optional(),
-        scope: scopeSchema.optional().describe("Edition scope for recurring/installment transactions."),
-        edition_date: dateSchema.optional().describe("The occurrence date to edit. Defaults to date if provided."),
+        ...transactionUpdateInputSchema,
         confirm: z.boolean().optional(),
       },
       annotations: { destructiveHint: true },
@@ -742,17 +801,49 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       if (refusal) return refusal;
 
       try {
-        const payload: TransactionUpdatePayload = dropUndefined({
-          ...rest,
-          amount: amount_cents,
-          is_expense: kind === undefined ? undefined : kind === "expense",
-          edition_type: scope,
-          edition_date: edition_date ?? rest.date,
+        const prepared = prepareUpdateTransaction(id, amount_cents, kind, scope, edition_date, rest);
+        if (!prepared.ready) {
+          return errorResponse(
+            new Error(`Transaction update payload is not ready: ${prepared.issues.join(" ")}`),
+            "update transaction",
+          );
+        }
+
+        const transaction = await client.updateTransaction(id, prepared.payload);
+        return jsonResponse({
+          updated: true,
+          id,
+          payload: prepared.payload,
+          transaction,
         });
-        return jsonResponse(await client.updateTransaction(id, payload));
       } catch (error) {
         return errorResponse(error, "update transaction");
       }
+    },
+  );
+
+  server.registerTool(
+    "despezzas_prepare_delete_transaction",
+    {
+      title: "Prepare Transaction Delete",
+      description:
+        "Dry-run helper. Show the delete target and scope without deleting anything. Use before despezzas_delete_transaction.",
+      inputSchema: {
+        id: idSchema,
+        scope: scopeSchema,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ id, scope }) => {
+      return jsonResponse({
+        ready: true,
+        id,
+        scope,
+        endpoint: `/v1/transactions/${id}`,
+        method: "DELETE",
+        body: { type: scope },
+        note: "No API call was made. To delete this transaction, call despezzas_delete_transaction with this id, scope, and confirm:true.",
+      });
     },
   );
 
@@ -761,7 +852,7 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     {
       title: "Delete Transaction",
       description:
-        "Destructive write operation. Delete a transaction. Requires confirm: true. Scope can delete only this occurrence, this and next, or all.",
+        "Destructive write operation. Delete a transaction. Requires confirm: true. Use despezzas_prepare_delete_transaction first.",
       inputSchema: {
         id: idSchema,
         scope: scopeSchema,
@@ -863,23 +954,43 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
     "despezzas_export_transactions",
     {
       title: "Export Transactions",
-      description: "Ask Despezzas to create an export for a date range and optional account/card filters.",
+      description:
+        "Inspect/export Despezzas transactions for a date range. Defaults to a safe count plus field summary; set count_only:false to call the export endpoint.",
       inputSchema: {
         date_start: dateSchema,
         date_end: dateSchema,
         account_ids: idsSchema,
         credit_card_ids: idsSchema,
         count_only: z.boolean().default(true),
+        include_field_summary: z.boolean().default(true),
+        sample_limit: z.number().int().min(1).max(50).default(10),
       },
     },
-    async ({ count_only, ...filters }) => {
+    async ({ count_only, include_field_summary, sample_limit, ...filters }) => {
       try {
         const normalized = toTransactionFilters(filters);
-        return jsonResponse(
-          count_only
-            ? { count: await client.countExportableTransactions(normalized), filters: normalized }
-            : await client.exportTransactions(normalized),
-        );
+        const [profile_context, count_result, sample_transactions] = await Promise.all([
+          safeProfileContext(client),
+          captureApiResult(() => client.countExportableTransactions(normalized)),
+          include_field_summary ? client.getTransactions(normalized) : Promise.resolve([]),
+        ]);
+        const result: JsonObject = {
+          profile_context,
+          filters: normalized,
+          mode: count_only ? "count_and_field_summary" : "export_endpoint",
+          export_count_result: count_result,
+          sample_count: sample_transactions.length,
+          field_summary: include_field_summary ? summarizeFields(sample_transactions) : undefined,
+          sample_transactions: include_field_summary
+            ? compactTransactions(sample_transactions.slice(0, sample_limit))
+            : undefined,
+        };
+
+        if (!count_only) {
+          result.export_result = await client.exportTransactions(normalized);
+        }
+
+        return jsonResponse(dropUndefined(result));
       } catch (error) {
         return errorResponse(error, "export transactions");
       }
@@ -921,6 +1032,321 @@ export function registerTools(server: McpServer, client = new DespezzasClient())
       }
     },
   );
+}
+
+interface PreparedCreateTransaction {
+  ready: boolean;
+  issues: string[];
+  payload: TransactionPayload;
+  endpoint: string;
+  method: "POST";
+  note: string;
+}
+
+interface PreparedUpdateTransaction {
+  ready: boolean;
+  issues: string[];
+  id: string;
+  payload: TransactionUpdatePayload;
+  endpoint: string;
+  method: "PUT";
+  note: string;
+}
+
+function prepareCreateTransaction(args: {
+  title: string;
+  description?: string;
+  amount_cents: number;
+  date: string;
+  kind: "expense" | "income";
+  account_id?: string;
+  credit_card_id?: string;
+  category_id?: string;
+  subcategory_id?: string;
+  paid?: boolean;
+  transaction_type?: "unique" | "recurring" | "parcelled";
+  frequency?: Frequency;
+  installments?: number;
+  amount_mode?: "per_installment" | "total";
+  allow_uncategorized?: boolean;
+}): PreparedCreateTransaction {
+  const issues = createTransactionIssues(args);
+  const payload = buildTransactionPayload(args);
+
+  return {
+    ready: issues.length === 0,
+    issues,
+    payload,
+    endpoint: "/v1/transactions",
+    method: "POST",
+    note: "No API call was made. If ready is true, call despezzas_create_transaction with the same fields plus confirm:true.",
+  };
+}
+
+function prepareUpdateTransaction(
+  id: string,
+  amountCents: number | undefined,
+  kind: "expense" | "income" | undefined,
+  scope: DeleteScope | undefined,
+  editionDate: string | undefined,
+  rest: {
+    title?: string;
+    description?: string;
+    date?: string;
+    account_id?: string;
+    credit_card_id?: string;
+    category_id?: string;
+    subcategory_id?: string;
+    paid?: boolean;
+  },
+): PreparedUpdateTransaction {
+  const payload = buildTransactionUpdatePayload(amountCents, kind, scope, editionDate, rest);
+  const issues: string[] = [];
+
+  if (Object.keys(payload).length === 0) {
+    issues.push("Provide at least one transaction field to update.");
+  }
+
+  if (rest.account_id && rest.credit_card_id) {
+    issues.push("Provide either account_id or credit_card_id, not both.");
+  }
+
+  return {
+    ready: issues.length === 0,
+    issues,
+    id,
+    payload,
+    endpoint: `/v1/transactions/${id}`,
+    method: "PUT",
+    note: "No API call was made. If ready is true, call despezzas_update_transaction with the same fields plus confirm:true.",
+  };
+}
+
+function createTransactionIssues(args: {
+  account_id?: string;
+  credit_card_id?: string;
+  category_id?: string;
+  subcategory_id?: string;
+  transaction_type?: "unique" | "recurring" | "parcelled";
+  installments?: number;
+  allow_uncategorized?: boolean;
+}): string[] {
+  const issues: string[] = [];
+
+  if (!args.account_id && !args.credit_card_id) {
+    issues.push("Either account_id or credit_card_id is required.");
+  }
+
+  if (args.account_id && args.credit_card_id) {
+    issues.push("Provide either account_id or credit_card_id, not both.");
+  }
+
+  if (!args.category_id && !args.allow_uncategorized) {
+    issues.push("category_id is required unless allow_uncategorized is true.");
+  }
+
+  if (args.subcategory_id && !args.category_id) {
+    issues.push("subcategory_id requires category_id.");
+  }
+
+  if (args.transaction_type === "parcelled" && (!args.installments || args.installments < 2)) {
+    issues.push("Parcelled transactions require installments >= 2.");
+  }
+
+  return issues;
+}
+
+function buildTransactionUpdatePayload(
+  amountCents: number | undefined,
+  kind: "expense" | "income" | undefined,
+  scope: DeleteScope | undefined,
+  editionDate: string | undefined,
+  rest: {
+    title?: string;
+    description?: string;
+    date?: string;
+    account_id?: string;
+    credit_card_id?: string;
+    category_id?: string;
+    subcategory_id?: string;
+    paid?: boolean;
+  },
+): TransactionUpdatePayload {
+  return dropUndefined({
+    ...rest,
+    amount: amountCents,
+    is_expense: kind === undefined ? undefined : kind === "expense",
+    edition_type: scope,
+    edition_date: editionDate ?? rest.date,
+  });
+}
+
+async function captureApiResult<T>(operation: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  try {
+    return { ok: true, value: await operation() };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function compactTransactions(transactions: unknown[]) {
+  return transactions.map(compactTransaction);
+}
+
+function compactTransaction(transaction: unknown): JsonObject {
+  if (!isRecord(transaction)) {
+    return { value: transaction };
+  }
+
+  return dropUndefined({
+    id: stringOrUndefined(transaction.id),
+    date: normalizeDateForOutput(transaction.date),
+    title: stringOrUndefined(transaction.title),
+    description: stringOrUndefined(transaction.description),
+    amount_cents: numberValue(transaction.amount),
+    kind: transaction.is_expense === true ? "expense" : "income",
+    paid: typeof transaction.paid === "boolean" ? transaction.paid : undefined,
+    type: stringOrUndefined(transaction.type),
+    installments: typeof transaction.installments === "number" ? transaction.installments : undefined,
+    installment_number: typeof transaction.installment_number === "number" ? transaction.installment_number : undefined,
+    account_id: stringOrUndefined(transaction.account_id),
+    account_name: nestedString(transaction.account, "name"),
+    credit_card_id: stringOrUndefined(transaction.credit_card_id),
+    credit_card_name: nestedString(transaction.credit_card, "name"),
+    category_id: stringOrUndefined(transaction.category_id),
+    category_name: nestedString(transaction.category, "name"),
+    subcategory_id: stringOrUndefined(transaction.subcategory_id),
+    subcategory_name: nestedString(transaction.subcategory, "name"),
+    profile_id: normalizedProfileId(transaction.profile_id),
+  });
+}
+
+function transactionSearchDiagnostics(
+  transactions: unknown[],
+  returnedTransactions: unknown[],
+  limit: number,
+  filters: TransactionFilters,
+) {
+  return {
+    requested_limit: limit,
+    api_returned_count: transactions.length,
+    returned_count_after_limit: returnedTransactions.length,
+    truncated_by_mcp_limit: transactions.length > limit,
+    sort_check: verifySort(returnedTransactions, filters.order_by, filters.order),
+    note:
+      "Despezzas currently returns a single matching list for these filters; this MCP applies limit locally and reports has_more/truncated_by_mcp_limit when the local limit hides rows.",
+  };
+}
+
+function verifySort(transactions: unknown[], field: SortField | undefined, order: SortOrder | undefined) {
+  const sortField = field ?? "date";
+  const sortOrder = order ?? "desc";
+  let comparablePairs = 0;
+
+  for (let index = 1; index < transactions.length; index += 1) {
+    const previous = sortValue(transactions[index - 1], sortField);
+    const current = sortValue(transactions[index], sortField);
+
+    if (previous === undefined || current === undefined) {
+      continue;
+    }
+
+    comparablePairs += 1;
+    if (sortOrder === "asc" ? previous > current : previous < current) {
+      return {
+        field: sortField,
+        order: sortOrder,
+        ok: false,
+        checked_pairs: comparablePairs,
+        first_mismatch_index: index - 1,
+      };
+    }
+  }
+
+  return {
+    field: sortField,
+    order: sortOrder,
+    ok: true,
+    checked_pairs: comparablePairs,
+  };
+}
+
+function sortValue(transaction: unknown, field: SortField): number | string | undefined {
+  if (!isRecord(transaction)) {
+    return undefined;
+  }
+
+  if (field === "amount") {
+    return numberValue(transaction.amount);
+  }
+
+  if (field === "title") {
+    return stringOrUndefined(transaction.title)?.toLocaleLowerCase();
+  }
+
+  const date = typeof transaction.date === "string" ? Date.parse(transaction.date) : Number.NaN;
+  return Number.isFinite(date) ? date : undefined;
+}
+
+function summarizeFields(transactions: unknown[]) {
+  const fields = new Map<string, { count: number; types: Set<string> }>();
+
+  for (const transaction of transactions) {
+    if (!isRecord(transaction)) {
+      continue;
+    }
+
+    collectFields(transaction, fields);
+  }
+
+  return {
+    sampled_transactions: transactions.length,
+    fields: [...fields.entries()]
+      .map(([name, value]) => ({
+        name,
+        present_count: value.count,
+        types: [...value.types].sort(),
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name)),
+  };
+}
+
+function collectFields(value: Record<string, unknown>, fields: Map<string, { count: number; types: Set<string> }>, prefix = "") {
+  for (const [key, child] of Object.entries(value)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const existing = fields.get(path) ?? { count: 0, types: new Set<string>() };
+    existing.count += 1;
+    existing.types.add(valueType(child));
+    fields.set(path, existing);
+
+    if (isRecord(child) && prefix === "") {
+      collectFields(child, fields, path);
+    }
+  }
+}
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) {
+    return "array";
+  }
+
+  if (value === null) {
+    return "null";
+  }
+
+  return typeof value;
+}
+
+function nestedString(value: unknown, key: string): string | undefined {
+  return isRecord(value) ? stringOrUndefined(value[key]) : undefined;
+}
+
+function normalizeDateForOutput(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  return value.includes("T") ? value.slice(0, 10) : value;
 }
 
 function toTransactionFilters(args: {
@@ -1121,14 +1547,14 @@ function buildTransactionPayload(args: {
 
   return dropUndefined({
     title: args.title,
-    description: args.description,
+    description: args.description ?? args.title,
     amount: args.amount_cents,
     date: args.date,
     is_expense: args.kind === "expense",
     type,
-    frequency,
-    installments: type === "PARCELLED" ? args.installments : undefined,
-    is_full_amount: type === "PARCELLED" ? args.amount_mode !== "total" : undefined,
+    frequency: frequency ?? "MONTHLY",
+    installments: type === "PARCELLED" ? args.installments : 1,
+    is_full_amount: type === "PARCELLED" ? args.amount_mode !== "total" : true,
     account_id: args.account_id,
     credit_card_id: args.credit_card_id,
     category_id: args.category_id,

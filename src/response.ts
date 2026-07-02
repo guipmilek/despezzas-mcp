@@ -40,7 +40,15 @@ export function jsonResponse(data: unknown, note?: string) {
 
 export function errorResponse(error: unknown, action: string) {
   const message = error instanceof Error ? error.message : String(error);
+  const details = error && typeof error === "object" && "details" in error ? redact((error as { details: unknown }).details) : undefined;
+  const structuredContent = dropUndefined({
+    error: message,
+    action,
+    details,
+  });
+
   return {
+    structuredContent,
     content: [
       {
         type: "text" as const,
@@ -56,11 +64,19 @@ export function requireConfirmation(confirm: boolean | undefined, action: string
     return undefined;
   }
 
+  const message = `Refusing to ${action} because confirm was not true. Re-run this tool with confirm: true after verifying the target IDs and payload.`;
   return {
+    structuredContent: {
+      refused: true,
+      action,
+      required_argument: "confirm",
+      required_value: true,
+      message,
+    },
     content: [
       {
         type: "text" as const,
-        text: `Refusing to ${action} because confirm was not true. Re-run this tool with confirm: true after verifying the target IDs and payload.`,
+        text: message,
       },
     ],
     isError: true,
@@ -82,4 +98,14 @@ function toStructuredPayload(value: unknown): Record<string, unknown> {
 function isSensitiveKey(key: string) {
   const normalized = key.toLowerCase();
   return EXACT_SENSITIVE_KEYS.has(normalized) || SENSITIVE_KEY_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+function dropUndefined(value: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (child !== undefined) {
+      out[key] = child;
+    }
+  }
+  return out;
 }

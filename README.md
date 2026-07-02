@@ -6,7 +6,8 @@ This is an MVP built from observed Despezzas web traffic and frontend bundle ins
 
 ## What Is Implemented
 
-- Read tools: profile, profile access, personal config, accounts, banks, credit cards, categories, subcategories, transactions, overview, finance summary, export count/export link.
+- Read tools: profile, profile access, personal config, accounts, banks, credit cards, categories, subcategories, compact transaction search, overview, finance summary, and export/field diagnostics.
+- Dry-run transaction tools: prepare create/update/delete payloads without calling Despezzas.
 - Write tools: switch/create/update/delete/leave profile, create/update/delete account, credit card, transaction, transfer, duplicate transaction, toggle paid.
 - Auth flow: copied bearer token, env email/password login, or local HTTP login page.
 - Token refresh: saved Firebase refresh sessions are reused and refreshed automatically.
@@ -15,6 +16,15 @@ This is an MVP built from observed Despezzas web traffic and frontend bundle ins
 - Debugging: HAR inspector and DevTools request monitor for future endpoint captures.
 
 Amounts use Despezzas native integer cents. Example: `12345` means `R$123.45`.
+
+For transaction writes, use the prepare tools first:
+
+1. Search/list the target account, card, category, subcategory, or transaction.
+2. Call `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction`, or `despezzas_prepare_delete_transaction`.
+3. Review the returned payload and target IDs.
+4. Call the real write tool with the same fields and `confirm: true`.
+
+`despezzas_create_transaction` intentionally refuses payloads with no account/card target, both account and card targets, or no `category_id` unless `allow_uncategorized` is explicitly true.
 
 ## Setup
 

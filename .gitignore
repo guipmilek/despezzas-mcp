@@ -13,5 +13,4 @@ dist/
 __pycache__/
 coverage/
 .turbo/
-.vercel/
 .agents/

@@ -12,7 +12,7 @@ Dois modos de operação:
 ## Por que este caminho faz sentido
 
 - O plano gratuito do Workers cobre um MCP de finanças pessoais sem problemas.
-- Sem hibernação de container nem cold start como no Koyeb ou Render Free.
+- Sem hibernação de processo nem cold start típico de hospedagens que pausam serviços ociosos.
 - HTTPS e URL `workers.dev` já vêm embutidos.
 - O ChatGPT conecta direto em `https://<nome-do-worker>.<sua-conta>.workers.dev/mcp`.
 - Senhas do Despezzas nunca são armazenadas. Apenas tokens de sessão Firebase criptografados vão para o Workers KV.

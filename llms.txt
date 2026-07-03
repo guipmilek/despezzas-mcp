@@ -11,7 +11,7 @@ This project can read and change personal financial data. Agents must treat all 
 - Language: TypeScript, ESM
 - License: MIT
 - Default API base URL: `https://api.despezzas.com`
-- Transports: local stdio, Node HTTP at `/mcp`, Cloudflare Workers HTTP at `/mcp`
+- Transports: local stdio, local Node HTTP at `/mcp`, Cloudflare Workers HTTP at `/mcp`
 - Authentication: manual Despezzas bearer token, email/password with Firebase token exchange, or MCP OAuth for ChatGPT
 - Recommended remote deployment: Cloudflare Workers
 
@@ -47,7 +47,7 @@ This project was largely AI-assisted, or "vibecoded": most implementation work w
 - [docs/agent-task-template.md](docs/agent-task-template.md): reusable prompt template for AI-agent tasks.
 - [docs/agent-architecture-map.md](docs/agent-architecture-map.md): source ownership map and change checklists.
 - [docs/cloudflare-workers.md](docs/cloudflare-workers.md): Cloudflare Workers deployment.
-- [docs/deployment.md](docs/deployment.md): deployment options.
+- [docs/deployment.md](docs/deployment.md): Cloudflare-only deployment notes.
 - [docs/chatgpt-app-setup.md](docs/chatgpt-app-setup.md): ChatGPT app/connector setup.
 
 ## Local Commands
@@ -168,8 +168,9 @@ Write or destructive tools must keep requiring `confirm: true`. Transaction writ
 ## Deployment Notes
 
 - Local stdio clients should run the built `dist/index.js`.
-- Node HTTP mode exposes `/health`, `/auth/status`, `/login`, OAuth discovery endpoints, `/oauth/register`, `/oauth/authorize`, `/oauth/token`, and `/mcp`.
-- ChatGPT OAuth requires a public HTTPS URL and `MCP_PUBLIC_BASE_URL`.
+- Remote deployment is Cloudflare Workers only.
+- Node HTTP mode is available for local development and private HTTP use, not as a documented remote deployment path.
+- ChatGPT OAuth should use the public Cloudflare Worker URL or a custom domain configured with `MCP_PUBLIC_BASE_URL`.
 - Cloudflare Workers deployment is configured by `wrangler.jsonc` and `src/cloudflare.ts`.
 - Cloudflare multi-user mode requires Workers KV binding `DESPEZZAS_SESSIONS` plus `SESSION_ENCRYPTION_KEY`.
 - Single-account public deployments should set `MCP_OWNER_AUTH_CODE`.

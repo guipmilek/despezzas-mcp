@@ -6,19 +6,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 
 const GENERATED_PREFIXES = ["dist/"];
-const SOURCE_SIGNAL_PREFIXES = ["src/", "test/", "scripts/", "api/", "docs/"];
-const SOURCE_SIGNAL_FILES = [
-  "package.json",
-  "package-lock.json",
-  "tsconfig.json",
-  "wrangler.jsonc",
-  "vercel.json",
-  "Dockerfile",
-  "render.yaml",
-  "railway.json",
-  "horizon_proxy.py",
-  "requirements.txt",
-];
+const SOURCE_SIGNAL_PREFIXES = ["src/", "test/", "scripts/", "docs/"];
+const SOURCE_SIGNAL_FILES = ["package.json", "package-lock.json", "tsconfig.json", "wrangler.jsonc"];
 
 const MAX_SCAN_BYTES = 1024 * 1024;
 
@@ -119,7 +108,7 @@ function contentFindings(filePath) {
     {
       label: "Non-placeholder Despezzas secret env value",
       pattern:
-        /^DESPEZZAS_(?:TOKEN|PASSWORD|FIREBASE_API_KEY)\s*=\s*(?!$|<|your|seu|placeholder|example|xxx|\.\.\.)\S+/im,
+        /^DESPEZZAS_(?:TOKEN|PASSWORD|FIREBASE_API_KEY)[ \t]*=[ \t]*(?!$|<|your|seu|placeholder|example|xxx|\.\.\.)\S+/im,
     },
     {
       label: "Firebase API key literal",

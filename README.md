@@ -67,7 +67,6 @@
 - [☁️ Deploy remoto](#️-deploy-remoto)
 - [🔎 Inspeção de HAR](#-inspeção-de-har)
 - [📚 MCPs de referência](#-mcps-de-referência)
-- [🗺 Roadmap](#-roadmap)
 - [🤝 Contribuição](#-contribuição)
 - [📄 Licença](#-licença)
 
@@ -172,9 +171,6 @@ As principais ferramentas usadas neste projeto:
 
 <p>
   <a href="https://workers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare_Workers-f38020?style=for-the-badge&amp;logo=cloudflare&amp;logoColor=202024" alt="Cloudflare Workers" /></a>
-  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-white?style=for-the-badge&amp;logo=docker" alt="Docker" /></a>
-  <a href="https://vercel.com/"><img src="https://img.shields.io/badge/Vercel-0a0a0a?style=for-the-badge&amp;logo=vercel&amp;logoColor=white" alt="Vercel" /></a>
-  <a href="https://render.com/"><img src="https://img.shields.io/badge/Render-111111?style=for-the-badge&amp;logo=render&amp;logoColor=white" alt="Render" /></a>
 </p>
 
 ### Ferramentas
@@ -311,23 +307,22 @@ Se expuser o modo HTTP além do localhost, coloque HTTPS e controle de acesso na
 
 Para a tela **New App** em ChatGPT Apps & Connectors:
 
-1. Exponha o MCP por HTTPS, por exemplo:
+1. Faça deploy em Cloudflare Workers seguindo [docs/cloudflare-workers.md](docs/cloudflare-workers.md).
 
    ```powershell
-   npm run start:http
-   ngrok http 8787
+   npm run check:cloudflare
+   npm run deploy:cloudflare
    ```
 
-2. Defina a URL pública antes de iniciar o servidor:
+2. Confirme a URL pública do Worker:
 
    ```powershell
-   $env:MCP_PUBLIC_BASE_URL = "https://seu-dominio-ngrok.ngrok.app"
-   npm run start:http
+   Invoke-RestMethod https://despezzas-mcp.<sua-conta>.workers.dev/health
    ```
 
 3. No ChatGPT, use:
 
-   - URL do servidor: `https://seu-dominio-ngrok.ngrok.app/mcp`
+   - URL do servidor: `https://despezzas-mcp.<sua-conta>.workers.dev/mcp`
    - Autenticação: `OAuth`
 
 O servidor expõe os endpoints de descoberta esperados pelo ChatGPT:
@@ -358,28 +353,20 @@ Apps/conectores personalizados do ChatGPT exigem um endpoint MCP remoto em HTTPS
 
 ## ☁️ Deploy remoto
 
-Caminho recomendado: [Cloudflare Workers](docs/cloudflare-workers.md). Alternativa em container: [Koyeb Free](docs/koyeb.md).
+Caminho suportado para deploy remoto: [Cloudflare Workers](docs/cloudflare-workers.md).
 
-Veja [docs/deployment.md](docs/deployment.md) para a comparação mais ampla de hospedagens gratuitas e notas de configuração por provedor.
+Veja [docs/deployment.md](docs/deployment.md) para o resumo operacional do deploy apenas em Cloudflare.
 
-| Provedor               | Melhor para                         | Arquivos                              | Observação                                      |
-| ---------------------- | ----------------------------------- | ------------------------------------- | ----------------------------------------------- |
-| **Cloudflare Workers** | MCP remoto recomendado              | `wrangler.jsonc`, `src/cloudflare.ts` | Melhor caminho para OAuth com ChatGPT.          |
-| **Docker/Koyeb**       | Container simples                   | `Dockerfile`                          | Bom para uso pessoal; pode escalar para zero.   |
-| **Vercel**             | Função serverless Express           | `vercel.json`, `api/index.js`         | Sem estado; use env vars para credenciais.      |
-| **Render/Railway**     | Demos e deploys rápidos pelo GitHub | `render.yaml`, `railway.json`         | Planos gratuitos podem hibernar ou ter limites. |
-| **Prefect Horizon**    | Gateway MCP gerenciado              | `horizon_proxy.py`                    | Proxy FastMCP para backend Node publicado.      |
+| Provedor               | Melhor para            | Arquivos                              | Observação                            |
+| ---------------------- | ---------------------- | ------------------------------------- | ------------------------------------- |
+| **Cloudflare Workers** | MCP remoto com ChatGPT | `wrangler.jsonc`, `src/cloudflare.ts` | Caminho de deploy mantido no projeto. |
 
-Arquivos de deploy incluídos:
+Arquivos de deploy mantidos:
 
-- `render.yaml` para Render Blueprints.
-- `railway.json` para Railway.
-- `vercel.json` e `api/index.js` para Vercel Functions.
 - `wrangler.jsonc` e `src/cloudflare.ts` para Cloudflare Workers.
-- `Dockerfile` para Koyeb, Cloud Run, Fly.io, Northflank, deploys Docker no Railway ou uma VM.
-- `horizon_proxy.py` e `requirements.txt` para Prefect Horizon como proxy FastMCP na frente de um backend Node já publicado.
+- `docs/cloudflare-workers.md` para o passo a passo completo.
 
-Para o modo multiusuário em Cloudflare Workers, associe o namespace KV `DESPEZZAS_SESSIONS`, defina `MCP_OAUTH_TOKEN_SECRET`, `SESSION_ENCRYPTION_KEY` e `DESPEZZAS_FIREBASE_API_KEY` como secrets do Wrangler e faça deploy com `npm run deploy:cloudflare`. Para deploys privados de conta única, defina `MCP_OWNER_AUTH_CODE` junto com suas credenciais do Despezzas e `DESPEZZAS_FIREBASE_API_KEY`. Para Horizon, publique o backend Node em outro lugar e aponte `horizon_proxy.py:mcp` para esse backend.
+Para o modo multiusuário em Cloudflare Workers, associe o namespace KV `DESPEZZAS_SESSIONS`, defina `MCP_OAUTH_TOKEN_SECRET`, `SESSION_ENCRYPTION_KEY` e `DESPEZZAS_FIREBASE_API_KEY` como secrets do Wrangler e faça deploy com `npm run deploy:cloudflare`. Para deploys privados de conta única, defina `MCP_OWNER_AUTH_CODE` junto com suas credenciais do Despezzas e `DESPEZZAS_FIREBASE_API_KEY`.
 
 ## 🔎 Inspeção de HAR
 
@@ -412,14 +399,6 @@ Este projeto tomou como referência:
 - [WeslleyNasRocha/organizze-mcp](https://github.com/WeslleyNasRocha/organizze-mcp)
 
 Este repositório mantém uma estrutura parecida, mas usa endpoints nativos do Despezzas e IDs em UUID.
-
-## 🗺 Roadmap
-
-- [ ] Expandir cobertura de endpoints de relatórios, metas e investimentos.
-- [ ] Gerar documentação automática do catálogo de ferramentas MCP.
-- [ ] Adicionar screenshots do fluxo de conexão no ChatGPT.
-- [ ] Criar exemplos de configuração para Claude Desktop, ChatGPT e clientes MCP.
-- [ ] Documentar mais casos de borda de perfis compartilhados.
 
 ## 🤝 Contribuição
 

@@ -73,11 +73,7 @@ architecture and ownership notes here.
 Use the owner file for the target:
 
 - Cloudflare Workers: `wrangler.jsonc`, `src/cloudflare.ts`, `docs/cloudflare-workers.md`.
-- Node HTTP: `src/httpApp.ts`, `src/index.ts`, `docs/deployment.md`.
-- Vercel: `vercel.json`, `api/index.js`.
-- Docker/Koyeb: `Dockerfile`, `docs/koyeb.md`.
-- Render/Railway: `render.yaml`, `railway.json`.
-- Prefect Horizon: `horizon_proxy.py`, `requirements.txt`.
+- Deployment notes: `docs/deployment.md`.
 
 Run the narrow deployment check when relevant:
 

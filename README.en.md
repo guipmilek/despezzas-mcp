@@ -67,7 +67,6 @@
 - [☁️ Remote Deploy](#️-remote-deploy)
 - [🔎 HAR Inspection](#-har-inspection)
 - [📚 Reference MCPs](#-reference-mcps)
-- [🗺 Roadmap](#-roadmap)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
@@ -172,9 +171,6 @@ Main tools used in this project:
 
 <p>
   <a href="https://workers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare_Workers-f38020?style=for-the-badge&amp;logo=cloudflare&amp;logoColor=202024" alt="Cloudflare Workers" /></a>
-  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-white?style=for-the-badge&amp;logo=docker" alt="Docker" /></a>
-  <a href="https://vercel.com/"><img src="https://img.shields.io/badge/Vercel-0a0a0a?style=for-the-badge&amp;logo=vercel&amp;logoColor=white" alt="Vercel" /></a>
-  <a href="https://render.com/"><img src="https://img.shields.io/badge/Render-111111?style=for-the-badge&amp;logo=render&amp;logoColor=white" alt="Render" /></a>
 </p>
 
 ### Tooling
@@ -311,23 +307,22 @@ If you expose HTTP mode beyond localhost, put HTTPS and real access control in f
 
 For the **New App** screen in ChatGPT Apps & Connectors:
 
-1. Expose the MCP over HTTPS, for example:
+1. Deploy to Cloudflare Workers by following [docs/cloudflare-workers.md](docs/cloudflare-workers.md).
 
    ```powershell
-   npm run start:http
-   ngrok http 8787
+   npm run check:cloudflare
+   npm run deploy:cloudflare
    ```
 
-2. Set the public URL before starting the server:
+2. Confirm the public Worker URL:
 
    ```powershell
-   $env:MCP_PUBLIC_BASE_URL = "https://your-ngrok-domain.ngrok.app"
-   npm run start:http
+   Invoke-RestMethod https://despezzas-mcp.<your-account>.workers.dev/health
    ```
 
 3. In ChatGPT, use:
 
-   - Server URL: `https://your-ngrok-domain.ngrok.app/mcp`
+   - Server URL: `https://despezzas-mcp.<your-account>.workers.dev/mcp`
    - Authentication: `OAuth`
 
 The server exposes the discovery endpoints expected by ChatGPT:
@@ -358,28 +353,20 @@ Custom ChatGPT apps/connectors require a remote HTTPS MCP endpoint. See:
 
 ## ☁️ Remote Deploy
 
-Recommended first path: [Cloudflare Workers](docs/cloudflare-workers.md). Free container alternative: [Koyeb Free](docs/koyeb.md).
+Supported remote deploy path: [Cloudflare Workers](docs/cloudflare-workers.md).
 
-See [docs/deployment.md](docs/deployment.md) for a broader comparison of free hosting options and provider-specific configuration notes.
+See [docs/deployment.md](docs/deployment.md) for the operational summary of the Cloudflare-only deploy.
 
-| Provider               | Best For                       | Files                                 | Note                                        |
-| ---------------------- | ------------------------------ | ------------------------------------- | ------------------------------------------- |
-| **Cloudflare Workers** | Recommended remote MCP         | `wrangler.jsonc`, `src/cloudflare.ts` | Best path for ChatGPT OAuth.                |
-| **Docker/Koyeb**       | Simple container deploy        | `Dockerfile`                          | Good for personal use; may scale to zero.   |
-| **Vercel**             | Serverless Express function    | `vercel.json`, `api/index.js`         | Stateless; use env vars for credentials.    |
-| **Render/Railway**     | Quick demos and GitHub deploys | `render.yaml`, `railway.json`         | Free services may sleep or have limits.     |
-| **Prefect Horizon**    | Managed MCP gateway            | `horizon_proxy.py`                    | FastMCP proxy for a published Node backend. |
+| Provider               | Best For                | Files                                 | Note                                 |
+| ---------------------- | ----------------------- | ------------------------------------- | ------------------------------------ |
+| **Cloudflare Workers** | Remote MCP with ChatGPT | `wrangler.jsonc`, `src/cloudflare.ts` | Maintained deploy path in this repo. |
 
-Included deploy files:
+Maintained deploy files:
 
-- `render.yaml` for Render Blueprints.
-- `railway.json` for Railway.
-- `vercel.json` and `api/index.js` for Vercel Functions.
 - `wrangler.jsonc` and `src/cloudflare.ts` for Cloudflare Workers.
-- `Dockerfile` for Koyeb, Cloud Run, Fly.io, Northflank, Docker deploys on Railway, or a VM.
-- `horizon_proxy.py` and `requirements.txt` for Prefect Horizon as a FastMCP proxy in front of an already published Node backend.
+- `docs/cloudflare-workers.md` for the full walkthrough.
 
-For multi-user Cloudflare Workers mode, bind the `DESPEZZAS_SESSIONS` KV namespace, set `MCP_OAUTH_TOKEN_SECRET`, `SESSION_ENCRYPTION_KEY`, and `DESPEZZAS_FIREBASE_API_KEY` as Wrangler secrets, then deploy with `npm run deploy:cloudflare`. For private single-account deploys, set `MCP_OWNER_AUTH_CODE` with your Despezzas credentials and `DESPEZZAS_FIREBASE_API_KEY`. For Horizon, publish the Node backend somewhere else and point `horizon_proxy.py:mcp` to that backend.
+For multi-user Cloudflare Workers mode, bind the `DESPEZZAS_SESSIONS` KV namespace, set `MCP_OAUTH_TOKEN_SECRET`, `SESSION_ENCRYPTION_KEY`, and `DESPEZZAS_FIREBASE_API_KEY` as Wrangler secrets, then deploy with `npm run deploy:cloudflare`. For private single-account deploys, set `MCP_OWNER_AUTH_CODE` with your Despezzas credentials and `DESPEZZAS_FIREBASE_API_KEY`.
 
 ## 🔎 HAR Inspection
 
@@ -412,14 +399,6 @@ The implementation style was compared with:
 - [WeslleyNasRocha/organizze-mcp](https://github.com/WeslleyNasRocha/organizze-mcp)
 
 This repository keeps a similar structure, but uses native Despezzas endpoints and UUID IDs.
-
-## 🗺 Roadmap
-
-- [ ] Expand coverage for reports, goals, and investment endpoints.
-- [ ] Generate automatic documentation for the MCP tool catalog.
-- [ ] Add screenshots for the ChatGPT connection flow.
-- [ ] Add ready-to-copy examples for `Claude Desktop`, ChatGPT, and local MCP clients.
-- [ ] Document more shared-profile edge cases.
 
 ## 🤝 Contributing
 

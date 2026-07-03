@@ -24,6 +24,7 @@ Repo rules:
 - Use integer cents for money and YYYY-MM-DD dates.
 - Prefer existing helpers in src/response.ts, src/client.ts, src/auth.ts, src/oauth.ts, and src/tools.ts.
 - Update llms.txt/docs when architecture, commands, tools, payload rules, or security rules change.
+- Keep remote deploy docs and artifacts Cloudflare Workers-only unless the task explicitly changes that project policy.
 
 Before editing, state:
 - Change class:

@@ -22,6 +22,9 @@ Core source files live in `src/`. Build output lives in `dist/`.
    `src/oauth.ts`, and `src/tools.ts` before adding parallel patterns.
 9. Update `llms.txt`, `AGENTS.md`, and docs under `docs/` when changing architecture,
    commands, tool behavior, security rules, or agent conventions.
+10. Keep remote deployment support and documentation Cloudflare Workers-only unless the
+    user explicitly changes that project policy. Local Node HTTP is for development,
+    local clients, and private HTTP use, not a maintained remote deploy path.
 
 ## Required Agent Workflow
 
@@ -99,6 +102,7 @@ Notes:
 - `src/loginPage.ts`: local/OAuth login page HTML.
 - `test/`: Node test suite for tool validation, login page behavior, and Cloudflare paths.
 - `scripts/`: local diagnostics, HAR inspection, smoke tests, and repo checks.
+- `docs/cloudflare-workers.md` and `docs/deployment.md`: Cloudflare-only remote deploy docs.
 
 ## Stop Rules
 

@@ -70,6 +70,9 @@ architecture and ownership notes here.
 
 ## Deployment Checklist
 
+Remote deployment support is Cloudflare Workers-only. Local Node HTTP remains a
+development/private-use transport, not a maintained remote deploy target.
+
 Use the owner file for the target:
 
 - Cloudflare Workers: `wrangler.jsonc`, `src/cloudflare.ts`, `docs/cloudflare-workers.md`.

@@ -23,7 +23,7 @@ Run this before reading large files or editing anything:
    - Despezzas API endpoint/client behavior
    - Authentication or session persistence
    - OAuth or HTTP transport
-   - Cloudflare Workers deployment
+   - Cloudflare Workers deployment (only maintained remote deploy path)
    - Tests or safety validation
    - Documentation only
 6. State the owner files before editing.
@@ -45,9 +45,14 @@ Run this before reading large files or editing anything:
 - Login page markup belongs in `src/loginPage.ts`.
 - Tests belong in `test/*.test.mjs`.
 - Diagnostic scripts belong in `scripts/`.
-- Deployment docs belong in `docs/`.
+- Cloudflare-only remote deployment docs belong in `docs/cloudflare-workers.md` and
+  `docs/deployment.md`.
 
 Avoid introducing a new helper when an existing one already owns the behavior.
+
+Remote deployment guidance must stay Cloudflare Workers-only unless the user explicitly
+changes that project policy. Local Node HTTP remains a development/private-use transport,
+not a maintained remote deploy target.
 
 ## Security Rules
 

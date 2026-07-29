@@ -16,6 +16,7 @@ one Despezzas account.
 - Session storage: in-memory only; cold starts authenticate again
 - Money: integer cents
 - Dates: `YYYY-MM-DD`
+- Tool metadata: complete input/output schemas and explicit MCP behavior annotations
 
 ## Important files
 
@@ -78,8 +79,10 @@ The smoke test calls real read-only endpoints and is optional.
 - `despezzas_export_transactions`
 - `despezzas_raw_api`
 
-Every destructive/write tool must expose and enforce `confirm: true` before any
-API request. Non-GET raw calls additionally require `allow_destructive: true`.
+Every write tool must expose and enforce `confirm: true` before any API request.
+Annotations must accurately distinguish reads, creates, updates, deletes, and
+non-idempotent operations. Non-GET raw calls additionally require
+`allow_destructive: true`.
 
 ## Security
 

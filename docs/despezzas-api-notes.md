@@ -30,17 +30,11 @@ O MCP implementa o mesmo fluxo e renova a sessão por:
 - `POST https://securetoken.googleapis.com/v1/token?key=<firebase-api-key>`
 - Corpo de formulário: `grant_type=refresh_token&refresh_token=<refresh-token>`
 
-## Wrapper OAuth do MCP
+## OAuth do MCP
 
-Para ChatGPT Apps & Connectors, o servidor MCP também atua como um pequeno servidor de autorização OAuth 2.1 ao redor da sessão Despezzas:
-
-- Metadados do recurso protegido: `GET /.well-known/oauth-protected-resource`
-- Metadados OAuth: `GET /.well-known/oauth-authorization-server`
-- Registro dinâmico de cliente: `POST /oauth/register`
-- Endpoint de autorização: `GET|POST /oauth/authorize`
-- Endpoint de token: `POST /oauth/token`
-
-O token de acesso OAuth é opaco e autoriza acesso ao `/mcp`. Ele não é um token do Despezzas. A sessão Despezzas no lado do servidor é obtida por `/v2/auth` e pela troca de custom token do Firebase.
+O Prefect Horizon publica o endpoint MCP e gerencia OAuth. Este pacote não
+implementa endpoints próprios de login, registro ou token. As credenciais do
+Despezzas ficam nos secrets do deployment e a sessão Firebase permanece em memória.
 
 ## Endpoints de leitura capturados
 

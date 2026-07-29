@@ -4,6 +4,8 @@ import pytest
 from fastmcp import Client
 
 from despezzas_mcp import tools as tools_module
+from despezzas_mcp.client import DespezzasApiError
+from despezzas_mcp.helpers import public_error
 from despezzas_mcp.server import mcp
 
 EXPECTED_TOOLS = {
@@ -44,6 +46,16 @@ EXPECTED_TOOLS = {
     "despezzas_raw_api",
 }
 
+NONDESTRUCTIVE_WRITES = {
+    "despezzas_switch_profile",
+    "despezzas_create_profile",
+    "despezzas_create_account",
+    "despezzas_create_credit_card",
+    "despezzas_create_transaction",
+    "despezzas_duplicate_transaction",
+    "despezzas_create_transfer",
+}
+
 
 @pytest.fixture
 def no_api(monkeypatch):
@@ -58,13 +70,23 @@ async def test_catalog_has_exactly_35_tools():
     assert {tool.name for tool in listed} == EXPECTED_TOOLS
 
 
-async def test_every_destructive_tool_exposes_confirmation():
+async def test_catalog_exposes_complete_and_accurate_metadata():
     async with Client(mcp) as client:
         listed = await client.list_tools()
-    destructive = [tool for tool in listed if tool.annotations and tool.annotations.destructiveHint]
-    assert destructive
-    for tool in destructive:
-        assert "confirm" in tool.inputSchema["properties"], tool.name
+    for tool in listed:
+        assert tool.outputSchema is not None, tool.name
+        assert tool.annotations is not None, tool.name
+        assert tool.annotations.openWorldHint is False, tool.name
+        assert tool.annotations.idempotentHint is not None, tool.name
+        if tool.annotations.readOnlyHint is False:
+            assert "confirm" in tool.inputSchema["properties"], tool.name
+            assert tool.annotations.destructiveHint is (tool.name not in NONDESTRUCTIVE_WRITES), tool.name
+
+
+def test_public_errors_do_not_expose_exception_details():
+    assert "secret-token" not in public_error(RuntimeError("secret-token"))
+    assert public_error(RuntimeError("secret-token")) == "A operação falhou sem expor detalhes internos."
+    assert public_error(DespezzasApiError("secret-token", 403, {})) == "A API Despezzas retornou HTTP 403."
 
 
 @pytest.mark.parametrize(

@@ -19,6 +19,7 @@ from .helpers import (
     prepare_update_transaction,
     profile_context,
     profile_warning,
+    public_error,
     redact,
     refusal,
     search_diagnostics,
@@ -35,9 +36,50 @@ Scope = Literal["THIS", "THIS_AND_NEXT", "ALL"]
 Frequency = Literal["DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "SEMIANNUAL", "YEARLY"]
 Kind = Literal["expense", "income"]
 TransactionType = Literal["unique", "recurring", "parcelled"]
+JsonResponse = dict[str, Any] | list[Any] | None
 
-READ_ONLY = ToolAnnotations(readOnlyHint=True)
-WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
+READ_ONLY = ToolAnnotations(
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False,
+)
+STATE_CHANGE = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False,
+)
+CREATE = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=False,
+)
+UPDATE = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=True,
+    openWorldHint=False,
+)
+DELETE = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=True,
+    openWorldHint=False,
+)
+TOGGLE = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=False,
+)
+ADVANCED_WRITE = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=False,
+)
 TODAY = date.today().isoformat()
 
 
@@ -90,7 +132,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         }
 
     @mcp.tool(name="despezzas_profile", title="Obter Perfil do Despezzas", annotations=READ_ONLY)
-    async def despezzas_profile() -> Any:
+    async def despezzas_profile() -> JsonResponse:
         """Busca o perfil autenticado. Campos sensíveis são mascarados."""
         return await attempt("obter perfil", client.get_profile())
 
@@ -108,9 +150,9 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
                 }
             )
         except Exception as error:
-            return {"error": str(error), "action": "listar perfis"}
+            return {"error": public_error(error), "action": "listar perfis"}
 
-    @mcp.tool(name="despezzas_switch_profile", title="Trocar Perfil Ativo", annotations=WRITE)
+    @mcp.tool(name="despezzas_switch_profile", title="Trocar Perfil Ativo", annotations=STATE_CHANGE)
     async def despezzas_switch_profile(profile_id: str | None, confirm: bool = False) -> dict[str, Any]:
         """Troca o perfil ativo. Exige confirm=true."""
         if not confirm:
@@ -123,13 +165,13 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
             "note": "Chamadas futuras usarão este contexto de perfil ativo.",
         }
 
-    @mcp.tool(name="despezzas_create_profile", title="Criar Perfil Compartilhado", annotations=WRITE)
+    @mcp.tool(name="despezzas_create_profile", title="Criar Perfil Compartilhado", annotations=CREATE)
     async def despezzas_create_profile(
         name: Annotated[str, Field(min_length=1, max_length=60)],
         type: Literal["pj", "family", "investments"],
         invites: Annotated[list[ProfileInvite], Field(max_length=5)] | None = None,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Cria um perfil extra PJ, família ou investimentos. Exige confirm=true."""
         if not confirm:
             return refusal("criar um perfil compartilhado")
@@ -140,14 +182,14 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         payload = {"name": name.strip(), "type": type, "invites": normalize_invites(invites)}
         return await attempt("criar perfil compartilhado", client.create_access_profile(payload))
 
-    @mcp.tool(name="despezzas_update_profile_access", title="Editar Perfil Compartilhado", annotations=WRITE)
+    @mcp.tool(name="despezzas_update_profile_access", title="Editar Perfil Compartilhado", annotations=UPDATE)
     async def despezzas_update_profile_access(
         id: Identifier,
         name: Annotated[str, Field(min_length=1, max_length=60)] | None = None,
         type: Literal["pj", "family", "investments"] | None = None,
         invites: Annotated[list[ProfileInvite], Field(max_length=5)] | None = None,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Edita perfil compartilhado; invites substitui a lista atual. Exige confirm=true."""
         if not confirm:
             return refusal("editar um perfil compartilhado")
@@ -165,7 +207,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
             }
         return await attempt("editar perfil compartilhado", client.update_access_profile(id, payload))
 
-    @mcp.tool(name="despezzas_delete_profile", title="Excluir Perfil Compartilhado", annotations=WRITE)
+    @mcp.tool(name="despezzas_delete_profile", title="Excluir Perfil Compartilhado", annotations=DELETE)
     async def despezzas_delete_profile(id: Identifier, confirm: bool = False) -> dict[str, Any]:
         """Exclui um perfil compartilhado próprio. Exige confirm=true."""
         if not confirm:
@@ -173,15 +215,15 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         result = await attempt("excluir perfil compartilhado", client.delete_access_profile(id))
         return result if isinstance(result, dict) and "error" in result else {"deleted": True, "id": id}
 
-    @mcp.tool(name="despezzas_leave_profile", title="Sair de Perfil Compartilhado", annotations=WRITE)
-    async def despezzas_leave_profile(profile_id: Identifier, confirm: bool = False) -> Any:
+    @mcp.tool(name="despezzas_leave_profile", title="Sair de Perfil Compartilhado", annotations=DELETE)
+    async def despezzas_leave_profile(profile_id: Identifier, confirm: bool = False) -> JsonResponse:
         """Sai de um perfil em que a conta é membro. Exige confirm=true."""
         if not confirm:
             return refusal("sair de um perfil compartilhado")
         return await attempt("sair de perfil compartilhado", client.leave_access_profile(profile_id))
 
     @mcp.tool(name="despezzas_personal_config", title="Obter Configuração Pessoal", annotations=READ_ONLY)
-    async def despezzas_personal_config() -> Any:
+    async def despezzas_personal_config() -> JsonResponse:
         """Busca preferências de visibilidade financeira."""
         return await attempt("obter configuração pessoal", client.get_personal_config())
 
@@ -198,21 +240,21 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
                 "warning": profile_warning("accounts", len(items), context),
             }
         except Exception as error:
-            return {"error": str(error), "action": "listar contas"}
+            return {"error": public_error(error), "action": "listar contas"}
 
     @mcp.tool(name="despezzas_list_banks", title="Listar Bancos/Logos de Conta", annotations=READ_ONLY)
-    async def despezzas_list_banks() -> Any:
+    async def despezzas_list_banks() -> JsonResponse:
         """Lista opções de bancos e logos usadas em contas manuais."""
         return await attempt("listar bancos", client.get_banks())
 
-    @mcp.tool(name="despezzas_create_account", title="Criar Conta Manual", annotations=WRITE)
+    @mcp.tool(name="despezzas_create_account", title="Criar Conta Manual", annotations=CREATE)
     async def despezzas_create_account(
         name: Identifier,
         logo: Identifier,
         initial_balance_cents: int | None = None,
         include_total_balance: bool = True,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Cria conta manual. Exige confirm=true."""
         if not confirm:
             return refusal("criar uma conta")
@@ -226,7 +268,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         )
         return await attempt("criar conta", client.create_account(payload))
 
-    @mcp.tool(name="despezzas_update_account", title="Editar Conta", annotations=WRITE)
+    @mcp.tool(name="despezzas_update_account", title="Editar Conta", annotations=UPDATE)
     async def despezzas_update_account(
         id: Identifier,
         name: Identifier | None = None,
@@ -234,7 +276,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         balance_cents: int | None = None,
         include_total_balance: bool | None = None,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Edita conta manual. Exige confirm=true."""
         if not confirm:
             return refusal("editar uma conta")
@@ -243,7 +285,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         )
         return await attempt("editar conta", client.update_account(id, payload))
 
-    @mcp.tool(name="despezzas_delete_account", title="Excluir Conta", annotations=WRITE)
+    @mcp.tool(name="despezzas_delete_account", title="Excluir Conta", annotations=DELETE)
     async def despezzas_delete_account(id: Identifier, confirm: bool = False) -> dict[str, Any]:
         """Exclui conta. Exige confirm=true."""
         if not confirm:
@@ -264,9 +306,9 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
                 "warning": profile_warning("credit_cards", len(items), context),
             }
         except Exception as error:
-            return {"error": str(error), "action": "listar cartões de crédito"}
+            return {"error": public_error(error), "action": "listar cartões de crédito"}
 
-    @mcp.tool(name="despezzas_create_credit_card", title="Criar Cartão de Crédito", annotations=WRITE)
+    @mcp.tool(name="despezzas_create_credit_card", title="Criar Cartão de Crédito", annotations=CREATE)
     async def despezzas_create_credit_card(
         name: Identifier,
         logo: str | None = None,
@@ -277,7 +319,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         closing_date: str | None = None,
         account_id: Identifier | None = None,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Cria cartão manual. Exige confirm=true."""
         if not confirm:
             return refusal("criar um cartão de crédito")
@@ -295,7 +337,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         )
         return await attempt("criar cartão de crédito", client.create_credit_card(payload))
 
-    @mcp.tool(name="despezzas_update_credit_card", title="Editar Cartão de Crédito", annotations=WRITE)
+    @mcp.tool(name="despezzas_update_credit_card", title="Editar Cartão de Crédito", annotations=UPDATE)
     async def despezzas_update_credit_card(
         id: Identifier,
         name: Identifier | None = None,
@@ -307,7 +349,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         closing_date: str | None = None,
         account_id: Identifier | None = None,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Edita cartão manual. Exige confirm=true."""
         if not confirm:
             return refusal("editar um cartão de crédito")
@@ -325,7 +367,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         )
         return await attempt("editar cartão de crédito", client.update_credit_card(id, payload))
 
-    @mcp.tool(name="despezzas_delete_credit_card", title="Excluir Cartão de Crédito", annotations=WRITE)
+    @mcp.tool(name="despezzas_delete_credit_card", title="Excluir Cartão de Crédito", annotations=DELETE)
     async def despezzas_delete_credit_card(id: Identifier, confirm: bool = False) -> dict[str, Any]:
         """Exclui cartão. Exige confirm=true."""
         if not confirm:
@@ -334,12 +376,12 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         return result if isinstance(result, dict) and "error" in result else {"deleted": True, "id": id}
 
     @mcp.tool(name="despezzas_list_categories", title="Listar Categorias", annotations=READ_ONLY)
-    async def despezzas_list_categories(include_user: bool = True) -> Any:
+    async def despezzas_list_categories(include_user: bool = True) -> JsonResponse:
         """Lista categorias padrão e do usuário."""
         return await attempt("listar categorias", client.get_categories(include_user))
 
     @mcp.tool(name="despezzas_list_subcategories", title="Listar Subcategorias", annotations=READ_ONLY)
-    async def despezzas_list_subcategories(include_user: bool = True) -> Any:
+    async def despezzas_list_subcategories(include_user: bool = True) -> JsonResponse:
         """Lista subcategorias padrão e do usuário."""
         return await attempt("listar subcategorias", client.get_subcategories(include_user))
 
@@ -397,10 +439,10 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                 "warning": profile_warning("transactions", len(items), context),
             }
         except Exception as error:
-            return {"error": str(error), "action": "buscar transações"}
+            return {"error": public_error(error), "action": "buscar transações"}
 
     @mcp.tool(name="despezzas_transaction_overview", title="Visão Geral de Transações", annotations=READ_ONLY)
-    async def despezzas_transaction_overview(date: DateString = TODAY) -> Any:
+    async def despezzas_transaction_overview(date: DateString = TODAY) -> JsonResponse:
         """Obtém totais e saldos para uma data."""
         return await attempt("obter visão geral de transações", client.get_overview(date))
 
@@ -436,7 +478,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                 }
             )
         except Exception as error:
-            return {"error": str(error), "action": "resumir finanças"}
+            return {"error": public_error(error), "action": "resumir finanças"}
 
     @mcp.tool(name="despezzas_prepare_create_transaction", title="Preparar Criação de Transação", annotations=READ_ONLY)
     async def despezzas_prepare_create_transaction(
@@ -459,7 +501,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         """Monta e valida uma transação sem chamar a API."""
         return prepare_create_transaction(locals())
 
-    @mcp.tool(name="despezzas_create_transaction", title="Criar Transação", annotations=WRITE)
+    @mcp.tool(name="despezzas_create_transaction", title="Criar Transação", annotations=CREATE)
     async def despezzas_create_transaction(
         title: Identifier,
         amount_cents: PositiveCents,
@@ -477,7 +519,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         amount_mode: Literal["per_installment", "total"] = "per_installment",
         allow_uncategorized: bool = False,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Cria transação. Exige confirm=true e recomenda prepare primeiro."""
         if not confirm:
             return refusal("criar uma transação")
@@ -510,7 +552,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         """Monta e valida uma edição sem chamar a API."""
         return prepare_update_transaction(locals())
 
-    @mcp.tool(name="despezzas_update_transaction", title="Editar Transação", annotations=WRITE)
+    @mcp.tool(name="despezzas_update_transaction", title="Editar Transação", annotations=UPDATE)
     async def despezzas_update_transaction(
         id: Identifier,
         title: Identifier | None = None,
@@ -526,7 +568,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         scope: Scope | None = None,
         edition_date: DateString | None = None,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Edita transação. Exige confirm=true."""
         if not confirm:
             return refusal("editar uma transação")
@@ -540,7 +582,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             else {"updated": True, "id": id, "payload": prepared["payload"], "transaction": transaction}
         )
 
-    @mcp.tool(name="despezzas_batch_update_transactions", title="Editar Transações em Lote", annotations=WRITE)
+    @mcp.tool(name="despezzas_batch_update_transactions", title="Editar Transações em Lote", annotations=UPDATE)
     async def despezzas_batch_update_transactions(
         updates: Annotated[list[TransactionUpdate], Field(min_length=1, max_length=50)],
         confirm: bool = False,
@@ -575,7 +617,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                     }
                 )
             except Exception as error:
-                results.append({"index": item["index"], "id": item["id"], "ok": False, "error": str(error)})
+                results.append({"index": item["index"], "id": item["id"], "ok": False, "error": public_error(error)})
                 if stop_on_error:
                     break
         return {
@@ -604,7 +646,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             "note": "Nenhuma chamada de API foi feita.",
         }
 
-    @mcp.tool(name="despezzas_delete_transaction", title="Excluir Transação", annotations=WRITE)
+    @mcp.tool(name="despezzas_delete_transaction", title="Excluir Transação", annotations=DELETE)
     async def despezzas_delete_transaction(
         id: Identifier, scope: Scope = "THIS", confirm: bool = False
     ) -> dict[str, Any]:
@@ -614,25 +656,25 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         result = await attempt("excluir transação", client.delete_transaction(id, scope))
         return result if isinstance(result, dict) and "error" in result else {"deleted": True, "id": id, "scope": scope}
 
-    @mcp.tool(name="despezzas_duplicate_transaction", title="Duplicar Transação", annotations=WRITE)
-    async def despezzas_duplicate_transaction(id: Identifier, confirm: bool = False) -> Any:
+    @mcp.tool(name="despezzas_duplicate_transaction", title="Duplicar Transação", annotations=CREATE)
+    async def despezzas_duplicate_transaction(id: Identifier, confirm: bool = False) -> JsonResponse:
         """Duplica transação. Exige confirm=true."""
         if not confirm:
             return refusal("duplicar uma transação")
         return await attempt("duplicar transação", client.duplicate_transaction(id))
 
-    @mcp.tool(name="despezzas_toggle_transaction_paid", title="Alternar Pagamento da Transação", annotations=WRITE)
+    @mcp.tool(name="despezzas_toggle_transaction_paid", title="Alternar Pagamento da Transação", annotations=TOGGLE)
     async def despezzas_toggle_transaction_paid(
         id: Identifier,
         date: DateString = TODAY,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Alterna pagamento na data. Exige confirm=true."""
         if not confirm:
             return refusal("alternar status de pagamento da transação")
         return await attempt("alternar status de pagamento", client.toggle_paid(id, date))
 
-    @mcp.tool(name="despezzas_create_transfer", title="Criar Transferência", annotations=WRITE)
+    @mcp.tool(name="despezzas_create_transfer", title="Criar Transferência", annotations=CREATE)
     async def despezzas_create_transfer(
         amount_cents: PositiveCents,
         date: DateString,
@@ -642,7 +684,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         title: str | None = None,
         description: str | None = None,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Cria transferência entre contas. Exige confirm=true."""
         if not confirm:
             return refusal("criar uma transferência")
@@ -695,9 +737,9 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                 result["export_result"] = redact(await client.export_transactions(filters))
             return redact(clean(result))
         except Exception as error:
-            return {"error": str(error), "action": "exportar transações"}
+            return {"error": public_error(error), "action": "exportar transações"}
 
-    @mcp.tool(name="despezzas_raw_api", title="Chamada Bruta à API Despezzas", annotations=WRITE)
+    @mcp.tool(name="despezzas_raw_api", title="Chamada Bruta à API Despezzas", annotations=ADVANCED_WRITE)
     async def despezzas_raw_api(
         path: Annotated[str, Field(pattern=r"^/v\d+/")],
         method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET",
@@ -705,7 +747,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         body: Any = None,
         allow_destructive: bool = False,
         confirm: bool = False,
-    ) -> Any:
+    ) -> JsonResponse:
         """Executa GET bruto; outros métodos exigem allow_destructive=true e confirm=true."""
         if method != "GET" and (not allow_destructive or not confirm):
             return {

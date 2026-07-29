@@ -10,14 +10,15 @@ Horizon only.
 
 1. Read `llms.txt` before non-trivial changes.
 2. Keep every write/destructive tool gated by `confirm: true`.
-3. Non-GET `despezzas_raw_api` calls also require `allow_destructive: true`.
-4. Never commit `.env`, credentials, sessions, HARs, API responses, or finance data.
-5. Use integer cents for money and `YYYY-MM-DD` dates.
-6. Never accept Despezzas passwords as MCP tool arguments.
-7. Reuse helpers in `helpers.py`, `client.py`, and `auth.py`.
-8. Update docs and `llms.txt` when architecture, commands, tools, or security change.
-9. Keep remote deployment and documentation Prefect Horizon-only.
-10. Do not add persistent session storage or multi-user credentials without an explicit request.
+3. Keep output schemas and all four MCP behavior annotations explicit and accurate.
+4. Non-GET `despezzas_raw_api` calls also require `allow_destructive: true`.
+5. Never commit `.env`, credentials, sessions, HARs, API responses, or finance data.
+6. Use integer cents for money and `YYYY-MM-DD` dates.
+7. Never accept Despezzas passwords as MCP tool arguments.
+8. Reuse helpers in `helpers.py`, `client.py`, and `auth.py`.
+9. Update docs and `llms.txt` when architecture, commands, tools, or security change.
+10. Keep remote deployment and documentation Prefect Horizon-only.
+11. Do not add persistent session storage or multi-user credentials without an explicit request.
 
 ## Workflow
 

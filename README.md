@@ -47,6 +47,10 @@ ao Despezzas.
 | Autenticação do Despezzas | Token ou e-mail/senha + Firebase |
 | Desenvolvimento | Majoritariamente assistido por IA, com revisão humana |
 
+O catálogo publica schemas de entrada e saída e annotations MCP completas. As
+annotations distinguem leitura, criação, atualização, exclusão e operações não
+idempotentes para clientes como ChatGPT planejarem chamadas com segurança.
+
 > [!IMPORTANT]
 > Este servidor acessa finanças reais. Nunca faça commit de `.env`, tokens, senhas,
 > HARs, respostas da API ou exportações financeiras.
@@ -84,6 +88,7 @@ Os grupos principais são:
 Valores monetários usam centavos inteiros (`12345` = `R$123,45`) e datas usam
 `YYYY-MM-DD`. Toda escrita exige `confirm: true`; `despezzas_raw_api` também exige
 `allow_destructive: true` para métodos diferentes de GET.
+Consulte o [contrato de escritas](WRITES.md) antes de habilitar mutações.
 
 ## Deploy no Prefect Horizon
 

@@ -47,6 +47,10 @@ with Despezzas.
 | Despezzas authentication | Token or email/password + Firebase |
 | Development | Primarily AI-assisted, with human review |
 
+The catalog publishes input/output schemas and complete MCP annotations. The
+annotations distinguish reads, creates, updates, deletes, and non-idempotent
+operations so clients such as ChatGPT can plan calls safely.
+
 > [!IMPORTANT]
 > This server accesses real finances. Never commit `.env`, tokens, passwords,
 > HAR captures, API responses, or financial exports.
@@ -79,6 +83,7 @@ secrets.
 Money uses integer cents (`12345` = `R$123.45`) and dates use `YYYY-MM-DD`.
 Every write requires `confirm: true`; non-GET raw calls also require
 `allow_destructive: true`.
+Read the [write contract](WRITES.md) before enabling mutations.
 
 ## Prefect Horizon deployment
 

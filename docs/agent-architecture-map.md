@@ -29,8 +29,9 @@ Tool change:
 
 1. Update `tools.py`.
 2. Preserve confirmation for writes.
-3. Add/update catalog and behavior tests.
-4. Synchronize `llms.txt` and user docs.
+3. Keep output schemas and all four behavior annotations explicit.
+4. Add/update catalog and behavior tests.
+5. Synchronize `llms.txt` and user docs.
 
 Endpoint change:
 

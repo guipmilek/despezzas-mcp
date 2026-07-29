@@ -50,11 +50,18 @@ def refusal(action: str) -> dict[str, Any]:
     }
 
 
+def public_error(error: Exception) -> str:
+    status = getattr(error, "status", None)
+    if isinstance(status, int):
+        return f"A API Despezzas retornou HTTP {status}."
+    return "A operação falhou sem expor detalhes internos."
+
+
 async def attempt(action: str, operation: Awaitable[Any]) -> Any:
     try:
         return redact(await operation)
     except Exception as error:
-        return {"error": str(error), "action": action}
+        return {"error": public_error(error), "action": action}
 
 
 def current_month_range(today: date | None = None) -> tuple[str, str]:

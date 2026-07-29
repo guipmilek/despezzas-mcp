@@ -1,0 +1,88 @@
+# Despezzas MCP
+
+Unofficial Python/FastMCP server for Despezzas personal finance data. It exposes
+35 tools and is deployed through Prefect Horizon. Each fork/deployment represents
+one Despezzas account.
+
+## Core context
+
+- Runtime: Python `>=3.11`
+- Package manager: uv
+- MCP framework: FastMCP 3
+- Remote deployment: Prefect Horizon only
+- Horizon entrypoint: `src/despezzas_mcp/server.py:mcp`
+- MCP authentication: Horizon-managed OAuth
+- Despezzas authentication: `DESPEZZAS_TOKEN` or email/password/Firebase key
+- Session storage: in-memory only; cold starts authenticate again
+- Money: integer cents
+- Dates: `YYYY-MM-DD`
+
+## Important files
+
+- `src/despezzas_mcp/server.py`: FastMCP instance and entrypoint.
+- `src/despezzas_mcp/tools.py`: tool schemas, handlers, annotations, and write guards.
+- `src/despezzas_mcp/client.py`: endpoint mapping and one-time 401 retry.
+- `src/despezzas_mcp/auth.py`: login, refresh, and in-memory session lock.
+- `src/despezzas_mcp/helpers.py`: redaction, payload preparation, summaries, and profile context.
+- `tests/`: in-memory catalog, confirmation, auth, retry, and normalization tests.
+- `docs/deployment.md`: Horizon deployment instructions.
+
+## Commands
+
+```powershell
+uv sync --extra dev
+uv run ruff format .
+uv run ruff check .
+uv run pytest
+uv run fastmcp inspect src/despezzas_mcp/server.py:mcp
+uv run --env-file .env python scripts/smoke_readonly.py
+```
+
+The smoke test calls real read-only endpoints and is optional.
+
+## Tool catalog
+
+- `despezzas_status`
+- `despezzas_profile`
+- `despezzas_list_profiles`
+- `despezzas_switch_profile`
+- `despezzas_create_profile`
+- `despezzas_update_profile_access`
+- `despezzas_delete_profile`
+- `despezzas_leave_profile`
+- `despezzas_personal_config`
+- `despezzas_list_accounts`
+- `despezzas_list_banks`
+- `despezzas_create_account`
+- `despezzas_update_account`
+- `despezzas_delete_account`
+- `despezzas_list_credit_cards`
+- `despezzas_create_credit_card`
+- `despezzas_update_credit_card`
+- `despezzas_delete_credit_card`
+- `despezzas_list_categories`
+- `despezzas_list_subcategories`
+- `despezzas_search_transactions`
+- `despezzas_transaction_overview`
+- `despezzas_finance_summary`
+- `despezzas_prepare_create_transaction`
+- `despezzas_create_transaction`
+- `despezzas_prepare_update_transaction`
+- `despezzas_update_transaction`
+- `despezzas_batch_update_transactions`
+- `despezzas_prepare_delete_transaction`
+- `despezzas_delete_transaction`
+- `despezzas_duplicate_transaction`
+- `despezzas_toggle_transaction_paid`
+- `despezzas_create_transfer`
+- `despezzas_export_transactions`
+- `despezzas_raw_api`
+
+Every destructive/write tool must expose and enforce `confirm: true` before any
+API request. Non-GET raw calls additionally require `allow_destructive: true`.
+
+## Security
+
+Never commit credentials, `.env`, Firebase sessions, raw API responses, HAR files,
+or financial exports. Never accept Despezzas passwords as MCP tool arguments.
+Keep error output redacted. Treat undocumented endpoints as unstable.

@@ -1,0 +1,41 @@
+name: Bug report
+description: Reporte um problema reproduzivel no Despezzas MCP.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Descricao
+      description: O que aconteceu?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. Configure ...
+        2. Execute ...
+        3. Veja ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs mascarados
+      description: Remova tokens, senhas, emails, IDs sensiveis e dados financeiros reais antes de colar.
+      render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacidade
+      options:
+        - label: Eu removi tokens, senhas, arquivos de sessao, HARs nao mascarados e dados financeiros reais.
+          required: true

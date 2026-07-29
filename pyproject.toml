@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "despezzas-mcp"
+version = "0.1.0"
+description = "Servidor MCP não oficial para dados financeiros do Despezzas."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Guilherme Milek" }]
+dependencies = [
+  "fastmcp>=3.0,<4",
+  "httpx>=0.28,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=1",
+  "ruff>=0.12",
+]
+
+[project.scripts]
+despezzas-mcp = "despezzas_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/despezzas_mcp"]
+
+[tool.pytest.ini_options]
+addopts = "-q -p no:cacheprovider"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]

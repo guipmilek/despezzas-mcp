@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, Literal
 from urllib.parse import quote
 
@@ -9,6 +12,8 @@ from .auth import DespezzasAuthManager, auth_manager, browser_headers, response_
 from .config import Settings, settings
 
 HttpMethod = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
+RATE_LIMIT_RETRIES = 3
+RETRYABLE_METHODS = {"GET", "PUT", "PATCH", "DELETE"}
 
 
 class DespezzasApiError(RuntimeError):
@@ -35,12 +40,22 @@ class DespezzasClient:
         method: HttpMethod = "GET",
         body: Any = None,
         query: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
     ) -> Any:
         token = await self.auth.get_token()
-        response = await self._send(path, method, token, body, query)
-        if response.status_code == 401:
-            token = await self.auth.get_token(force_refresh=True)
-            response = await self._send(path, method, token, body, query)
+        refreshed = False
+        rate_limit_attempt = 0
+        while True:
+            response = await self._send(path, method, token, body, query, idempotency_key)
+            if response.status_code == 401 and not refreshed:
+                token = await self.auth.get_token(force_refresh=True)
+                refreshed = True
+                continue
+            if response.status_code == 429 and method in RETRYABLE_METHODS and rate_limit_attempt < RATE_LIMIT_RETRIES:
+                await asyncio.sleep(retry_after_seconds(response, rate_limit_attempt))
+                rate_limit_attempt += 1
+                continue
+            break
         data = response_json(response)
         if response.is_error:
             message = data.get("message") if isinstance(data, dict) else None
@@ -58,8 +73,11 @@ class DespezzasClient:
         token: str,
         body: Any,
         query: dict[str, Any] | None,
+        idempotency_key: str | None,
     ) -> httpx.Response:
         headers = browser_headers() | {"Authorization": f"Bearer {token}"}
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
         return await self.http.request(
             method,
             f"{self.config.api_base_url}{path}",
@@ -140,8 +158,18 @@ class DespezzasClient:
     async def create_transaction(self, payload: dict[str, Any]) -> Any:
         return await self.request("/v1/transactions", "POST", payload)
 
-    async def update_transaction(self, transaction_id: str, payload: dict[str, Any]) -> Any:
-        return await self.request(f"/v1/transactions/{quote(transaction_id, safe='')}", "PUT", payload)
+    async def update_transaction(
+        self,
+        transaction_id: str,
+        payload: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> Any:
+        return await self.request(
+            f"/v1/transactions/{quote(transaction_id, safe='')}",
+            "PUT",
+            payload,
+            idempotency_key=idempotency_key,
+        )
 
     async def delete_transaction(self, transaction_id: str, scope: str = "THIS") -> Any:
         return await self.request(
@@ -186,6 +214,22 @@ def query_pairs(query: dict[str, Any] | None) -> list[tuple[str, str]] | None:
         values = value if isinstance(value, list) else [value]
         pairs.extend((key, str(item).lower() if isinstance(item, bool) else str(item)) for item in values)
     return pairs
+
+
+def retry_after_seconds(response: httpx.Response, attempt: int) -> float:
+    value = response.headers.get("Retry-After")
+    if value:
+        try:
+            return min(max(float(value), 0.0), 30.0)
+        except ValueError:
+            try:
+                retry_at = parsedate_to_datetime(value)
+                if retry_at.tzinfo is None:
+                    retry_at = retry_at.replace(tzinfo=UTC)
+                return min(max((retry_at - datetime.now(UTC)).total_seconds(), 0.0), 30.0)
+            except (TypeError, ValueError):
+                pass
+    return min(2**attempt, 30)
 
 
 client = DespezzasClient()

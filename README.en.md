@@ -32,7 +32,7 @@
 
 ## Overview
 
-This project exposes 35 MCP tools for Despezzas profiles, accounts, cards,
+This project exposes 36 MCP tools for Despezzas profiles, accounts, cards,
 categories, transactions, transfers, summaries, and diagnostics. It is an
 open-source integration built from observed web app endpoints and is not affiliated
 with Despezzas.
@@ -77,12 +77,15 @@ secrets.
 | Profiles | `despezzas_list_profiles`, `despezzas_switch_profile` |
 | Accounts and cards | `despezzas_list_accounts`, `despezzas_create_credit_card` |
 | Transactions | `despezzas_search_transactions`, `despezzas_finance_summary` |
-| Preview | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction` |
+| Preview | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction`, `despezzas_prepare_batch_update_transactions` |
 | Diagnostics | `despezzas_export_transactions`, `despezzas_raw_api` |
 
 Money uses integer cents (`12345` = `R$123.45`) and dates use `YYYY-MM-DD`.
 Every write requires `confirm: true`; non-GET raw calls also require
 `allow_destructive: true`.
+Transaction updates read the current state, merge it before `PUT`, and validate
+the result after the write. Omitted fields are preserved; explicit `null` clears
+nullable fields. Search supports offsets, opaque cursors, and stable ordering.
 Read the [write contract](WRITES.md) before enabling mutations.
 
 ## Prefect Horizon deployment

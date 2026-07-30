@@ -6,13 +6,30 @@ Este MCP permite alterar dados financeiros reais. Toda ferramenta de escrita exi
 ## Fluxo recomendado
 
 1. Consulte os recursos e IDs atuais.
-2. Para transações, use a ferramenta `despezzas_prepare_*` correspondente.
-3. Revise payload, valor em centavos, data e perfil ativo.
+2. Para transações, use `despezzas_prepare_update_transaction` ou
+   `despezzas_prepare_batch_update_transactions`.
+3. Revise `before`, `after`, `changed_fields`, valor em centavos, data e perfil ativo.
 4. Execute a escrita com os mesmos argumentos e `confirm: true`.
 5. Consulte novamente o recurso para verificar o resultado.
 
-As pré-visualizações não escrevem. Uma escrita confirmada não tem rollback
-automático.
+As pré-visualizações podem fazer leituras para montar o diff, mas não escrevem.
+Uma escrita confirmada não tem rollback automático.
+
+## Atualização segura de transações
+
+- Campo ausente preserva o valor atual.
+- `null` explícito limpa somente campos anuláveis.
+- Antes do `PUT`, o MCP relê a transação e envia um payload completo mesclado.
+- `edition_date` usa a data original quando não é informada, inclusive com
+  `scope: ALL`; uma nova `date` não vira a âncora da série.
+- Depois da escrita, o MCP relê e confere campos alterados e preservados.
+- Lotes são sequenciais, respeitam `Retry-After`, usam chave de idempotência e
+  retornam `success`, `failed` e `not_attempted`.
+
+O MCP envia uma única chamada para edições de série. A atomicidade e o rollback
+das parcelas dentro dessa chamada dependem da implementação da API Despezzas;
+o MCP detecta divergências posteriores, mas não tenta uma reversão compensatória
+que poderia agravar uma série parcialmente alterada.
 
 ## Semântica MCP
 

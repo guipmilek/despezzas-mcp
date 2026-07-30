@@ -1,32 +1,45 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.experimental.missing_sentinel import MISSING
 
 from .client import DespezzasClient, client
 from .helpers import (
     MAX_EXTRA_PROFILES,
     attempt,
+    build_update_plan,
+    category_pair_issue,
     clean,
     compact_transaction,
     current_month_range,
+    cursor_fingerprint,
+    decode_cursor,
+    encode_cursor,
+    locate_transaction,
     prepare_create_transaction,
     prepare_update_transaction,
     profile_context,
     profile_warning,
     public_error,
+    public_update_plan,
     redact,
     refusal,
     search_diagnostics,
+    stable_sort_transactions,
     summarize_fields,
     summarize_transactions,
     transaction_filters,
+    transaction_items,
     validate_profile_creation,
+    validate_update_result,
 )
 
 DateString = Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")]
@@ -92,18 +105,18 @@ class TransactionUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: Identifier
-    title: Annotated[str, Field(min_length=1)] | None = None
-    description: str | None = None
-    amount_cents: Annotated[int, Field(gt=0)] | None = None
-    date: DateString | None = None
-    kind: Kind | None = None
-    account_id: Identifier | None = None
-    credit_card_id: Identifier | None = None
-    category_id: Identifier | None = None
-    subcategory_id: Identifier | None = None
-    paid: bool | None = None
-    scope: Scope | None = None
-    edition_date: DateString | None = None
+    title: Annotated[str, Field(min_length=1)] | MISSING = MISSING
+    description: str | None | MISSING = MISSING
+    amount_cents: Annotated[int, Field(gt=0)] | MISSING = MISSING
+    date: DateString | MISSING = MISSING
+    kind: Kind | MISSING = MISSING
+    account_id: Identifier | None | MISSING = MISSING
+    credit_card_id: Identifier | None | MISSING = MISSING
+    category_id: Identifier | None | MISSING = MISSING
+    subcategory_id: Identifier | None | MISSING = MISSING
+    paid: bool | MISSING = MISSING
+    scope: Scope | MISSING = MISSING
+    edition_date: DateString | MISSING = MISSING
 
 
 def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
@@ -405,9 +418,11 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         order_by: Literal["date", "title", "amount"] = "date",
         order: Literal["asc", "desc"] = "desc",
         limit: Annotated[int, Field(ge=1, le=500)] = 100,
+        offset: Annotated[int, Field(ge=0)] | None = None,
+        cursor: str | None = None,
         include_raw: bool = False,
     ) -> dict[str, Any]:
-        """Lista transações filtradas; por padrão usa o mês atual e contas bancárias."""
+        """Lista transações com paginação estável; por padrão usa o mês atual e contas bancárias."""
         start, end = current_month_range()
         filters = transaction_filters(
             date_start=date_start or start,
@@ -426,18 +441,32 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         )
         try:
             transactions, context = await asyncio.gather(client.get_transactions(filters), safe_profile_context())
-            items = transactions if isinstance(transactions, list) else []
-            returned = items[:limit]
+            items = stable_sort_transactions(transaction_items(transactions), order_by, order)
+            fingerprint = cursor_fingerprint(filters)
+            if cursor and offset is not None:
+                return {
+                    "error": "Informe cursor ou offset, não ambos.",
+                    "action": "buscar transações",
+                }
+            page_offset = decode_cursor(cursor, fingerprint) if cursor else offset or 0
+            returned = items[page_offset : page_offset + limit]
+            next_offset = page_offset + len(returned)
+            has_more = next_offset < len(items)
             return {
                 "profile_context": context,
                 "filters": filters,
                 "count": len(items),
+                "total_count": len(items),
                 "returned": len(returned),
-                "has_more": len(items) > limit,
+                "offset": page_offset,
+                "next_cursor": encode_cursor(next_offset, fingerprint) if has_more else None,
+                "has_more": has_more,
                 "diagnostics": search_diagnostics(items, returned, limit, filters),
                 "transactions": redact(returned if include_raw else [compact_transaction(item) for item in returned]),
                 "warning": profile_warning("transactions", len(items), context),
             }
+        except ValueError as error:
+            return {"error": str(error), "action": "buscar transações"}
         except Exception as error:
             return {"error": public_error(error), "action": "buscar transações"}
 
@@ -536,51 +565,76 @@ def register_transaction_tools(mcp: FastMCP) -> None:
     @mcp.tool(name="despezzas_prepare_update_transaction", title="Preparar Edição de Transação", annotations=READ_ONLY)
     async def despezzas_prepare_update_transaction(
         id: Identifier,
-        title: Identifier | None = None,
-        description: str | None = None,
-        amount_cents: Annotated[int, Field(gt=0)] | None = None,
-        date: DateString | None = None,
-        kind: Kind | None = None,
-        account_id: Identifier | None = None,
-        credit_card_id: Identifier | None = None,
-        category_id: Identifier | None = None,
-        subcategory_id: Identifier | None = None,
-        paid: bool | None = None,
-        scope: Scope | None = None,
-        edition_date: DateString | None = None,
+        title: Identifier | MISSING = MISSING,
+        description: str | None | MISSING = MISSING,
+        amount_cents: Annotated[int, Field(gt=0)] | MISSING = MISSING,
+        date: DateString | MISSING = MISSING,
+        kind: Kind | MISSING = MISSING,
+        account_id: Identifier | None | MISSING = MISSING,
+        credit_card_id: Identifier | None | MISSING = MISSING,
+        category_id: Identifier | None | MISSING = MISSING,
+        subcategory_id: Identifier | None | MISSING = MISSING,
+        paid: bool | MISSING = MISSING,
+        scope: Scope | MISSING = MISSING,
+        edition_date: DateString | MISSING = MISSING,
     ) -> dict[str, Any]:
-        """Monta e valida uma edição sem chamar a API."""
-        return prepare_update_transaction(locals())
+        """Lê o estado atual e mostra o diff seguro sem executar escrita."""
+        plan = (await prepare_update_plans([locals()]))[0]
+        return {
+            "mode": "preview",
+            **public_update_plan(plan),
+            "note": "Apenas leituras foram realizadas; nenhuma atualização foi enviada à API.",
+        }
+
+    @mcp.tool(
+        name="despezzas_prepare_batch_update_transactions",
+        title="Preparar Edição de Transações em Lote",
+        annotations=READ_ONLY,
+    )
+    async def despezzas_prepare_batch_update_transactions(
+        updates: Annotated[list[TransactionUpdate], Field(min_length=1, max_length=50)],
+    ) -> dict[str, Any]:
+        """Lê o estado atual e mostra diffs de até 50 edições sem escrever."""
+        arguments = [update.model_dump(exclude_unset=True) for update in updates]
+        plans = await prepare_update_plans(arguments)
+        return {
+            "mode": "preview",
+            "total": len(plans),
+            "ready_count": sum(bool(plan["ready"]) for plan in plans),
+            "all_ready": all(bool(plan["ready"]) for plan in plans),
+            "preview": [{"index": index, **public_update_plan(plan)} for index, plan in enumerate(plans)],
+            "note": "Apenas leituras foram realizadas; nenhuma atualização foi enviada à API.",
+        }
 
     @mcp.tool(name="despezzas_update_transaction", title="Editar Transação", annotations=UPDATE)
     async def despezzas_update_transaction(
         id: Identifier,
-        title: Identifier | None = None,
-        description: str | None = None,
-        amount_cents: Annotated[int, Field(gt=0)] | None = None,
-        date: DateString | None = None,
-        kind: Kind | None = None,
-        account_id: Identifier | None = None,
-        credit_card_id: Identifier | None = None,
-        category_id: Identifier | None = None,
-        subcategory_id: Identifier | None = None,
-        paid: bool | None = None,
-        scope: Scope | None = None,
-        edition_date: DateString | None = None,
+        title: Identifier | MISSING = MISSING,
+        description: str | None | MISSING = MISSING,
+        amount_cents: Annotated[int, Field(gt=0)] | MISSING = MISSING,
+        date: DateString | MISSING = MISSING,
+        kind: Kind | MISSING = MISSING,
+        account_id: Identifier | None | MISSING = MISSING,
+        credit_card_id: Identifier | None | MISSING = MISSING,
+        category_id: Identifier | None | MISSING = MISSING,
+        subcategory_id: Identifier | None | MISSING = MISSING,
+        paid: bool | MISSING = MISSING,
+        scope: Scope | MISSING = MISSING,
+        edition_date: DateString | MISSING = MISSING,
         confirm: bool = False,
     ) -> JsonResponse:
-        """Edita transação. Exige confirm=true."""
+        """Edita uma transação com merge e validação posterior. Exige confirm=true."""
         if not confirm:
             return refusal("editar uma transação")
-        prepared = prepare_update_transaction(locals())
-        if not prepared["ready"]:
-            return {"error": f"Payload não está pronto: {' '.join(prepared['issues'])}", "action": "editar transação"}
-        transaction = await attempt("editar transação", client.update_transaction(id, prepared["payload"]))
-        return (
-            transaction
-            if isinstance(transaction, dict) and "error" in transaction
-            else {"updated": True, "id": id, "payload": prepared["payload"], "transaction": transaction}
-        )
+        plan = (await prepare_update_plans([locals()]))[0]
+        if not plan["ready"]:
+            return {
+                "mode": "blocked",
+                "updated": False,
+                **public_update_plan(plan),
+                "error": f"Edição bloqueada: {' '.join(plan['issues'])}",
+            }
+        return await execute_update_plan(plan)
 
     @mcp.tool(name="despezzas_batch_update_transactions", title="Editar Transações em Lote", annotations=UPDATE)
     async def despezzas_batch_update_transactions(
@@ -588,47 +642,98 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         confirm: bool = False,
         stop_on_error: bool = True,
     ) -> dict[str, Any]:
-        """Pré-visualiza ou edita até 50 transações. Exige confirm=true para escrever."""
-        preview = []
-        for index, update in enumerate(updates):
-            preview.append({"index": index, **prepare_update_transaction(update.model_dump(exclude_none=True))})
-        ready_count = sum(bool(item["ready"]) for item in preview)
-        if not confirm or ready_count != len(preview):
+        """Edita até 50 transações sequencialmente, com retry e validação. Exige confirm=true."""
+        arguments = [update.model_dump(exclude_unset=True) for update in updates]
+        if not confirm:
             return {
+                "mode": "confirmation_required",
                 "confirmed": False,
-                "total": len(preview),
-                "ready_count": ready_count,
-                "all_ready": ready_count == len(preview),
+                "total": len(arguments),
                 "requires_confirm": True,
-                "preview": preview,
-                "note": "Nenhuma chamada de API foi feita. Revise os payloads e repita com confirm:true.",
+                "requested_changes": [
+                    {"index": index, **public_update_plan(prepare_update_transaction(arguments_item))}
+                    for index, arguments_item in enumerate(arguments)
+                ],
+                "preview_tool": "despezzas_prepare_batch_update_transactions",
+                "note": (
+                    "Nenhuma chamada de API foi feita. Use a ferramenta de preparação para revisar "
+                    "before/after e depois repita com confirm:true."
+                ),
             }
+        plans = await prepare_update_plans(arguments)
+        ready_count = sum(bool(plan["ready"]) for plan in plans)
+        if ready_count != len(plans):
+            return {
+                "mode": "blocked",
+                "confirmed": True,
+                "total": len(plans),
+                "ready_count": ready_count,
+                "all_ready": False,
+                "preview": [{"index": index, **public_update_plan(plan)} for index, plan in enumerate(plans)],
+                "updated_count": 0,
+                "failed_count": len(plans) - ready_count,
+                "not_attempted_count": ready_count,
+                "note": "O lote foi bloqueado antes da primeira escrita porque nem todas as edições estão válidas.",
+            }
+
         results = []
-        for item in preview:
-            try:
-                value = await client.update_transaction(item["id"], item["payload"])
+        stopped = False
+        for index, plan in enumerate(plans):
+            if stopped:
                 results.append(
                     {
-                        "index": item["index"],
-                        "id": item["id"],
-                        "ok": True,
-                        "payload": item["payload"],
-                        "transaction": redact(value),
+                        "index": index,
+                        "id": plan.get("id") or plan.get("requested_id"),
+                        "status": "not_attempted",
+                        "ok": False,
+                    }
+                )
+                continue
+            try:
+                value = await execute_update_plan(plan)
+                ok = bool(value.get("ok"))
+                results.append(
+                    {
+                        "index": index,
+                        "id": plan["id"],
+                        "status": value.get("status", "success" if ok else "failed"),
+                        "ok": ok,
+                        "result": value,
                     }
                 )
             except Exception as error:
-                results.append({"index": item["index"], "id": item["id"], "ok": False, "error": public_error(error)})
+                results.append(
+                    {
+                        "index": index,
+                        "id": plan["id"],
+                        "status": "failed",
+                        "ok": False,
+                        "error": public_error(error),
+                    }
+                )
                 if stop_on_error:
-                    break
+                    stopped = True
+            if stop_on_error and results[-1]["ok"] is False:
+                stopped = True
+        success_count = sum(item["status"] == "success" for item in results)
+        failed_count = sum(item["status"] not in {"success", "not_attempted"} for item in results)
+        not_attempted_count = sum(item["status"] == "not_attempted" for item in results)
+        api_updated_count = sum(
+            isinstance(item.get("result"), dict) and item["result"].get("updated") is True for item in results
+        )
         return {
+            "mode": "executed",
             "confirmed": True,
-            "total": len(preview),
+            "total": len(plans),
             "ready_count": ready_count,
             "all_ready": True,
-            "preview": preview,
-            "updated_count": sum(bool(item["ok"]) for item in results),
+            "updated_count": success_count,
+            "api_updated_count": api_updated_count,
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "not_attempted_count": not_attempted_count,
             "results": results,
-            "note": "Edições concluídas; revise results para falhas.",
+            "note": "Execução concluída; itens interrompidos aparecem como not_attempted e podem ser retomados.",
         }
 
     @mcp.tool(
@@ -755,6 +860,195 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                 "action": f"{method} {path}",
             }
         return await attempt("chamar API bruta do Despezzas", client.request(path, method, body, query))
+
+
+async def prepare_update_plans(arguments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    prepared_items = [prepare_update_transaction(item) for item in arguments]
+    if not any(item["ready"] for item in prepared_items):
+        return [
+            {
+                **prepared,
+                "before": {},
+                "after": {},
+                "requested_fields": list(prepared["changes"]),
+                "changed_fields": [],
+                "preserved_fields": [],
+            }
+            for prepared in prepared_items
+        ]
+
+    try:
+        items = transaction_items(await client.get_transactions())
+    except Exception as error:
+        issue = public_error(error)
+        return [
+            {
+                **prepared,
+                "ready": False,
+                "issues": [*prepared["issues"], f"Não foi possível ler a transação atual: {issue}"],
+                "before": {},
+                "after": {},
+                "requested_fields": list(prepared["changes"]),
+                "changed_fields": [],
+                "preserved_fields": [],
+            }
+            for prepared in prepared_items
+        ]
+
+    fallback_dates = {
+        prepared["edition_date"]
+        for prepared in prepared_items
+        if prepared["ready"] and prepared["edition_date"] and not locate_transaction(items, prepared["id"])["found"]
+    }
+    for fallback_date in fallback_dates:
+        try:
+            dated = await client.get_transactions({"date_start": fallback_date, "date_end": fallback_date})
+            known_ids = {item.get("id") for item in items}
+            items.extend(item for item in transaction_items(dated) if item.get("id") not in known_ids)
+        except Exception:
+            pass
+
+    plans = []
+    for prepared in prepared_items:
+        if not prepared["ready"]:
+            plans.append(
+                {
+                    **prepared,
+                    "before": {},
+                    "after": {},
+                    "requested_fields": list(prepared["changes"]),
+                    "changed_fields": [],
+                    "preserved_fields": [],
+                }
+            )
+            continue
+        lookup = locate_transaction(items, prepared["id"])
+        if not lookup["found"] or not lookup["editable"]:
+            plans.append(
+                {
+                    **prepared,
+                    "ready": False,
+                    "issues": [*prepared["issues"], lookup["reason"]],
+                    "lookup": {key: value for key, value in lookup.items() if key != "transaction"},
+                    "before": {},
+                    "after": {},
+                    "requested_fields": list(prepared["changes"]),
+                    "changed_fields": [],
+                    "preserved_fields": [],
+                }
+            )
+            continue
+        plans.append(build_update_plan(lookup["transaction"], prepared))
+
+    requires_catalog = any(
+        plan["ready"]
+        and plan["after"].get("subcategory_id")
+        and {"category_id", "subcategory_id"} & set(plan["requested_fields"])
+        for plan in plans
+    )
+    if requires_catalog:
+        try:
+            catalog = await client.get_subcategories(True)
+            for plan in plans:
+                if not plan["ready"]:
+                    continue
+                issue = category_pair_issue(
+                    plan["after"].get("category_id"),
+                    plan["after"].get("subcategory_id"),
+                    catalog,
+                )
+                if issue:
+                    plan["issues"].append(issue)
+                    plan["ready"] = False
+        except Exception as error:
+            issue = f"Não foi possível validar categoria e subcategoria: {public_error(error)}"
+            for plan in plans:
+                if plan["ready"] and {"category_id", "subcategory_id"} & set(plan["requested_fields"]):
+                    plan["issues"].append(issue)
+                    plan["ready"] = False
+    return plans
+
+
+async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    serialized = json.dumps(
+        {"id": plan["id"], "payload": plan["payload"]},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    idempotency_key = f"despezzas-mcp-{hashlib.sha256(serialized.encode()).hexdigest()[:32]}"
+    try:
+        response = await client.update_transaction(plan["id"], plan["payload"], idempotency_key=idempotency_key)
+    except Exception as error:
+        status = getattr(error, "status", None)
+        error_type = "transaction_not_found" if status == 404 else "rate_limited" if status == 429 else "api_error"
+        return {
+            "mode": "executed",
+            "status": "failed",
+            "ok": False,
+            "updated": False,
+            "id": plan["id"],
+            "error_type": error_type,
+            "error": public_error(error),
+            "before": plan["before"],
+            "after": plan["after"],
+            "changed_fields": plan["changed_fields"],
+        }
+
+    result = {
+        "mode": "executed",
+        "status": "success",
+        "ok": False,
+        "updated": True,
+        "id": plan["id"],
+        "before": plan["before"],
+        "after": plan["after"],
+        "changed_fields": plan["changed_fields"],
+        "preserved_fields": plan["preserved_fields"],
+    }
+
+    actual = await read_updated_transaction(plan["id"], response)
+    if actual is None:
+        result.update(
+            {
+                "status": "failed_validation",
+                "ok": False,
+                "validation": {
+                    "ok": False,
+                    "mismatches": [],
+                    "reason": "A escrita respondeu, mas a transação não pôde ser relida para validação.",
+                },
+            }
+        )
+        return result
+
+    validation = validate_update_result(plan, actual)
+    result.update(
+        {
+            "status": "success" if validation["ok"] else "failed_validation",
+            "ok": validation["ok"],
+            "transaction": compact_transaction(actual),
+            "validation": validation,
+        }
+    )
+    return result
+
+
+async def read_updated_transaction(transaction_id: str, response: Any = None) -> dict[str, Any] | None:
+    try:
+        lookup = locate_transaction(transaction_items(await client.get_transactions()), transaction_id)
+        if lookup["found"] and lookup["editable"]:
+            return lookup["transaction"]
+    except Exception:
+        pass
+    if isinstance(response, dict):
+        if any(key in response for key in ("id", "transaction_id", "title", "amount", "date")):
+            return response
+        for key in ("transaction", "data", "result"):
+            child = response.get(key)
+            if isinstance(child, dict):
+                return child
+    return None
 
 
 async def safe_profile_context() -> dict[str, Any]:

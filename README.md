@@ -32,7 +32,7 @@
 
 ## Visão geral
 
-Este projeto expõe 35 ferramentas MCP para perfis, contas, cartões, categorias,
+Este projeto expõe 36 ferramentas MCP para perfis, contas, cartões, categorias,
 transações, transferências, resumos e diagnósticos do Despezzas. É uma integração
 open-source construída sobre endpoints observados no aplicativo web; não é afiliada
 ao Despezzas.
@@ -82,12 +82,15 @@ Os grupos principais são:
 | Perfis | `despezzas_list_profiles`, `despezzas_switch_profile` |
 | Contas e cartões | `despezzas_list_accounts`, `despezzas_create_credit_card` |
 | Transações | `despezzas_search_transactions`, `despezzas_finance_summary` |
-| Pré-visualização | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction` |
+| Pré-visualização | `despezzas_prepare_create_transaction`, `despezzas_prepare_update_transaction`, `despezzas_prepare_batch_update_transactions` |
 | Diagnóstico | `despezzas_export_transactions`, `despezzas_raw_api` |
 
 Valores monetários usam centavos inteiros (`12345` = `R$123,45`) e datas usam
 `YYYY-MM-DD`. Toda escrita exige `confirm: true`; `despezzas_raw_api` também exige
 `allow_destructive: true` para métodos diferentes de GET.
+Edições de transação leem o estado atual, fazem merge antes do `PUT` e validam o
+resultado depois da escrita. Campo omitido é preservado; `null` explícito limpa
+campos anuláveis. A busca oferece `offset`, cursor opaco e ordenação estável.
 Consulte o [contrato de escritas](WRITES.md) antes de habilitar mutações.
 
 ## Deploy no Prefect Horizon

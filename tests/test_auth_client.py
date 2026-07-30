@@ -1,4 +1,5 @@
 import asyncio
+import json
 from unittest.mock import AsyncMock
 
 import httpx
@@ -81,6 +82,30 @@ async def test_client_retries_429_and_preserves_idempotency_key(monkeypatch):
     assert len(requests) == 3
     assert {request.headers["idempotency-key"] for request in requests} == {"batch-key"}
     assert sleep.await_count == 2
+    await http.aclose()
+
+
+async def test_client_serializes_explicit_null_in_transaction_update():
+    captured_body = None
+
+    class FakeAuth:
+        async def get_token(self, force_refresh=False):
+            return "token"
+
+        async def status(self):
+            return {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_body
+        captured_body = json.loads(request.content)
+        return httpx.Response(200, json={"id": "transaction"})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = DespezzasClient(Settings(), FakeAuth(), http)
+
+    await client.update_transaction("transaction", {"description": None})
+
+    assert captured_body == {"description": None}
     await http.aclose()
 
 

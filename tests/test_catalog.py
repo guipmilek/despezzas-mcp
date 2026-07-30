@@ -251,6 +251,62 @@ async def test_failed_transaction_validation_does_not_claim_persisted_update(no_
     assert result.data["api_accepted"] is True
 
 
+async def test_partial_transaction_update_reports_persisted_and_failed_fields(no_api):
+    before = transaction()
+    partial = transaction(title="iFood | Pedido via delivery")
+    no_api.get_transactions.side_effect = [[before], [partial]]
+    no_api.update_transaction.return_value = partial
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_transaction",
+            {
+                "id": "transaction",
+                "title": "iFood | Pedido via delivery",
+                "description": None,
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "partially_updated"
+    assert result.data["ok"] is False
+    assert result.data["updated"] is True
+    assert result.data["partially_updated"] is True
+    assert result.data["persisted_fields"] == ["title"]
+    assert result.data["failed_fields"] == ["description"]
+    assert result.data["null_clear_failed_fields"] == ["description"]
+    assert result.data["error_type"] == "explicit_null_not_persisted"
+    assert result.data["retry"]["safe_to_retry_automatically"] is False
+    assert result.data["retry"]["remaining_fields"] == ["description"]
+    payload = no_api.update_transaction.await_args.args[1]
+    assert "description" in payload
+    assert payload["description"] is None
+    assert no_api.update_transaction.await_count == 1
+
+
+async def test_unpersisted_null_clear_is_reported_without_claiming_update(no_api):
+    before = transaction()
+    no_api.get_transactions.side_effect = [[before], [before]]
+    no_api.update_transaction.return_value = before
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_transaction",
+            {
+                "id": "transaction",
+                "description": None,
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "failed_validation"
+    assert result.data["updated"] is False
+    assert result.data["partially_updated"] is False
+    assert result.data["failed_fields"] == ["description"]
+    assert result.data["null_clear_failed_fields"] == ["description"]
+    assert result.data["error_type"] == "explicit_null_not_persisted"
+
+
 async def test_prepare_create_rejects_incompatible_category_pair(no_api):
     no_api.get_subcategories.return_value = [
         {
@@ -895,7 +951,61 @@ async def test_batch_reports_failed_and_not_attempted_items(no_api):
     assert result.data["not_attempted_count"] == 1
     assert [item["status"] for item in result.data["results"]] == [
         "success",
-        "failed",
+        "failed_request",
+        "not_attempted",
+    ]
+
+
+async def test_batch_counts_partial_update_and_stops_without_claiming_total_failure(no_api):
+    before = [
+        transaction(),
+        transaction(id="transaction-2"),
+        transaction(id="transaction-3"),
+    ]
+    partial = [
+        transaction(title="iFood | Pedido via delivery"),
+        before[1],
+        before[2],
+    ]
+    no_api.get_transactions.side_effect = [before, partial]
+    no_api.update_transaction.return_value = partial[0]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_batch_update_transactions",
+            {
+                "updates": [
+                    {
+                        "id": "transaction",
+                        "title": "iFood | Pedido via delivery",
+                        "description": None,
+                    },
+                    {"id": "transaction-2", "title": "Segundo"},
+                    {"id": "transaction-3", "title": "Terceiro"},
+                ],
+                "confirm": True,
+                "stop_on_error": True,
+            },
+        )
+
+    assert result.data["updated_count"] == 1
+    assert result.data["api_updated_count"] == 1
+    assert result.data["success_count"] == 0
+    assert result.data["fully_updated_count"] == 0
+    assert result.data["partial_success_count"] == 1
+    assert result.data["partially_updated_count"] == 1
+    assert result.data["failed_count"] == 0
+    assert result.data["not_attempted_count"] == 2
+    assert result.data["attempted_count"] == 1
+    assert result.data["api_called_count"] == 1
+    assert result.data["api_accepted_count"] == 1
+    assert result.data["stopped"] is True
+    assert result.data["stopped_at_index"] == 0
+    assert result.data["stop_reason"] == "partial_update_validation_failure"
+    assert result.data["has_persisted_changes"] is True
+    assert [item["status"] for item in result.data["results"]] == [
+        "partially_updated",
+        "not_attempted",
         "not_attempted",
     ]
 

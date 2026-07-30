@@ -17,10 +17,13 @@ one Despezzas account.
 - Money: integer cents
 - Dates: `YYYY-MM-DD`
 - Transaction updates: read/merge/write/re-read, with explicit missing-vs-null semantics
+- Empty transaction descriptions normalize to explicit null; nulls remain present in the JSON payload
+- Accepted partial writes return `partially_updated`, persisted/failed fields, and truthful batch counters
 - Transaction search: stable local pagination with offset and opaque cursors
 - Transaction lookup: current results, half-open date/account hints, then a bounded historical scan independent of worker memory
 - Series date updates: original occurrence in `date`, desired date in `edition_date`
 - No-op transaction updates: return `unchanged` without an API write
+- Accepted partial writes are never retried automatically; callers must re-read and prepare only remaining changes
 - Account updates: read/merge/full PUT/re-read with sanitized API diagnostics
 - Credit-card available limit: read-only, backend-calculated, absent from write input schemas
 - Transfer deletes: resolve raw, internal, reciprocal, or shared connection IDs before deleting both sides

@@ -692,6 +692,8 @@ def register_transaction_tools(mcp: FastMCP) -> None:
 
         results = []
         stopped = False
+        stopped_at_index = None
+        stop_reason = None
         for index, plan in enumerate(plans):
             if stopped:
                 results.append(
@@ -720,7 +722,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                     {
                         "index": index,
                         "id": plan["id"],
-                        "status": "failed",
+                        "status": "failed_request",
                         "ok": False,
                         "error": public_error(error),
                     }
@@ -729,10 +731,26 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                     stopped = True
             if stop_on_error and results[-1]["ok"] is False:
                 stopped = True
+                stopped_at_index = index
+                result_status = results[-1]["status"]
+                stop_reason = {
+                    "partially_updated": "partial_update_validation_failure",
+                    "failed_validation": "validation_failure",
+                }.get(result_status, "request_failure")
         success_count = sum(item["status"] == "success" for item in results)
+        partial_success_count = sum(item["status"] == "partially_updated" for item in results)
         unchanged_count = sum(item["status"] == "unchanged" for item in results)
-        failed_count = sum(item["status"] not in {"success", "unchanged", "not_attempted"} for item in results)
+        failed_count = sum(
+            item["status"] not in {"success", "partially_updated", "unchanged", "not_attempted"} for item in results
+        )
         not_attempted_count = sum(item["status"] == "not_attempted" for item in results)
+        attempted_count = len(results) - not_attempted_count
+        api_called_count = sum(
+            isinstance(item.get("result"), dict) and item["result"].get("api_called") is True for item in results
+        )
+        api_accepted_count = sum(
+            isinstance(item.get("result"), dict) and item["result"].get("api_accepted") is True for item in results
+        )
         api_updated_count = sum(
             isinstance(item.get("result"), dict) and item["result"].get("updated") is True for item in results
         )
@@ -742,12 +760,22 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             "total": len(plans),
             "ready_count": ready_count,
             "all_ready": True,
-            "updated_count": success_count,
+            "attempted_count": attempted_count,
+            "api_called_count": api_called_count,
+            "api_accepted_count": api_accepted_count,
+            "updated_count": success_count + partial_success_count,
             "api_updated_count": api_updated_count,
             "success_count": success_count,
+            "fully_updated_count": success_count,
+            "partial_success_count": partial_success_count,
+            "partially_updated_count": partial_success_count,
             "unchanged_count": unchanged_count,
             "failed_count": failed_count,
             "not_attempted_count": not_attempted_count,
+            "stopped": stopped,
+            "stopped_at_index": stopped_at_index,
+            "stop_reason": stop_reason,
+            "has_persisted_changes": api_updated_count > 0,
             "results": results,
             "note": "Execução concluída; itens interrompidos aparecem como not_attempted e podem ser retomados.",
         }
@@ -1449,7 +1477,7 @@ async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
         error_type = "transaction_not_found" if status == 404 else "rate_limited" if status == 429 else "api_error"
         return {
             "mode": "executed",
-            "status": "failed",
+            "status": "failed_request",
             "ok": False,
             "updated": False,
             "api_called": True,
@@ -1496,15 +1524,33 @@ async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
         return result
 
     validation = validate_update_result(plan, actual)
+    partially_updated = not validation["ok"] and bool(validation["api_changed_fields"])
     result.update(
         {
-            "status": "success" if validation["ok"] else "failed_validation",
+            "status": (
+                "success" if validation["ok"] else "partially_updated" if partially_updated else "failed_validation"
+            ),
             "ok": validation["ok"],
-            "updated": validation["ok"],
+            "updated": validation["ok"] or partially_updated,
+            "partially_updated": partially_updated,
+            "persisted_fields": validation["persisted_fields"],
+            "failed_fields": validation["failed_fields"],
+            "null_clear_failed_fields": validation["null_clear_failed_fields"],
+            "unexpectedly_changed_fields": validation["unexpectedly_changed_fields"],
             "transaction": compact_transaction(actual),
             "validation": validation,
         }
     )
+    if validation["null_clear_failed_fields"]:
+        result["error_type"] = "explicit_null_not_persisted"
+    if partially_updated:
+        result["retry"] = {
+            "safe_to_retry_automatically": False,
+            "remaining_fields": validation["failed_fields"],
+            "instruction": (
+                "Releia a transação e prepare uma nova atualização; não repita automaticamente o payload anterior."
+            ),
+        }
     return result
 
 

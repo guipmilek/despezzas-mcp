@@ -22,9 +22,9 @@ one Despezzas account.
 - Series date updates: original occurrence in `date`, desired date in `edition_date`
 - No-op transaction updates: return `unchanged` without an API write
 - Account updates: read/merge/full PUT/re-read with sanitized API diagnostics
-- Credit-card available limit: read-only, backend-calculated field
-- Transfer deletes: resolve and delete both connected transaction IDs, then validate
-- Profile outputs: minimized; legacy extra `pf` types normalize to `family`
+- Credit-card available limit: read-only, backend-calculated, absent from write input schemas
+- Transfer deletes: resolve raw, internal, reciprocal, or shared connection IDs before deleting both sides
+- Profile outputs: minimized; root is `personal`, while legacy extra `pf` types normalize to `family`
 - Tool metadata: complete input/output schemas and explicit MCP behavior annotations
 
 ## Important files

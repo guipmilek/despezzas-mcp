@@ -98,6 +98,7 @@ async def test_credit_card_write_schemas_do_not_accept_calculated_available_limi
         listed = {tool.name: tool for tool in await client.list_tools()}
     for name in ("despezzas_create_credit_card", "despezzas_update_credit_card"):
         assert "available_limit_cents" not in listed[name].inputSchema["properties"]
+        assert "available_limit_cents é calculado e não é aceito" in listed[name].description
 
 
 def test_public_errors_do_not_expose_exception_details():
@@ -687,15 +688,17 @@ async def test_update_and_batch_block_incompatible_category_pair(no_api):
 
 async def test_transfer_delete_previews_and_removes_both_sides(no_api):
     sent = transaction(
-        id="sent",
+        id="sent-api",
+        internal_id="sent",
         type="TRANSFER",
-        connected_transaction_id="received",
+        connected_transaction_id="received-api",
         date="2026-07-30T00:00:00.000Z",
     )
     received = transaction(
-        id="received",
+        id="received-api",
+        internal_id="received",
         type="TRANSFER",
-        connected_transaction_id="sent",
+        connected_transaction_id="sent-api",
         date="2026-07-30T00:00:00.000Z",
     )
     no_api.get_transactions.side_effect = [[sent, received], [sent, received], [], [], []]
@@ -713,6 +716,10 @@ async def test_transfer_delete_previews_and_removes_both_sides(no_api):
 
     assert preview.data["transaction_type"] == "TRANSFER"
     assert preview.data["affected_transactions"] == ["sent", "received"]
+    assert preview.data["relationship_match"] == [
+        "connected_to_counterpart_id",
+        "counterpart_connected_to_source_id",
+    ]
     assert [call.args[:2] for call in no_api.delete_transaction.await_args_list] == [
         ("sent", "THIS"),
         ("received", "THIS"),
@@ -720,6 +727,47 @@ async def test_transfer_delete_previews_and_removes_both_sides(no_api):
     assert result.data["status"] == "success"
     assert result.data["deleted"] is True
     assert result.data["validation"]["remaining_transaction_ids"] == []
+
+
+async def test_transfer_preview_fetches_counterpart_by_date_and_uses_internal_id(no_api):
+    sent = transaction(
+        id="sent-api",
+        internal_id="sent",
+        type="TRANSFER",
+        connected_transaction_id="received-api",
+        date="2026-07-30T00:00:00.000Z",
+    )
+    received = transaction(
+        id="received-api",
+        internal_id="received",
+        type="TRANSFER",
+        connected_transaction_id="sent-api",
+        date="2026-07-30T00:00:00.000Z",
+    )
+    no_api.get_transactions.side_effect = [[sent], [sent, received], []]
+
+    async with Client(mcp) as client:
+        preview = await client.call_tool(
+            "despezzas_prepare_delete_transaction",
+            {"id": "sent"},
+        )
+
+    assert preview.data["ready"] is True
+    assert preview.data["affected_transactions"] == ["sent", "received"]
+    assert no_api.get_transactions.await_args_list[1].args == (
+        {
+            "account_type": "bank_account",
+            "date_start": "2026-07-30",
+            "date_end": "2026-07-30",
+        },
+    )
+    assert no_api.get_transactions.await_args_list[2].args == (
+        {
+            "account_type": "credit_card",
+            "date_start": "2026-07-30",
+            "date_end": "2026-07-30",
+        },
+    )
 
 
 async def test_transfer_delete_blocks_nonreciprocal_counterpart(no_api):
@@ -744,7 +792,7 @@ async def test_transfer_delete_blocks_nonreciprocal_counterpart(no_api):
 
     assert result.data["status"] == "blocked"
     assert result.data["deleted"] is False
-    assert "não é uma contraparte recíproca" in result.data["error"]
+    assert "não pôde ser localizada" in result.data["error"]
     no_api.delete_transaction.assert_not_awaited()
 
 

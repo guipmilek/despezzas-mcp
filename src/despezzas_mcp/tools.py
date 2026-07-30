@@ -33,6 +33,7 @@ from .helpers import (
     public_update_plan,
     redact,
     refusal,
+    resolve_transfer_counterpart,
     search_diagnostics,
     stable_sort_transactions,
     summarize_fields,
@@ -343,7 +344,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         account_id: Identifier | None = None,
         confirm: bool = False,
     ) -> JsonResponse:
-        """Cria cartão manual. Exige confirm=true."""
+        """Cria cartão manual. available_limit_cents é calculado e não é aceito. Exige confirm=true."""
         if not confirm:
             return refusal("criar um cartão de crédito")
         payload = clean(
@@ -371,7 +372,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         account_id: Identifier | None = None,
         confirm: bool = False,
     ) -> JsonResponse:
-        """Edita cartão manual. Exige confirm=true."""
+        """Edita cartão manual. available_limit_cents é calculado e não é aceito. Exige confirm=true."""
         if not confirm:
             return refusal("editar um cartão de crédito")
         payload = clean(
@@ -1319,30 +1320,34 @@ async def prepare_delete_transaction_plan(
     lookup_date = raw_date[:10] if isinstance(raw_date, str) else edition_date
     targets = [{"id": transaction_id, "scope": scope, "edition_date": lookup_date}]
     issues: list[str] = []
+    relationship_match: list[str] = []
     if transaction_type == "TRANSFER":
-        connected_id = transaction_internal_id({"id": transaction.get("connected_transaction_id")})
-        if not connected_id:
-            issues.append("A transferência não informa connected_transaction_id; a exclusão foi bloqueada.")
+        counterpart = resolve_transfer_counterpart(items, transaction)
+        if not counterpart["found"] and lookup_date:
+            try:
+                for account_type in ("bank_account", "credit_card"):
+                    additions = transaction_items(
+                        await client.get_transactions(
+                            {
+                                "account_type": account_type,
+                                "date_start": lookup_date,
+                                "date_end": lookup_date,
+                            }
+                        )
+                    )
+                    add_transaction_items(items, additions)
+                counterpart = resolve_transfer_counterpart(items, transaction)
+            except Exception:
+                pass
+        if not counterpart["found"]:
+            issues.append(counterpart["reason"])
         else:
-            items = await expand_transaction_lookup(
-                items,
-                [{"id": connected_id, "ready": True, "edition_date": lookup_date}],
-            )
-            counterpart = locate_transaction(items, connected_id)
-            if not counterpart["found"] or not counterpart["editable"]:
-                issues.append("A contraparte da transferência não pôde ser localizada para exclusão conjunta.")
-            else:
-                counterpart_transaction = counterpart["transaction"]
-                counterpart_connected_id = transaction_internal_id(
-                    {"id": counterpart_transaction.get("connected_transaction_id")}
-                )
-                if counterpart_transaction.get("type") != "TRANSFER" or counterpart_connected_id != transaction_id:
-                    issues.append("A transação conectada não é uma contraparte recíproca; a exclusão foi bloqueada.")
-                else:
-                    targets = [
-                        {"id": transaction_id, "scope": "THIS", "edition_date": lookup_date},
-                        {"id": connected_id, "scope": "THIS", "edition_date": lookup_date},
-                    ]
+            connected_id = counterpart["id"]
+            relationship_match = counterpart["match_modes"]
+            targets = [
+                {"id": transaction_id, "scope": "THIS", "edition_date": lookup_date},
+                {"id": connected_id, "scope": "THIS", "edition_date": lookup_date},
+            ]
 
     return {
         "ready": not issues,
@@ -1350,6 +1355,7 @@ async def prepare_delete_transaction_plan(
         "id": transaction_id,
         "scope": "THIS" if transaction_type == "TRANSFER" else scope,
         "transaction_type": transaction_type,
+        "relationship_match": relationship_match,
         "affected_transactions": [target["id"] for target in targets],
         "targets": targets,
         "method": "DELETE",

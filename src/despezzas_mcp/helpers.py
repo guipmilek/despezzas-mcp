@@ -358,6 +358,76 @@ def transaction_external_id(item: dict[str, Any]) -> str | None:
     return raw_id if internal_id and raw_id != internal_id else None
 
 
+def transaction_identifiers(item: dict[str, Any]) -> set[str]:
+    fields = (
+        "internal_id",
+        "id",
+        "transaction_id",
+        "external_id",
+        "external_transaction_id",
+        "provider_transaction_id",
+    )
+    return {value for field in fields if (value := string_value(item.get(field)))}
+
+
+def transfer_connection_identifiers(item: dict[str, Any]) -> set[str]:
+    value = item.get("connected_transaction_id")
+    if isinstance(value, str) and value:
+        return {value}
+    if isinstance(value, dict):
+        return transaction_identifiers(value)
+    return set()
+
+
+def resolve_transfer_counterpart(items: list[dict[str, Any]], source: dict[str, Any]) -> dict[str, Any]:
+    source_id = transaction_internal_id(source)
+    source_ids = transaction_identifiers(source)
+    source_connections = transfer_connection_identifiers(source)
+    if not source_connections:
+        return {
+            "found": False,
+            "reason": "A transferência não informa connected_transaction_id; a exclusão foi bloqueada.",
+        }
+
+    matches = []
+    for candidate in items:
+        candidate_id = transaction_internal_id(candidate)
+        if candidate is source or (source_id and candidate_id == source_id):
+            continue
+        if candidate.get("type") != "TRANSFER" or not candidate_id:
+            continue
+        candidate_ids = transaction_identifiers(candidate)
+        candidate_connections = transfer_connection_identifiers(candidate)
+        modes = []
+        if source_connections & candidate_ids:
+            modes.append("connected_to_counterpart_id")
+        if candidate_connections & source_ids:
+            modes.append("counterpart_connected_to_source_id")
+        if source_connections & candidate_connections:
+            modes.append("shared_connection_id")
+        if modes:
+            matches.append(
+                {
+                    "transaction": candidate,
+                    "id": candidate_id,
+                    "match_modes": modes,
+                }
+            )
+
+    if len(matches) == 1:
+        return {"found": True, **matches[0]}
+    if len(matches) > 1:
+        return {
+            "found": False,
+            "reason": "Mais de uma contraparte possível foi encontrada; a exclusão foi bloqueada.",
+            "candidate_ids": [match["id"] for match in matches],
+        }
+    return {
+        "found": False,
+        "reason": "A contraparte da transferência não pôde ser localizada para exclusão conjunta.",
+    }
+
+
 def locate_transaction(items: list[dict[str, Any]], requested_id: str) -> dict[str, Any]:
     for item in items:
         if transaction_internal_id(item) == requested_id:
@@ -680,13 +750,14 @@ def profile_context(profile: Any, access: Any) -> dict[str, Any]:
     available = []
     for item, default_role in [*((item, "owner") for item in owners), *((item, "member") for item in members)]:
         item_id = string_value(item.get("id"))
+        is_personal = item_id is None and default_role == "owner"
         available.append(
             {
                 "id": item_id,
                 **clean(
                     {
                         "name": string_value(item.get("name")),
-                        "type": normalize_profile_type(item.get("type")),
+                        "type": normalize_profile_type(item.get("type"), personal=is_personal),
                         "role": string_value(item.get("role")) or default_role,
                         "is_active": item_id == active_id,
                     }

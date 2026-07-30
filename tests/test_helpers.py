@@ -9,6 +9,7 @@ from despezzas_mcp.helpers import (
     prepare_update_transaction,
     profile_context,
     redact,
+    resolve_transfer_counterpart,
     summarize_transactions,
     validate_update_result,
 )
@@ -182,6 +183,95 @@ def test_legacy_extra_pf_profile_is_normalized_to_family():
 
     assert context["active_profile"]["type"] == "family"
     assert context["active_profile"]["role"] == "owner"
+
+
+def test_personal_profile_entry_with_null_id_is_not_normalized_to_family():
+    context = profile_context(
+        {"current_profile_access_id": None},
+        {
+            "owner_profiles": [
+                {
+                    "id": None,
+                    "name": "Perfil Principal",
+                    "type": "pf",
+                },
+                {
+                    "id": "legacy-family",
+                    "name": "Perfil familiar",
+                    "type": "pf",
+                },
+            ]
+        },
+    )
+
+    assert context["active_profile"]["type"] == "personal"
+    assert context["active_profile"]["is_personal_profile"] is True
+    assert [profile["type"] for profile in context["available_profiles"]] == ["personal", "family"]
+
+
+def test_transfer_counterpart_resolves_connected_raw_api_id_to_internal_id():
+    source = {
+        "internal_id": "sent-internal",
+        "id": "sent-api",
+        "type": "TRANSFER",
+        "connected_transaction_id": "received-api",
+    }
+    counterpart = {
+        "internal_id": "received-internal",
+        "id": "received-api",
+        "type": "TRANSFER",
+        "connected_transaction_id": "sent-api",
+    }
+
+    result = resolve_transfer_counterpart([source, counterpart], source)
+
+    assert result["found"] is True
+    assert result["id"] == "received-internal"
+    assert result["match_modes"] == [
+        "connected_to_counterpart_id",
+        "counterpart_connected_to_source_id",
+    ]
+
+
+def test_transfer_counterpart_resolves_shared_connection_group():
+    source = {
+        "id": "sent",
+        "type": "TRANSFER",
+        "connected_transaction_id": "transfer-group",
+    }
+    counterpart = {
+        "id": "received",
+        "type": "TRANSFER",
+        "connected_transaction_id": "transfer-group",
+    }
+
+    result = resolve_transfer_counterpart([source, counterpart], source)
+
+    assert result["found"] is True
+    assert result["id"] == "received"
+    assert result["match_modes"] == ["shared_connection_id"]
+
+
+def test_transfer_counterpart_rejects_ambiguous_shared_connection_group():
+    source = {
+        "id": "sent",
+        "type": "TRANSFER",
+        "connected_transaction_id": "transfer-group",
+    }
+    candidates = [
+        {
+            "id": candidate_id,
+            "type": "TRANSFER",
+            "connected_transaction_id": "transfer-group",
+        }
+        for candidate_id in ("received-one", "received-two")
+    ]
+
+    result = resolve_transfer_counterpart([source, *candidates], source)
+
+    assert result["found"] is False
+    assert "Mais de uma contraparte possível" in result["reason"]
+    assert result["candidate_ids"] == ["received-one", "received-two"]
 
 
 def test_category_pair_rejects_incompatible_subcategory():

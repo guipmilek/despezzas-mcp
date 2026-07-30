@@ -155,6 +155,9 @@ class DespezzasClient:
     async def get_transactions(self, filters: dict[str, Any] | None = None) -> Any:
         return await self.request("/v1/transactions", query=filters)
 
+    async def get_transaction(self, transaction_id: str) -> Any:
+        return await self.request(f"/v1/transactions/{quote(transaction_id, safe='')}")
+
     async def create_transaction(self, payload: dict[str, Any]) -> Any:
         return await self.request("/v1/transactions", "POST", payload)
 

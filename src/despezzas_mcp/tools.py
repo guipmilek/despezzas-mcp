@@ -37,6 +37,7 @@ from .helpers import (
     summarize_fields,
     summarize_transactions,
     transaction_filters,
+    transaction_internal_id,
     transaction_items,
     validate_profile_creation,
     validate_update_result,
@@ -94,6 +95,8 @@ ADVANCED_WRITE = ToolAnnotations(
     openWorldHint=False,
 )
 TODAY = date.today().isoformat()
+MAX_TRANSACTION_LOOKUP_HINTS = 5000
+TRANSACTION_LOOKUP_HINTS: dict[str, dict[str, str]] = {}
 
 
 class ProfileInvite(BaseModel):
@@ -442,6 +445,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         try:
             transactions, context = await asyncio.gather(client.get_transactions(filters), safe_profile_context())
             items = stable_sort_transactions(transaction_items(transactions), order_by, order)
+            remember_transaction_lookup_hints(items)
             fingerprint = cursor_fingerprint(filters)
             if cursor and offset is not None:
                 return {
@@ -716,7 +720,8 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             if stop_on_error and results[-1]["ok"] is False:
                 stopped = True
         success_count = sum(item["status"] == "success" for item in results)
-        failed_count = sum(item["status"] not in {"success", "not_attempted"} for item in results)
+        unchanged_count = sum(item["status"] == "unchanged" for item in results)
+        failed_count = sum(item["status"] not in {"success", "unchanged", "not_attempted"} for item in results)
         not_attempted_count = sum(item["status"] == "not_attempted" for item in results)
         api_updated_count = sum(
             isinstance(item.get("result"), dict) and item["result"].get("updated") is True for item in results
@@ -730,6 +735,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
             "updated_count": success_count,
             "api_updated_count": api_updated_count,
             "success_count": success_count,
+            "unchanged_count": unchanged_count,
             "failed_count": failed_count,
             "not_attempted_count": not_attempted_count,
             "results": results,
@@ -879,6 +885,7 @@ async def prepare_update_plans(arguments: list[dict[str, Any]]) -> list[dict[str
 
     try:
         items = transaction_items(await client.get_transactions())
+        items = await expand_transaction_lookup(items, prepared_items)
     except Exception as error:
         issue = public_error(error)
         return [
@@ -894,19 +901,6 @@ async def prepare_update_plans(arguments: list[dict[str, Any]]) -> list[dict[str
             }
             for prepared in prepared_items
         ]
-
-    fallback_dates = {
-        prepared["edition_date"]
-        for prepared in prepared_items
-        if prepared["ready"] and prepared["edition_date"] and not locate_transaction(items, prepared["id"])["found"]
-    }
-    for fallback_date in fallback_dates:
-        try:
-            dated = await client.get_transactions({"date_start": fallback_date, "date_end": fallback_date})
-            known_ids = {item.get("id") for item in items}
-            items.extend(item for item in transaction_items(dated) if item.get("id") not in known_ids)
-        except Exception:
-            pass
 
     plans = []
     for prepared in prepared_items:
@@ -970,6 +964,25 @@ async def prepare_update_plans(arguments: list[dict[str, Any]]) -> list[dict[str
 
 
 async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    if not plan["changed_fields"]:
+        return {
+            "mode": "executed",
+            "status": "unchanged",
+            "ok": True,
+            "updated": False,
+            "api_called": False,
+            "id": plan["id"],
+            "before": plan["before"],
+            "after": plan["after"],
+            "changed_fields": [],
+            "preserved_fields": plan["preserved_fields"],
+            "validation": {
+                "ok": True,
+                "skipped": True,
+                "reason": "Nenhuma alteração efetiva foi detectada; a API não foi chamada.",
+            },
+        }
+
     serialized = json.dumps(
         {"id": plan["id"], "payload": plan["payload"]},
         sort_keys=True,
@@ -1007,7 +1020,11 @@ async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
         "preserved_fields": plan["preserved_fields"],
     }
 
-    actual = await read_updated_transaction(plan["id"], response)
+    actual = await read_updated_transaction(
+        plan["id"],
+        response,
+        lookup_date=plan["after"].get("date") or plan["edition_date"],
+    )
     if actual is None:
         result.update(
             {
@@ -1034,9 +1051,24 @@ async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-async def read_updated_transaction(transaction_id: str, response: Any = None) -> dict[str, Any] | None:
+async def read_updated_transaction(
+    transaction_id: str,
+    response: Any = None,
+    lookup_date: str | None = None,
+) -> dict[str, Any] | None:
     try:
-        lookup = locate_transaction(transaction_items(await client.get_transactions()), transaction_id)
+        items = transaction_items(await client.get_transactions())
+        items = await expand_transaction_lookup(
+            items,
+            [
+                {
+                    "id": transaction_id,
+                    "ready": True,
+                    "edition_date": lookup_date,
+                }
+            ],
+        )
+        lookup = locate_transaction(items, transaction_id)
         if lookup["found"] and lookup["editable"]:
             return lookup["transaction"]
     except Exception:
@@ -1049,6 +1081,98 @@ async def read_updated_transaction(transaction_id: str, response: Any = None) ->
             if isinstance(child, dict):
                 return child
     return None
+
+
+async def expand_transaction_lookup(
+    items: list[dict[str, Any]],
+    prepared_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    remember_transaction_lookup_hints(items)
+    queries: list[dict[str, str]] = []
+    for prepared in prepared_items:
+        if not prepared["ready"] or locate_transaction(items, prepared["id"])["found"]:
+            continue
+        hint = TRANSACTION_LOOKUP_HINTS.get(prepared["id"], {})
+        lookup_date = prepared.get("edition_date") or hint.get("date")
+        if not lookup_date:
+            continue
+        preferred_type = hint.get("account_type")
+        account_types = ["bank_account", "credit_card"]
+        if preferred_type == "credit_card":
+            account_types.reverse()
+        for account_type in account_types:
+            query = {
+                "account_type": account_type,
+                "date_start": lookup_date,
+                "date_end": lookup_date,
+            }
+            if query not in queries:
+                queries.append(query)
+
+    for query in queries:
+        query_date = query["date_start"]
+        has_unresolved_for_date = any(
+            prepared["ready"]
+            and not locate_transaction(items, prepared["id"])["found"]
+            and (prepared.get("edition_date") or TRANSACTION_LOOKUP_HINTS.get(prepared["id"], {}).get("date"))
+            == query_date
+            for prepared in prepared_items
+        )
+        if not has_unresolved_for_date:
+            continue
+        try:
+            add_transaction_items(items, transaction_items(await client.get_transactions(query)))
+        except Exception:
+            continue
+
+    for prepared in prepared_items:
+        if not prepared["ready"] or locate_transaction(items, prepared["id"])["found"]:
+            continue
+        try:
+            add_transaction_items(items, transaction_detail_items(await client.get_transaction(prepared["id"])))
+        except Exception:
+            continue
+    remember_transaction_lookup_hints(items)
+    return items
+
+
+def add_transaction_items(items: list[dict[str, Any]], additions: list[dict[str, Any]]) -> None:
+    known_ids = {transaction_internal_id(item) for item in items}
+    for item in additions:
+        item_id = transaction_internal_id(item)
+        if item_id and item_id not in known_ids:
+            items.append(item)
+            known_ids.add(item_id)
+
+
+def transaction_detail_items(value: Any) -> list[dict[str, Any]]:
+    items = transaction_items(value)
+    if items:
+        return items
+    if not isinstance(value, dict):
+        return []
+    for key in ("transaction", "data", "result"):
+        child = value.get(key)
+        if isinstance(child, dict):
+            return [child]
+    if transaction_internal_id(value) and any(key in value for key in ("date", "title", "amount")):
+        return [value]
+    return []
+
+
+def remember_transaction_lookup_hints(items: list[dict[str, Any]]) -> None:
+    for item in items:
+        transaction_id = transaction_internal_id(item)
+        raw_date = item.get("date")
+        if not transaction_id or not isinstance(raw_date, str):
+            continue
+        TRANSACTION_LOOKUP_HINTS.pop(transaction_id, None)
+        TRANSACTION_LOOKUP_HINTS[transaction_id] = {
+            "date": raw_date[:10],
+            "account_type": "credit_card" if item.get("credit_card_id") else "bank_account",
+        }
+    while len(TRANSACTION_LOOKUP_HINTS) > MAX_TRANSACTION_LOOKUP_HINTS:
+        TRANSACTION_LOOKUP_HINTS.pop(next(iter(TRANSACTION_LOOKUP_HINTS)))
 
 
 async def safe_profile_context() -> dict[str, Any]:

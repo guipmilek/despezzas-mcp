@@ -52,6 +52,28 @@ async def test_client_retries_once_after_401():
     await http.aclose()
 
 
+async def test_client_reads_transaction_directly_by_encoded_id():
+    requests = []
+
+    class FakeAuth:
+        async def get_token(self, force_refresh=False):
+            return "token"
+
+        async def status(self):
+            return {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"id": "past/id"})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = DespezzasClient(Settings(), FakeAuth(), http)
+
+    assert await client.get_transaction("past/id") == {"id": "past/id"}
+    assert requests[0].url.raw_path == b"/v1/transactions/past%2Fid"
+    await http.aclose()
+
+
 async def test_client_retries_429_and_preserves_idempotency_key(monkeypatch):
     requests = []
 

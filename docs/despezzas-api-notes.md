@@ -77,6 +77,14 @@ interpretados como `null`, o MCP não envia patches parciais diretamente:
 5. executa o `PUT`;
 6. relê a transação e valida campos alterados e preservados.
 
+O `GET /v1/transactions` sem período pode ficar restrito ao mês atual. Para
+localizar com segurança uma transação histórica ou futura, o MCP guarda
+temporariamente a data e o tipo de conta observados na busca, consulta essa data
+em `bank_account` e `credit_card` e, como último recurso, tenta
+`GET /v1/transactions/{id}`. Esse endpoint direto é uma descoberta defensiva e
+pode não existir em todas as versões da API; falhas nele não substituem o erro
+seguro de transação não localizada.
+
 Atualizações idempotentes repetem HTTP 429 até três vezes, respeitando
 `Retry-After`, e enviam `Idempotency-Key`. O suporte efetivo à chave e a
 atomicidade de `scope: ALL` dependem do backend do Despezzas.

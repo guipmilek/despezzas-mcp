@@ -86,6 +86,8 @@ Every write requires `confirm: true`; non-GET raw calls also require
 Transaction updates read the current state, merge it before `PUT`, and validate
 the result after the write. Omitted fields are preserved; explicit `null` clears
 nullable fields. Search supports offsets, opaque cursors, and stable ordering.
+Transfer deletion handles both connected entries; available card limits are
+read-only.
 Read the [write contract](WRITES.md) before enabling mutations.
 
 ## Prefect Horizon deployment

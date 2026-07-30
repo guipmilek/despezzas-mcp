@@ -17,10 +17,11 @@ RETRYABLE_METHODS = {"GET", "PUT", "PATCH", "DELETE"}
 
 
 class DespezzasApiError(RuntimeError):
-    def __init__(self, message: str, status: int, details: Any) -> None:
+    def __init__(self, message: str, status: int, details: Any, request_id: str | None = None) -> None:
         super().__init__(message)
         self.status = status
         self.details = details
+        self.request_id = request_id
 
 
 class DespezzasClient:
@@ -63,6 +64,7 @@ class DespezzasClient:
                 f"HTTP {response.status_code}: {message or response.reason_phrase}",
                 response.status_code,
                 data,
+                response.headers.get("x-request-id") or response.headers.get("request-id"),
             )
         return data
 
@@ -154,9 +156,6 @@ class DespezzasClient:
 
     async def get_transactions(self, filters: dict[str, Any] | None = None) -> Any:
         return await self.request("/v1/transactions", query=filters)
-
-    async def get_transaction(self, transaction_id: str) -> Any:
-        return await self.request(f"/v1/transactions/{quote(transaction_id, safe='')}")
 
     async def create_transaction(self, payload: dict[str, Any]) -> Any:
         return await self.request("/v1/transactions", "POST", payload)

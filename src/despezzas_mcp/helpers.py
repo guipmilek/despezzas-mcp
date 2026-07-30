@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import math
+import re
 from collections import defaultdict
 from collections.abc import Awaitable
 from datetime import date
@@ -89,6 +90,60 @@ def public_error(error: Exception) -> str:
     if isinstance(status, int):
         return f"A API Despezzas retornou HTTP {status}."
     return "A operação falhou sem expor detalhes internos."
+
+
+def api_error_diagnostic(
+    error: Exception,
+    *,
+    endpoint: str,
+    method: str,
+    fields_sent: list[str],
+) -> dict[str, Any]:
+    details = getattr(error, "details", None)
+    details = details if isinstance(details, dict) else {}
+    code = first_safe_detail(details, ("code", "error_code", "type"), 100)
+    message = first_safe_detail(details, ("message", "error", "detail"), 300)
+    request_id = safe_text(getattr(error, "request_id", None), 100) or first_safe_detail(
+        details,
+        ("request_id", "requestId", "trace_id", "traceId"),
+        100,
+    )
+    return clean(
+        {
+            "endpoint": endpoint,
+            "method": method,
+            "fields_sent": sorted(fields_sent),
+            "status": getattr(error, "status", None),
+            "api": clean(
+                {
+                    "code": code,
+                    "message": message,
+                    "request_id": request_id,
+                }
+            ),
+        }
+    )
+
+
+def first_safe_detail(details: dict[str, Any], keys: tuple[str, ...], max_length: int) -> str | None:
+    for key in keys:
+        value = safe_text(details.get(key), max_length)
+        if value:
+            return value
+    return None
+
+
+def safe_text(value: Any, max_length: int) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()[:max_length]
+    text = re.sub(
+        r"(?i)\b(token|password|secret|credential|authorization|bearer)\b\s*[:=]?\s*\S+",
+        r"\1=[mascarado]",
+        text,
+    )
+    text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "[mascarado]", text)
+    return text
 
 
 async def attempt(action: str, operation: Awaitable[Any]) -> Any:
@@ -374,12 +429,17 @@ def build_update_plan(current: dict[str, Any], prepared: dict[str, Any]) -> dict
         issues.append("A transação resultante não pode ter subcategoria sem categoria.")
 
     scope = prepared["scope"]
-    edition_date = prepared["edition_date"] or original_date
-    payload = {
-        **after_api,
-        "edition_type": scope,
-        "edition_date": edition_date,
-    }
+    lookup_date = prepared["edition_date"] or original_date
+    is_series = before_api.get("type") in {"PARCELLED", "RECURRENT"}
+    payload = {**after_api}
+    if is_series:
+        payload.update(
+            {
+                "date": original_date,
+                "edition_type": scope,
+                "edition_date": after_api.get("date") or original_date,
+            }
+        )
     internal_id = transaction_internal_id(current)
     before = compact_transaction(current)
     merged_after = {**current, **after_api, "id": internal_id}
@@ -415,7 +475,8 @@ def build_update_plan(current: dict[str, Any], prepared: dict[str, Any]) -> dict
         "id": internal_id,
         "requested_id": prepared["id"],
         "scope": scope,
-        "edition_date": edition_date,
+        "edition_date": lookup_date,
+        "is_series": is_series,
         "before": before,
         "after": after,
         "requested_fields": requested_fields,
@@ -474,7 +535,9 @@ def category_pair_issue(category_id: str | None, subcategory_id: str | None, cat
         or string_value(subcategory.get("parent_id"))
         or (string_value(subcategory["category"].get("id")) if isinstance(subcategory.get("category"), dict) else None)
     )
-    if parent_id and parent_id != category_id:
+    if parent_id is None:
+        return "A subcategoria informada não possui uma categoria associada no catálogo."
+    if parent_id != category_id:
         return "A subcategoria informada não pertence à categoria selecionada."
     return None
 
@@ -600,6 +663,13 @@ def string_value(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def normalize_profile_type(value: Any, *, personal: bool = False) -> str | None:
+    if personal:
+        return "personal"
+    profile_type = string_value(value)
+    return "family" if profile_type == "pf" else profile_type
+
+
 def profile_context(profile: Any, access: Any) -> dict[str, Any]:
     profile = profile if isinstance(profile, dict) else {}
     access = access if isinstance(access, dict) else {}
@@ -608,7 +678,7 @@ def profile_context(profile: Any, access: Any) -> dict[str, Any]:
     owners = [item for item in access.get("owner_profiles", []) if isinstance(item, dict)]
     members = [item for item in access.get("member_profiles", []) if isinstance(item, dict)]
     available = []
-    for item in owners + members:
+    for item, default_role in [*((item, "owner") for item in owners), *((item, "member") for item in members)]:
         item_id = string_value(item.get("id"))
         available.append(
             {
@@ -616,8 +686,8 @@ def profile_context(profile: Any, access: Any) -> dict[str, Any]:
                 **clean(
                     {
                         "name": string_value(item.get("name")),
-                        "type": string_value(item.get("type")),
-                        "role": string_value(item.get("role")),
+                        "type": normalize_profile_type(item.get("type")),
+                        "role": string_value(item.get("role")) or default_role,
                         "is_active": item_id == active_id,
                     }
                 ),
@@ -628,8 +698,8 @@ def profile_context(profile: Any, access: Any) -> dict[str, Any]:
         **clean(
             {
                 "name": "Perfil Principal" if active_id is None else None,
-                "type": "pf" if active_id is None else None,
-                "role": active_role,
+                "type": normalize_profile_type(None, personal=active_id is None),
+                "role": active_role or ("owner" if active_id is None else None),
                 "is_active": True,
             }
         ),
@@ -674,7 +744,7 @@ def validate_profile_creation(access: Any, profile_type: str) -> str | None:
     extras = [item for item in profiles if isinstance(item, dict) and item.get("id") is not None]
     if len(extras) >= MAX_EXTRA_PROFILES:
         return f"O Despezzas permite no máximo {MAX_EXTRA_PROFILES} perfis extras."
-    if any(item.get("type") == profile_type for item in extras):
+    if any(normalize_profile_type(item.get("type")) == profile_type for item in extras):
         return f"Um perfil {profile_type} já existe. O Despezzas normalmente permite um perfil extra por tipo."
     return None
 

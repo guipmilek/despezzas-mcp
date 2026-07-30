@@ -14,6 +14,7 @@ from pydantic.experimental.missing_sentinel import MISSING
 from .client import DespezzasClient, client
 from .helpers import (
     MAX_EXTRA_PROFILES,
+    api_error_diagnostic,
     attempt,
     build_update_plan,
     category_pair_issue,
@@ -157,14 +158,15 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         """Lista perfis de proprietário e membro e informa o perfil ativo."""
         try:
             access, profile = await asyncio.gather(client.list_profile_access(), client.get_profile())
-            return redact(
-                {
-                    "profile_context": profile_context(profile, access),
-                    "max_extra_profiles": MAX_EXTRA_PROFILES,
-                    "extra_profile_types": ["pj", "family", "investments"],
-                    **(access if isinstance(access, dict) else {"data": access}),
-                }
-            )
+            context = profile_context(profile, access)
+            return {
+                "active_profile": context["active_profile"],
+                "profiles": context["available_profiles"],
+                "owner_profile_count": context["owner_profile_count"],
+                "member_profile_count": context["member_profile_count"],
+                "max_extra_profiles": MAX_EXTRA_PROFILES,
+                "extra_profile_types": ["pj", "family", "investments"],
+            }
         except Exception as error:
             return {"error": public_error(error), "action": "listar perfis"}
 
@@ -173,13 +175,17 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         """Troca o perfil ativo. Exige confirm=true."""
         if not confirm:
             return refusal("trocar o perfil ativo")
-        result = await attempt("trocar perfil ativo", client.change_profile(profile_id))
-        return {
-            "switched": "error" not in result if isinstance(result, dict) else True,
-            "active_profile_id": profile_id,
-            "result": result,
-            "note": "Chamadas futuras usarão este contexto de perfil ativo.",
-        }
+        try:
+            await client.change_profile(profile_id)
+            context = await safe_profile_context()
+            active = context.get("active_profile") if isinstance(context, dict) else None
+            return {
+                "switched": True,
+                "active_profile": active if isinstance(active, dict) else {"id": profile_id},
+                "note": "Chamadas futuras usarão este contexto de perfil ativo.",
+            }
+        except Exception as error:
+            return {"switched": False, "error": public_error(error), "action": "trocar perfil ativo"}
 
     @mcp.tool(name="despezzas_create_profile", title="Criar Perfil Compartilhado", annotations=CREATE)
     async def despezzas_create_profile(
@@ -299,7 +305,9 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         payload = clean(
             {"name": name, "logo": logo, "balance": balance_cents, "include_total_balance": include_total_balance}
         )
-        return await attempt("editar conta", client.update_account(id, payload))
+        if not payload:
+            return {"error": "Informe pelo menos um campo para editar.", "action": "editar conta"}
+        return await execute_account_update(id, payload)
 
     @mcp.tool(name="despezzas_delete_account", title="Excluir Conta", annotations=DELETE)
     async def despezzas_delete_account(id: Identifier, confirm: bool = False) -> dict[str, Any]:
@@ -329,7 +337,6 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         name: Identifier,
         logo: str | None = None,
         limit_cents: int | None = None,
-        available_limit_cents: int | None = None,
         is_unlimited: bool | None = None,
         expiring_date: str | None = None,
         closing_date: str | None = None,
@@ -344,14 +351,13 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
                 "name": name,
                 "logo": logo,
                 "limit": limit_cents,
-                "available_limit": available_limit_cents,
                 "is_unlimited": is_unlimited,
                 "expiring_date": expiring_date,
                 "closing_date": closing_date,
                 "account_id": account_id,
             }
         )
-        return await attempt("criar cartão de crédito", client.create_credit_card(payload))
+        return await execute_credit_card_create(payload)
 
     @mcp.tool(name="despezzas_update_credit_card", title="Editar Cartão de Crédito", annotations=UPDATE)
     async def despezzas_update_credit_card(
@@ -359,7 +365,6 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
         name: Identifier | None = None,
         logo: str | None = None,
         limit_cents: int | None = None,
-        available_limit_cents: int | None = None,
         is_unlimited: bool | None = None,
         expiring_date: str | None = None,
         closing_date: str | None = None,
@@ -374,14 +379,15 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
                 "name": name,
                 "logo": logo,
                 "limit": limit_cents,
-                "available_limit": available_limit_cents,
                 "is_unlimited": is_unlimited,
                 "expiring_date": expiring_date,
                 "closing_date": closing_date,
                 "account_id": account_id,
             }
         )
-        return await attempt("editar cartão de crédito", client.update_credit_card(id, payload))
+        if not payload:
+            return {"error": "Informe pelo menos um campo para editar.", "action": "editar cartão de crédito"}
+        return await execute_credit_card_update(id, payload)
 
     @mcp.tool(name="despezzas_delete_credit_card", title="Excluir Cartão de Crédito", annotations=DELETE)
     async def despezzas_delete_credit_card(id: Identifier, confirm: bool = False) -> dict[str, Any]:
@@ -531,8 +537,8 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         amount_mode: Literal["per_installment", "total"] = "per_installment",
         allow_uncategorized: bool = False,
     ) -> dict[str, Any]:
-        """Monta e valida uma transação sem chamar a API."""
-        return prepare_create_transaction(locals())
+        """Monta e valida uma transação sem executar escrita."""
+        return await prepare_create_transaction_plan(locals())
 
     @mcp.tool(name="despezzas_create_transaction", title="Criar Transação", annotations=CREATE)
     async def despezzas_create_transaction(
@@ -556,7 +562,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         """Cria transação. Exige confirm=true e recomenda prepare primeiro."""
         if not confirm:
             return refusal("criar uma transação")
-        prepared = prepare_create_transaction(locals())
+        prepared = await prepare_create_transaction_plan(locals())
         if not prepared["ready"]:
             return {"error": f"Payload não está pronto: {' '.join(prepared['issues'])}", "action": "criar transação"}
         transaction = await attempt("criar transação", client.create_transaction(prepared["payload"]))
@@ -745,27 +751,34 @@ def register_transaction_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="despezzas_prepare_delete_transaction", title="Preparar Exclusão de Transação", annotations=READ_ONLY
     )
-    async def despezzas_prepare_delete_transaction(id: Identifier, scope: Scope = "THIS") -> dict[str, Any]:
-        """Mostra alvo e escopo sem excluir."""
-        return {
-            "ready": True,
-            "id": id,
-            "scope": scope,
-            "endpoint": f"/v1/transactions/{id}",
-            "method": "DELETE",
-            "body": {"type": scope},
-            "note": "Nenhuma chamada de API foi feita.",
-        }
+    async def despezzas_prepare_delete_transaction(
+        id: Identifier,
+        scope: Scope = "THIS",
+        edition_date: DateString | None = None,
+    ) -> dict[str, Any]:
+        """Mostra alvo, contraparte de transferência e escopo sem excluir."""
+        plan = await prepare_delete_transaction_plan(id, scope, edition_date)
+        return {**plan, "note": "Apenas leituras foram realizadas; nenhuma exclusão foi enviada à API."}
 
     @mcp.tool(name="despezzas_delete_transaction", title="Excluir Transação", annotations=DELETE)
     async def despezzas_delete_transaction(
-        id: Identifier, scope: Scope = "THIS", confirm: bool = False
+        id: Identifier,
+        scope: Scope = "THIS",
+        edition_date: DateString | None = None,
+        confirm: bool = False,
     ) -> dict[str, Any]:
         """Exclui transação. Exige confirm=true."""
         if not confirm:
             return refusal("excluir uma transação")
-        result = await attempt("excluir transação", client.delete_transaction(id, scope))
-        return result if isinstance(result, dict) and "error" in result else {"deleted": True, "id": id, "scope": scope}
+        plan = await prepare_delete_transaction_plan(id, scope, edition_date)
+        if not plan["ready"]:
+            return {
+                "status": "blocked",
+                "deleted": False,
+                **plan,
+                "error": f"Exclusão bloqueada: {' '.join(plan['issues'])}",
+            }
+        return await execute_delete_transaction_plan(plan)
 
     @mcp.tool(name="despezzas_duplicate_transaction", title="Duplicar Transação", annotations=CREATE)
     async def despezzas_duplicate_transaction(id: Identifier, confirm: bool = False) -> JsonResponse:
@@ -963,6 +976,433 @@ async def prepare_update_plans(arguments: list[dict[str, Any]]) -> list[dict[str
     return plans
 
 
+async def prepare_create_transaction_plan(arguments: dict[str, Any]) -> dict[str, Any]:
+    prepared = prepare_create_transaction(arguments)
+    category_id = prepared["payload"].get("category_id")
+    subcategory_id = prepared["payload"].get("subcategory_id")
+    if not prepared["ready"] or not subcategory_id:
+        return prepared
+    try:
+        issue = category_pair_issue(category_id, subcategory_id, await client.get_subcategories(True))
+    except Exception as error:
+        issue = f"Não foi possível validar categoria e subcategoria: {public_error(error)}"
+    if issue:
+        prepared["issues"].append(issue)
+        prepared["ready"] = False
+    return prepared
+
+
+def entity_items(value: Any, keys: tuple[str, ...]) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if not isinstance(value, dict):
+        return []
+    for key in keys:
+        child = value.get(key)
+        if isinstance(child, list):
+            return [item for item in child if isinstance(item, dict)]
+    return []
+
+
+def locate_entity(items: list[dict[str, Any]], entity_id: str) -> dict[str, Any] | None:
+    return next((item for item in items if item.get("id") == entity_id), None)
+
+
+def compact_account(item: dict[str, Any]) -> dict[str, Any]:
+    return clean(
+        {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "logo": item.get("logo"),
+            "balance_cents": item.get("balance"),
+            "include_total_balance": item.get("include_total_balance"),
+            "external_id": item.get("external_id"),
+        }
+    )
+
+
+def compact_credit_card(item: dict[str, Any]) -> dict[str, Any]:
+    return clean(
+        {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "logo": item.get("logo"),
+            "limit_cents": item.get("limit"),
+            "available_limit_cents": item.get("available_limit"),
+            "is_unlimited": item.get("is_unlimited"),
+            "expiring_date": item.get("expiring_date"),
+            "closing_date": item.get("closing_date"),
+            "account_id": item.get("account_id"),
+            "external_id": item.get("external_id"),
+        }
+    )
+
+
+def validate_entity_update(
+    before: dict[str, Any],
+    actual: dict[str, Any],
+    requested_api_fields: list[str],
+    field_map: dict[str, str],
+) -> dict[str, Any]:
+    mismatches = []
+    for api_field in requested_api_fields:
+        public_field = field_map.get(api_field, api_field)
+        expected = before.get(public_field)
+        received = actual.get(public_field)
+        if expected != received:
+            mismatches.append({"field": public_field, "expected": expected, "received": received})
+    return {
+        "ok": not mismatches,
+        "checked_fields": [field_map.get(key, key) for key in requested_api_fields],
+        "mismatches": mismatches,
+    }
+
+
+async def execute_account_update(account_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+    endpoint = f"/v1/accounts/{account_id}"
+    try:
+        current = locate_entity(entity_items(await client.get_accounts(), ("accounts", "data", "items")), account_id)
+    except Exception as error:
+        return {"status": "blocked", "updated": False, "api_called": False, "error": public_error(error)}
+    if current is None:
+        return {
+            "status": "blocked",
+            "updated": False,
+            "api_called": False,
+            "error": "A conta não existe no perfil ativo.",
+        }
+
+    before = compact_account(current)
+    expected = compact_account({**current, **changes})
+    changed_fields = [key for key in expected if key != "id" and before.get(key) != expected.get(key)]
+    if not changed_fields:
+        return {
+            "status": "unchanged",
+            "ok": True,
+            "updated": False,
+            "api_called": False,
+            "id": account_id,
+            "before": before,
+            "after": expected,
+            "changed_fields": [],
+        }
+
+    payload = {**current, **changes}
+    try:
+        response = await client.update_account(account_id, payload)
+    except Exception as error:
+        return {
+            "status": "failed",
+            "ok": False,
+            "updated": False,
+            "api_called": True,
+            "api_accepted": False,
+            "id": account_id,
+            "error": public_error(error),
+            "diagnostic": api_error_diagnostic(
+                error,
+                endpoint=endpoint,
+                method="PUT",
+                fields_sent=list(payload),
+            ),
+        }
+
+    try:
+        actual_raw = locate_entity(entity_items(await client.get_accounts(), ("accounts", "data", "items")), account_id)
+    except Exception:
+        actual_raw = None
+    if actual_raw is None and isinstance(response, dict) and response.get("id") == account_id:
+        actual_raw = response
+    actual = compact_account(actual_raw or {})
+    validation = validate_entity_update(expected, actual, changed_fields, {})
+    return {
+        "status": "success" if validation["ok"] else "failed_validation",
+        "ok": validation["ok"],
+        "updated": validation["ok"],
+        "api_called": True,
+        "api_accepted": True,
+        "id": account_id,
+        "before": before,
+        "after": actual,
+        "changed_fields": changed_fields,
+        "validation": validation,
+    }
+
+
+async def execute_credit_card_update(card_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+    endpoint = f"/v1/credit-card/{card_id}"
+    try:
+        current = locate_entity(
+            entity_items(await client.get_credit_cards(), ("credit_cards", "cards", "data", "items")),
+            card_id,
+        )
+    except Exception as error:
+        return {"status": "blocked", "updated": False, "api_called": False, "error": public_error(error)}
+    if current is None:
+        return {
+            "status": "blocked",
+            "updated": False,
+            "api_called": False,
+            "error": "O cartão não existe no perfil ativo.",
+        }
+
+    supported_fields = (
+        "name",
+        "logo",
+        "limit",
+        "is_unlimited",
+        "expiring_date",
+        "closing_date",
+        "account_id",
+    )
+    payload = {key: changes.get(key, current.get(key)) for key in supported_fields}
+    payload = clean(payload)
+    before = compact_credit_card(current)
+    expected = compact_credit_card({**current, **changes})
+    field_map = {"limit": "limit_cents"}
+    requested_fields = [field_map.get(key, key) for key in changes]
+    changed_fields = [field for field in requested_fields if before.get(field) != expected.get(field)]
+    if not changed_fields:
+        return {
+            "status": "unchanged",
+            "ok": True,
+            "updated": False,
+            "api_called": False,
+            "id": card_id,
+            "before": before,
+            "after": expected,
+            "changed_fields": [],
+        }
+
+    try:
+        response = await client.update_credit_card(card_id, payload)
+    except Exception as error:
+        return {
+            "status": "failed",
+            "ok": False,
+            "updated": False,
+            "api_called": True,
+            "api_accepted": False,
+            "id": card_id,
+            "error": public_error(error),
+            "diagnostic": api_error_diagnostic(
+                error,
+                endpoint=endpoint,
+                method="PUT",
+                fields_sent=list(payload),
+            ),
+        }
+
+    try:
+        actual_raw = locate_entity(
+            entity_items(await client.get_credit_cards(), ("credit_cards", "cards", "data", "items")),
+            card_id,
+        )
+    except Exception:
+        actual_raw = None
+    if actual_raw is None and isinstance(response, dict) and response.get("id") == card_id:
+        actual_raw = response
+    actual = compact_credit_card(actual_raw or {})
+    validation = validate_entity_update(expected, actual, changed_fields, {})
+    return {
+        "status": "success" if validation["ok"] else "failed_validation",
+        "ok": validation["ok"],
+        "updated": validation["ok"],
+        "api_called": True,
+        "api_accepted": True,
+        "id": card_id,
+        "before": before,
+        "after": actual,
+        "changed_fields": changed_fields,
+        "validation": validation,
+    }
+
+
+async def execute_credit_card_create(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        response = await client.create_credit_card(payload)
+    except Exception as error:
+        return {
+            "status": "failed",
+            "ok": False,
+            "created": False,
+            "api_called": True,
+            "api_accepted": False,
+            "error": public_error(error),
+            "diagnostic": api_error_diagnostic(
+                error,
+                endpoint="/v1/credit-card",
+                method="POST",
+                fields_sent=list(payload),
+            ),
+        }
+
+    response_card = response if isinstance(response, dict) and response.get("id") else None
+    if response_card is None and isinstance(response, dict):
+        for key in ("credit_card", "card", "data", "result"):
+            child = response.get(key)
+            if isinstance(child, dict) and child.get("id"):
+                response_card = child
+                break
+    card_id = response_card.get("id") if isinstance(response_card, dict) else None
+    actual_raw = None
+    if isinstance(card_id, str):
+        try:
+            actual_raw = locate_entity(
+                entity_items(await client.get_credit_cards(), ("credit_cards", "cards", "data", "items")),
+                card_id,
+            )
+        except Exception:
+            actual_raw = None
+    actual_raw = actual_raw or response_card
+    if not isinstance(actual_raw, dict):
+        return {
+            "status": "unverified",
+            "ok": False,
+            "created": False,
+            "api_called": True,
+            "api_accepted": True,
+            "validation": {
+                "ok": False,
+                "reason": "A API aceitou a criação, mas o cartão não pôde ser identificado para releitura.",
+            },
+        }
+
+    expected = compact_credit_card({**payload, "id": card_id})
+    actual = compact_credit_card(actual_raw)
+    field_map = {"limit": "limit_cents"}
+    requested_fields = [field_map.get(key, key) for key in payload]
+    validation = validate_entity_update(expected, actual, requested_fields, {})
+    return {
+        "status": "success" if validation["ok"] else "failed_validation",
+        "ok": validation["ok"],
+        "created": validation["ok"],
+        "api_called": True,
+        "api_accepted": True,
+        "id": card_id,
+        "credit_card": actual,
+        "validation": validation,
+    }
+
+
+async def prepare_delete_transaction_plan(
+    transaction_id: str,
+    scope: Scope,
+    edition_date: str | None,
+) -> dict[str, Any]:
+    try:
+        prepared = [{"id": transaction_id, "ready": True, "edition_date": edition_date}]
+        items = transaction_items(await client.get_transactions())
+        items = await expand_transaction_lookup(items, prepared)
+    except Exception as error:
+        return {
+            "ready": False,
+            "issues": [f"Não foi possível localizar a transação: {public_error(error)}"],
+            "id": transaction_id,
+            "scope": scope,
+            "affected_transactions": [],
+        }
+
+    lookup = locate_transaction(items, transaction_id)
+    if not lookup["found"] or not lookup["editable"]:
+        return {
+            "ready": False,
+            "issues": [lookup["reason"]],
+            "id": transaction_id,
+            "scope": scope,
+            "affected_transactions": [],
+        }
+
+    transaction = lookup["transaction"]
+    transaction_type = transaction.get("type")
+    raw_date = transaction.get("date")
+    lookup_date = raw_date[:10] if isinstance(raw_date, str) else edition_date
+    targets = [{"id": transaction_id, "scope": scope, "edition_date": lookup_date}]
+    issues: list[str] = []
+    if transaction_type == "TRANSFER":
+        connected_id = transaction_internal_id({"id": transaction.get("connected_transaction_id")})
+        if not connected_id:
+            issues.append("A transferência não informa connected_transaction_id; a exclusão foi bloqueada.")
+        else:
+            items = await expand_transaction_lookup(
+                items,
+                [{"id": connected_id, "ready": True, "edition_date": lookup_date}],
+            )
+            counterpart = locate_transaction(items, connected_id)
+            if not counterpart["found"] or not counterpart["editable"]:
+                issues.append("A contraparte da transferência não pôde ser localizada para exclusão conjunta.")
+            else:
+                counterpart_transaction = counterpart["transaction"]
+                counterpart_connected_id = transaction_internal_id(
+                    {"id": counterpart_transaction.get("connected_transaction_id")}
+                )
+                if counterpart_transaction.get("type") != "TRANSFER" or counterpart_connected_id != transaction_id:
+                    issues.append("A transação conectada não é uma contraparte recíproca; a exclusão foi bloqueada.")
+                else:
+                    targets = [
+                        {"id": transaction_id, "scope": "THIS", "edition_date": lookup_date},
+                        {"id": connected_id, "scope": "THIS", "edition_date": lookup_date},
+                    ]
+
+    return {
+        "ready": not issues,
+        "issues": issues,
+        "id": transaction_id,
+        "scope": "THIS" if transaction_type == "TRANSFER" else scope,
+        "transaction_type": transaction_type,
+        "affected_transactions": [target["id"] for target in targets],
+        "targets": targets,
+        "method": "DELETE",
+        "body": {"type": "THIS" if transaction_type == "TRANSFER" else scope},
+    }
+
+
+async def execute_delete_transaction_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    results = []
+    for target in plan["targets"]:
+        try:
+            await client.delete_transaction(target["id"], target["scope"])
+            results.append({"id": target["id"], "status": "success", "api_called": True})
+        except Exception as error:
+            results.append(
+                {
+                    "id": target["id"],
+                    "status": "failed",
+                    "api_called": True,
+                    "error": public_error(error),
+                }
+            )
+
+    failed = [item for item in results if item["status"] == "failed"]
+    remaining: list[str] = []
+    validation_error = None
+    try:
+        prepared = [
+            {"id": target["id"], "ready": True, "edition_date": target["edition_date"]} for target in plan["targets"]
+        ]
+        items = transaction_items(await client.get_transactions())
+        items = await expand_transaction_lookup(items, prepared)
+        remaining = [target["id"] for target in plan["targets"] if locate_transaction(items, target["id"])["found"]]
+    except Exception as error:
+        validation_error = public_error(error)
+
+    validation = {
+        "ok": not failed and not remaining and validation_error is None,
+        "remaining_transaction_ids": remaining,
+        **({"reason": validation_error} if validation_error else {}),
+    }
+    status = "success" if validation["ok"] else "partial" if len(failed) < len(results) else "failed"
+    return {
+        "status": status,
+        "ok": validation["ok"],
+        "deleted": validation["ok"],
+        "transaction_type": plan["transaction_type"],
+        "affected_transactions": plan["affected_transactions"],
+        "results": results,
+        "validation": validation,
+    }
+
+
 async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
     if not plan["changed_fields"]:
         return {
@@ -1000,6 +1440,8 @@ async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
             "status": "failed",
             "ok": False,
             "updated": False,
+            "api_called": True,
+            "api_accepted": False,
             "id": plan["id"],
             "error_type": error_type,
             "error": public_error(error),
@@ -1012,7 +1454,9 @@ async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
         "mode": "executed",
         "status": "success",
         "ok": False,
-        "updated": True,
+        "updated": False,
+        "api_called": True,
+        "api_accepted": True,
         "id": plan["id"],
         "before": plan["before"],
         "after": plan["after"],
@@ -1044,6 +1488,7 @@ async def execute_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
         {
             "status": "success" if validation["ok"] else "failed_validation",
             "ok": validation["ok"],
+            "updated": validation["ok"],
             "transaction": compact_transaction(actual),
             "validation": validation,
         }
@@ -1125,13 +1570,6 @@ async def expand_transaction_lookup(
         except Exception:
             continue
 
-    for prepared in prepared_items:
-        if not prepared["ready"] or locate_transaction(items, prepared["id"])["found"]:
-            continue
-        try:
-            add_transaction_items(items, transaction_detail_items(await client.get_transaction(prepared["id"])))
-        except Exception:
-            continue
     remember_transaction_lookup_hints(items)
     return items
 
@@ -1143,21 +1581,6 @@ def add_transaction_items(items: list[dict[str, Any]], additions: list[dict[str,
         if item_id and item_id not in known_ids:
             items.append(item)
             known_ids.add(item_id)
-
-
-def transaction_detail_items(value: Any) -> list[dict[str, Any]]:
-    items = transaction_items(value)
-    if items:
-        return items
-    if not isinstance(value, dict):
-        return []
-    for key in ("transaction", "data", "result"):
-        child = value.get(key)
-        if isinstance(child, dict):
-            return [child]
-    if transaction_internal_id(value) and any(key in value for key in ("date", "title", "amount")):
-        return [value]
-    return []
 
 
 def remember_transaction_lookup_hints(items: list[dict[str, Any]]) -> None:
@@ -1180,7 +1603,7 @@ async def safe_profile_context() -> dict[str, Any]:
         profile, access = await asyncio.gather(client.get_profile(), client.list_profile_access())
         return profile_context(profile, access)
     except Exception as error:
-        return {"error": f"Não foi possível carregar o contexto do perfil ativo: {error}"}
+        return {"error": f"Não foi possível carregar o contexto do perfil ativo: {public_error(error)}"}
 
 
 def normalize_invites(invites: list[ProfileInvite] | None) -> list[dict[str, str]]:

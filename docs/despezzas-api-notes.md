@@ -73,17 +73,18 @@ interpretados como `null`, o MCP não envia patches parciais diretamente:
 1. lê a transação atual;
 2. diferencia campo ausente de `null` explícito;
 3. mescla os campos solicitados com o estado atual;
-4. usa a data original como `edition_date` quando o chamador não informa outra;
-5. executa o `PUT`;
-6. relê a transação e valida campos alterados e preservados.
+4. para transação única, envia a nova data apenas em `date`;
+5. para séries, envia a data original em `date`, a nova data em `edition_date`
+   e o escopo em `edition_type`;
+6. executa o `PUT`;
+7. relê a transação e valida campos alterados e preservados.
 
 O `GET /v1/transactions` sem período pode ficar restrito ao mês atual. Para
 localizar com segurança uma transação histórica ou futura, o MCP guarda
 temporariamente a data e o tipo de conta observados na busca, consulta essa data
-em `bank_account` e `credit_card` e, como último recurso, tenta
-`GET /v1/transactions/{id}`. Esse endpoint direto é uma descoberta defensiva e
-pode não existir em todas as versões da API; falhas nele não substituem o erro
-seguro de transação não localizada.
+em `bank_account` e `credit_card`. O endpoint direto
+`GET /v1/transactions/{id}` retornou 404 para IDs válidos e não é usado no
+lookup interno.
 
 Atualizações idempotentes repetem HTTP 429 até três vezes, respeitando
 `Retry-After`, e enviam `Idempotency-Key`. O suporte efetivo à chave e a
@@ -111,6 +112,23 @@ Payloads de criação/edição usam:
 ```
 
 Os papéis de convite observados no formulário web são `editor` e `viewer`.
+Perfis extras legados com `type: pf` são normalizados pelo MCP para `family`; o
+perfil raiz é exposto como `personal`.
+
+## Contas e cartões manuais
+
+A interface oficial usa `PUT /v1/accounts/{id}` com o objeto atual completo e os
+campos alterados sobrepostos. O MCP reproduz esse read/merge/write e retorna
+diagnóstico sanitizado em erros HTTP.
+
+Criação e edição de cartões usam `name`, `logo` na criação, `account_id`, `limit`,
+`is_unlimited`, `closing_date` e `expiring_date`. `available_limit` aparece
+somente nas leituras e é calculado a partir do limite e das faturas; por isso não
+é aceito pelos schemas de escrita.
+
+Transferências são duas transações `TRANSFER` ligadas por
+`connected_transaction_id`. Como o endpoint de exclusão remove apenas o ID
+informado, o MCP localiza e exclui as duas pontas dentro da mesma execução.
 
 ## Filtros de transação
 

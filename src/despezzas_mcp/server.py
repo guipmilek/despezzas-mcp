@@ -6,7 +6,7 @@ from despezzas_mcp.tools import register_tools
 
 mcp = FastMCP(
     name="despezzas-mcp",
-    version="0.1.1",
+    version="0.1.2",
     website_url="https://github.com/guipmilek/despezzas-mcp",
     mask_error_details=True,
     strict_input_validation=True,

@@ -5,7 +5,7 @@ import httpx
 
 from despezzas_mcp import client as client_module
 from despezzas_mcp.auth import DespezzasAuthManager
-from despezzas_mcp.client import DespezzasClient
+from despezzas_mcp.client import DespezzasApiError, DespezzasClient
 from despezzas_mcp.config import Settings
 
 
@@ -49,28 +49,6 @@ async def test_client_retries_once_after_401():
     client = DespezzasClient(Settings(), FakeAuth(), http)
     assert await client.get_profile() == {"ok": True}
     assert requests == ["Bearer old", "Bearer fresh"]
-    await http.aclose()
-
-
-async def test_client_reads_transaction_directly_by_encoded_id():
-    requests = []
-
-    class FakeAuth:
-        async def get_token(self, force_refresh=False):
-            return "token"
-
-        async def status(self):
-            return {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(200, json={"id": "past/id"})
-
-    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    client = DespezzasClient(Settings(), FakeAuth(), http)
-
-    assert await client.get_transaction("past/id") == {"id": "past/id"}
-    assert requests[0].url.raw_path == b"/v1/transactions/past%2Fid"
     await http.aclose()
 
 
@@ -134,4 +112,33 @@ async def test_client_does_not_retry_non_idempotent_post_on_429(monkeypatch):
         raise AssertionError("POST com 429 deveria falhar sem retry")
     assert calls == 1
     sleep.assert_not_awaited()
+    await http.aclose()
+
+
+async def test_client_preserves_api_request_id_on_error():
+    class FakeAuth:
+        async def get_token(self, force_refresh=False):
+            return "token"
+
+        async def status(self):
+            return {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            headers={"x-request-id": "request-123"},
+            json={"code": "VALIDATION_ERROR", "message": "invalid payload"},
+        )
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = DespezzasClient(Settings(), FakeAuth(), http)
+
+    try:
+        await client.update_account("account", {"name": "Conta"})
+    except DespezzasApiError as error:
+        assert error.status == 400
+        assert error.request_id == "request-123"
+        assert error.details == {"code": "VALIDATION_ERROR", "message": "invalid payload"}
+    else:
+        raise AssertionError("A resposta HTTP 400 deveria gerar DespezzasApiError")
     await http.aclose()

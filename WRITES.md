@@ -15,6 +15,23 @@ Este MCP permite alterar dados financeiros reais. Toda ferramenta de escrita exi
 As pré-visualizações podem fazer leituras para montar o diff, mas não escrevem.
 Uma escrita confirmada não tem rollback automático.
 
+## Validação segura de criações
+
+Antes do `POST`, o MCP lê o intervalo e o destino em que a transação será
+materializada. Depois da resposta aceita, relê o mesmo intervalo e identifica
+somente IDs que não existiam no snapshot anterior. A validação confere:
+
+- quantidade de ocorrências;
+- datas e números das parcelas;
+- título, descrição, tipo, destino, categoria, subcategoria e pagamento;
+- valor por ocorrência ou total, conforme `amount_mode`.
+
+Uma persistência integral retorna `status: success`. Se algum registro foi criado,
+mas a quantidade ou os campos divergiram, retorna `status: partially_created`,
+`created: true` e os mismatches. Se a API aceitou a requisição e nenhuma
+persistência foi localizada, retorna `failed_validation`. Se o snapshot anterior
+não puder ser lido, a criação é bloqueada antes do `POST`.
+
 ## Criação segura de recorrências
 
 O backend materializa recorrências com 12 ocorrências. O preview e a execução

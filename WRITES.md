@@ -44,13 +44,17 @@ que poderia agravar uma série parcialmente alterada.
 Criações e edições com subcategoria consultam o catálogo e bloqueiam pares de
 categoria/subcategoria incompatíveis antes da escrita. Contas manuais são
 relidas e mescladas antes do `PUT`, pois a interface oficial envia o objeto
-completo. O limite disponível de cartão é calculado pelo backend e não faz parte
-dos schemas de escrita.
+completo. O limite disponível de cartão é calculado pelo backend;
+`available_limit_cents` não faz parte dos schemas de entrada de criação ou
+edição, embora continue aparecendo nas respostas de leitura.
 
 Ao excluir uma transação `TRANSFER`, o preview localiza
-`connected_transaction_id`. A execução exclui as duas pontas sequencialmente e
-relê ambas; falhas parciais são expostas individualmente, pois a API não oferece
-um endpoint atômico conjunto.
+`connected_transaction_id`. Esse identificador pode apontar para o ID bruto da
+API ou ser compartilhado pelas duas pontas; o MCP resolve a relação e converte a
+contraparte para o ID interno editável. A execução exclui as duas pontas
+sequencialmente e relê ambas; relações ausentes ou ambíguas são bloqueadas e
+falhas parciais são expostas individualmente, pois a API não oferece um endpoint
+atômico conjunto.
 
 ## Semântica MCP
 

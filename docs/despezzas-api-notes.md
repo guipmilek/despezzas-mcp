@@ -124,11 +124,15 @@ diagnóstico sanitizado em erros HTTP.
 Criação e edição de cartões usam `name`, `logo` na criação, `account_id`, `limit`,
 `is_unlimited`, `closing_date` e `expiring_date`. `available_limit` aparece
 somente nas leituras e é calculado a partir do limite e das faturas; por isso não
-é aceito pelos schemas de escrita.
+é aceito pelos `inputSchema` de criação ou edição. As descrições públicas das
+duas ferramentas também explicitam essa restrição.
 
 Transferências são duas transações `TRANSFER` ligadas por
-`connected_transaction_id`. Como o endpoint de exclusão remove apenas o ID
-informado, o MCP localiza e exclui as duas pontas dentro da mesma execução.
+`connected_transaction_id`. O valor observado pode apontar para o `id` bruto da
+contraparte, enquanto a escrita exige seu `internal_id`, ou pode funcionar como
+identificador compartilhado do par. O MCP compara todos os identificadores
+conhecidos, rejeita relações ausentes ou ambíguas, converte a contraparte para o
+ID interno e exclui as duas pontas dentro da mesma execução.
 
 ## Filtros de transação
 

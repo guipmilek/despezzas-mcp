@@ -65,6 +65,22 @@ Despezzas ficam nos secrets do deployment e a sessão Firebase permanece em mem�
 - `GET /v1/export-transactions/count`
 - `GET /v1/export-transactions`
 
+## Semântica defensiva adotada pelo MCP
+
+A API observada usa `PUT /v1/transactions/{id}`. Como campos omitidos podem ser
+interpretados como `null`, o MCP não envia patches parciais diretamente:
+
+1. lê a transação atual;
+2. diferencia campo ausente de `null` explícito;
+3. mescla os campos solicitados com o estado atual;
+4. usa a data original como `edition_date` quando o chamador não informa outra;
+5. executa o `PUT`;
+6. relê a transação e valida campos alterados e preservados.
+
+Atualizações idempotentes repetem HTTP 429 até três vezes, respeitando
+`Retry-After`, e enviam `Idempotency-Key`. O suporte efetivo à chave e a
+atomicidade de `scope: ALL` dependem do backend do Despezzas.
+
 ## Endpoints de acesso a perfil descobertos no frontend
 
 O Despezzas oferece um perfil pessoal/raiz e até 3 tipos de perfis extras (`pj`, `family`, `investments`). O frontend lista o estado de acesso a perfis e troca o perfil ativo por:

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 import math
 from collections import defaultdict
 from collections.abc import Awaitable
 from datetime import date
 from typing import Any
+
+from pydantic.experimental.missing_sentinel import MISSING
 
 SENSITIVE_KEYS = {
     "password",
@@ -17,6 +22,35 @@ SENSITIVE_KEYS = {
 }
 SENSITIVE_PATTERNS = ("token", "password", "secret", "credential", "authorization")
 MAX_EXTRA_PROFILES = 3
+TRANSACTION_FIELDS = (
+    "title",
+    "description",
+    "amount",
+    "date",
+    "is_expense",
+    "type",
+    "frequency",
+    "installments",
+    "installment_number",
+    "is_full_amount",
+    "account_id",
+    "credit_card_id",
+    "category_id",
+    "subcategory_id",
+    "paid",
+)
+UPDATE_FIELD_MAP = {
+    "title": "title",
+    "description": "description",
+    "amount_cents": "amount",
+    "date": "date",
+    "kind": "is_expense",
+    "account_id": "account_id",
+    "credit_card_id": "credit_card_id",
+    "category_id": "category_id",
+    "subcategory_id": "subcategory_id",
+    "paid": "paid",
+}
 
 
 def redact(value: Any) -> Any:
@@ -148,36 +182,32 @@ def build_transaction_payload(args: dict[str, Any]) -> dict[str, Any]:
 
 def prepare_update_transaction(args: dict[str, Any]) -> dict[str, Any]:
     transaction_id = args["id"]
-    rest = {
-        key: value
-        for key, value in args.items()
-        if key not in {"id", "amount_cents", "kind", "scope", "edition_date", "confirm"}
-    }
-    payload = clean(
-        {
-            **rest,
-            "amount": args.get("amount_cents"),
-            "is_expense": None if args.get("kind") is None else args["kind"] == "expense",
-            "edition_type": args.get("scope"),
-            "edition_date": args.get("edition_date") or args.get("date"),
-        }
-    )
-    issues = []
-    if not payload:
+    changes: dict[str, Any] = {}
+    api_changes: dict[str, Any] = {}
+    for public_name, api_name in UPDATE_FIELD_MAP.items():
+        value = args.get(public_name, MISSING)
+        if value is MISSING:
+            continue
+        changes[public_name] = value
+        api_changes[api_name] = value == "expense" if public_name == "kind" else value
+
+    scope = args.get("scope", MISSING)
+    edition_date = args.get("edition_date", MISSING)
+    issues: list[str] = []
+    if not changes:
         issues.append("Informe pelo menos um campo de transação para editar.")
-    if args.get("account_id") and args.get("credit_card_id"):
+    if changes.get("account_id") and changes.get("credit_card_id"):
         issues.append("Informe account_id ou credit_card_id, não ambos.")
     return {
         "ready": not issues,
         "issues": issues,
         "id": transaction_id,
-        "payload": payload,
+        "changes": changes,
+        "api_changes": api_changes,
+        "scope": "THIS" if scope is MISSING else scope,
+        "edition_date": None if edition_date is MISSING else edition_date,
         "endpoint": f"/v1/transactions/{transaction_id}",
-        "method": "PUT",
-        "note": (
-            "Nenhuma chamada de API foi feita. Se ready for true, chame "
-            "despezzas_update_transaction com os mesmos campos e confirm:true."
-        ),
+        "method": "PUT (merge seguro)",
     }
 
 
@@ -190,22 +220,37 @@ def compact_transaction(item: Any) -> dict[str, Any]:
         return value.get("name") if isinstance(value, dict) and isinstance(value.get("name"), str) else None
 
     raw_date = item.get("date")
+    internal_id = transaction_internal_id(item)
+    external_id = transaction_external_id(item)
+    editable_value = item.get("editable", item.get("is_editable"))
+    editable = editable_value if isinstance(editable_value, bool) else internal_id is not None
     return {
         "profile_id": (item.get("profile_id") if isinstance(item.get("profile_id"), str) else None),
         **clean(
             {
-                "id": string_value(item.get("id")),
+                "id": internal_id,
+                "external_id": external_id,
+                "editable": editable,
+                "editability_reason": (
+                    string_value(item.get("editability_reason"))
+                    or string_value(item.get("non_editable_reason"))
+                    or (None if editable else "A API não informou um ID interno editável.")
+                ),
                 "date": raw_date[:10] if isinstance(raw_date, str) else None,
                 "title": string_value(item.get("title")),
                 "description": string_value(item.get("description")),
-                "amount_cents": number_value(item.get("amount")),
+                "amount_cents": int(number_value(item.get("amount"))),
                 "kind": "expense" if item.get("is_expense") is True else "income",
                 "paid": item.get("paid") if isinstance(item.get("paid"), bool) else None,
                 "type": string_value(item.get("type")),
+                "frequency": string_value(item.get("frequency")),
                 "installments": item.get("installments") if isinstance(item.get("installments"), int | float) else None,
                 "installment_number": item.get("installment_number")
                 if isinstance(item.get("installment_number"), int | float)
                 else None,
+                "is_full_amount": (
+                    item.get("is_full_amount") if isinstance(item.get("is_full_amount"), bool) else None
+                ),
                 "account_id": string_value(item.get("account_id")),
                 "account_name": nested("account"),
                 "credit_card_id": string_value(item.get("credit_card_id")),
@@ -219,13 +264,255 @@ def compact_transaction(item: Any) -> dict[str, Any]:
     }
 
 
+def transaction_items(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if not isinstance(value, dict):
+        return []
+    for key in ("transactions", "data", "results", "items"):
+        child = value.get(key)
+        if isinstance(child, list):
+            return [item for item in child if isinstance(item, dict)]
+    return []
+
+
+def transaction_internal_id(item: dict[str, Any]) -> str | None:
+    return (
+        string_value(item.get("internal_id"))
+        or string_value(item.get("id"))
+        or string_value(item.get("transaction_id"))
+    )
+
+
+def transaction_external_id(item: dict[str, Any]) -> str | None:
+    explicit = (
+        string_value(item.get("external_id"))
+        or string_value(item.get("external_transaction_id"))
+        or string_value(item.get("provider_transaction_id"))
+    )
+    raw_id = string_value(item.get("id"))
+    internal_id = string_value(item.get("internal_id"))
+    if explicit:
+        return explicit
+    return raw_id if internal_id and raw_id != internal_id else None
+
+
+def locate_transaction(items: list[dict[str, Any]], requested_id: str) -> dict[str, Any]:
+    for item in items:
+        if transaction_internal_id(item) == requested_id:
+            editable_value = item.get("editable", item.get("is_editable"))
+            if editable_value is False:
+                return {
+                    "found": True,
+                    "editable": False,
+                    "id": requested_id,
+                    "reason": (
+                        string_value(item.get("editability_reason"))
+                        or string_value(item.get("non_editable_reason"))
+                        or "A API marcou esta transação como não editável."
+                    ),
+                }
+            return {
+                "found": True,
+                "editable": True,
+                "id": requested_id,
+                "transaction": item,
+            }
+    for item in items:
+        if transaction_external_id(item) == requested_id:
+            return {
+                "found": True,
+                "editable": False,
+                "id": requested_id,
+                "id_type": "external_id",
+                "internal_id": transaction_internal_id(item),
+                "reason": "Foi enviado um ID externo; use o campo id interno retornado pela busca.",
+            }
+    return {
+        "found": False,
+        "editable": False,
+        "id": requested_id,
+        "reason": "A transação não existe no perfil ativo, foi excluída ou não está disponível para edição.",
+    }
+
+
+def transaction_api_snapshot(item: dict[str, Any]) -> dict[str, Any]:
+    snapshot: dict[str, Any] = {}
+    for key in TRANSACTION_FIELDS:
+        if key in item:
+            snapshot[key] = item[key]
+    for relation in ("account", "credit_card", "category", "subcategory"):
+        key = f"{relation}_id"
+        nested = item.get(relation)
+        if key not in snapshot and isinstance(nested, dict):
+            nested_id = string_value(nested.get("id"))
+            if nested_id:
+                snapshot[key] = nested_id
+    raw_date = snapshot.get("date")
+    if isinstance(raw_date, str):
+        snapshot["date"] = raw_date[:10]
+    return snapshot
+
+
+def build_update_plan(current: dict[str, Any], prepared: dict[str, Any]) -> dict[str, Any]:
+    before_api = transaction_api_snapshot(current)
+    issues = list(prepared["issues"])
+    original_date = before_api.get("date")
+    if not isinstance(original_date, str):
+        issues.append("A transação atual não possui uma data válida para ancorar a edição.")
+
+    after_api = {**before_api, **prepared["api_changes"]}
+    if after_api.get("account_id") and after_api.get("credit_card_id"):
+        issues.append("A transação resultante não pode ter account_id e credit_card_id ao mesmo tempo.")
+    if after_api.get("subcategory_id") and not after_api.get("category_id"):
+        issues.append("A transação resultante não pode ter subcategoria sem categoria.")
+
+    scope = prepared["scope"]
+    edition_date = prepared["edition_date"] or original_date
+    payload = {
+        **after_api,
+        "edition_type": scope,
+        "edition_date": edition_date,
+    }
+    internal_id = transaction_internal_id(current)
+    before = compact_transaction(current)
+    after = compact_transaction({**current, **after_api, "id": internal_id})
+    requested_fields = list(prepared["changes"])
+    changed_fields = [field for field in requested_fields if before.get(field) != after.get(field)]
+    protected_fields = [
+        "title",
+        "description",
+        "date",
+        "amount_cents",
+        "kind",
+        "paid",
+        "type",
+        "frequency",
+        "installment_number",
+        "installments",
+        "is_full_amount",
+        "account_id",
+        "credit_card_id",
+        "category_id",
+        "subcategory_id",
+    ]
+    preserved_fields = [field for field in protected_fields if field not in requested_fields]
+    return {
+        "ready": not issues,
+        "issues": issues,
+        "id": internal_id,
+        "requested_id": prepared["id"],
+        "scope": scope,
+        "edition_date": edition_date,
+        "before": before,
+        "after": after,
+        "requested_fields": requested_fields,
+        "changed_fields": changed_fields,
+        "preserved_fields": preserved_fields,
+        "payload": payload,
+        "endpoint": f"/v1/transactions/{internal_id or prepared['id']}",
+        "method": "PUT (merge seguro)",
+    }
+
+
+def public_update_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in plan.items() if key not in {"payload", "api_changes"}}
+
+
+def validate_update_result(plan: dict[str, Any], actual: dict[str, Any]) -> dict[str, Any]:
+    compact_actual = compact_transaction(actual)
+    mismatches = []
+    for field in plan["changed_fields"] + plan["preserved_fields"]:
+        expected_source = plan["after"] if field in plan["changed_fields"] else plan["before"]
+        expected = expected_source.get(field)
+        received = compact_actual.get(field)
+        if expected != received:
+            mismatches.append({"field": field, "expected": expected, "received": received})
+    return {
+        "ok": not mismatches,
+        "checked_changed_fields": plan["changed_fields"],
+        "checked_preserved_fields": plan["preserved_fields"],
+        "mismatches": mismatches,
+    }
+
+
+def flatten_catalog(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if not isinstance(value, dict):
+        return []
+    result = []
+    for child in value.values():
+        if isinstance(child, list):
+            result.extend(item for item in child if isinstance(item, dict))
+    return result
+
+
+def category_pair_issue(category_id: str | None, subcategory_id: str | None, catalog: Any) -> str | None:
+    if not subcategory_id:
+        return None
+    subcategory = next(
+        (item for item in flatten_catalog(catalog) if string_value(item.get("id")) == subcategory_id),
+        None,
+    )
+    if subcategory is None:
+        return "A subcategoria informada não existe no catálogo do perfil ativo."
+    parent_id = (
+        string_value(subcategory.get("category_id"))
+        or string_value(subcategory.get("parent_id"))
+        or (string_value(subcategory["category"].get("id")) if isinstance(subcategory.get("category"), dict) else None)
+    )
+    if parent_id and parent_id != category_id:
+        return "A subcategoria informada não pertence à categoria selecionada."
+    return None
+
+
+def stable_sort_transactions(items: list[dict[str, Any]], order_by: str, order: str) -> list[dict[str, Any]]:
+    def key(item: dict[str, Any]) -> tuple[Any, str, str]:
+        if order_by == "amount":
+            primary: Any = number_value(item.get("amount"))
+        elif order_by == "title":
+            primary = (string_value(item.get("title")) or "").lower()
+        else:
+            primary = string_value(item.get("date")) or ""
+        return (
+            primary,
+            string_value(item.get("date")) or "",
+            transaction_internal_id(item) or transaction_external_id(item) or "",
+        )
+
+    return sorted(items, key=key, reverse=order == "desc")
+
+
+def cursor_fingerprint(filters: dict[str, Any]) -> str:
+    serialized = json.dumps(filters, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(serialized.encode()).hexdigest()[:16]
+
+
+def encode_cursor(offset: int, fingerprint: str) -> str:
+    value = json.dumps({"offset": offset, "fingerprint": fingerprint}, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(value).decode().rstrip("=")
+
+
+def decode_cursor(cursor: str, fingerprint: str) -> int:
+    try:
+        padding = "=" * (-len(cursor) % 4)
+        value = json.loads(base64.urlsafe_b64decode(cursor + padding))
+        offset = value["offset"]
+        if value["fingerprint"] != fingerprint or not isinstance(offset, int) or offset < 0:
+            raise ValueError
+        return offset
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("Cursor inválido ou incompatível com os filtros informados.") from error
+
+
 def summarize_transactions(transactions: list[Any]) -> dict[str, Any]:
     expenses = revenues = paid = unpaid = 0
     categories: dict[str, dict[str, int]] = defaultdict(lambda: {"amount_cents": 0, "count": 0})
     for item in transactions:
         if not isinstance(item, dict):
             continue
-        amount = number_value(item.get("amount"))
+        amount = int(number_value(item.get("amount")))
         if item.get("is_expense") is True:
             expenses += amount
         else:

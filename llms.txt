@@ -1,7 +1,7 @@
 # Despezzas MCP
 
 Unofficial Python/FastMCP server for Despezzas personal finance data. It exposes
-35 tools and is deployed through Prefect Horizon. Each fork/deployment represents
+36 tools and is deployed through Prefect Horizon. Each fork/deployment represents
 one Despezzas account.
 
 ## Core context
@@ -16,6 +16,8 @@ one Despezzas account.
 - Session storage: in-memory only; cold starts authenticate again
 - Money: integer cents
 - Dates: `YYYY-MM-DD`
+- Transaction updates: read/merge/write/re-read, with explicit missing-vs-null semantics
+- Transaction search: stable local pagination with offset and opaque cursors
 - Tool metadata: complete input/output schemas and explicit MCP behavior annotations
 
 ## Important files
@@ -69,6 +71,7 @@ The smoke test calls real read-only endpoints and is optional.
 - `despezzas_prepare_create_transaction`
 - `despezzas_create_transaction`
 - `despezzas_prepare_update_transaction`
+- `despezzas_prepare_batch_update_transactions`
 - `despezzas_update_transaction`
 - `despezzas_batch_update_transactions`
 - `despezzas_prepare_delete_transaction`

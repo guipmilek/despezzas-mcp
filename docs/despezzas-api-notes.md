@@ -99,6 +99,22 @@ Atualizações idempotentes repetem HTTP 429 até três vezes, respeitando
 `Retry-After`, e enviam `Idempotency-Key`. O suporte efetivo à chave e a
 atomicidade de `scope: ALL` dependem do backend do Despezzas.
 
+O cliente HTTP serializa valores Python `None` como JSON `null` e não remove
+campos anuláveis. Descrições vazias ou compostas apenas por espaços são
+normalizadas para `description: null`; descrição ausente continua preservando o
+valor atual. Em teste real, a API aceitou um `PUT` de transação importada, mas
+ignorou `description: null` enquanto persistia outro campo do mesmo payload.
+Esse comportamento não pode ser tornado atômico pelo MCP, pois a transação do
+banco pertence ao backend Despezzas.
+
+Quando a releitura comprova que somente parte do payload foi persistida, o MCP
+retorna `status: partially_updated`, `updated: true`, `persisted_fields`,
+`failed_fields`, `null_clear_failed_fields` e uma instrução que proíbe retry
+automático. Se nenhum campo mudou, permanece `failed_validation` com
+`updated: false`; recusas HTTP usam `failed_request`. Lotes separam requisições
+chamadas/aceitas, atualizações completas, parciais, falhas e itens não tentados;
+com `stop_on_error: true`, uma atualização parcial interrompe os itens seguintes.
+
 ## Endpoints de acesso a perfil descobertos no frontend
 
 O Despezzas oferece um perfil pessoal/raiz e até 3 tipos de perfis extras (`pj`, `family`, `investments`). O frontend lista o estado de acesso a perfis e troca o perfil ativo por:

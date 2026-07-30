@@ -243,6 +243,8 @@ def prepare_update_transaction(args: dict[str, Any]) -> dict[str, Any]:
         value = args.get(public_name, MISSING)
         if value is MISSING:
             continue
+        if public_name == "description" and isinstance(value, str) and not value.strip():
+            value = None
         changes[public_name] = value
         api_changes[api_name] = value == "expense" if public_name == "kind" else value
 
@@ -525,6 +527,7 @@ def build_update_plan(current: dict[str, Any], prepared: dict[str, Any]) -> dict
     after = compact_transaction(merged_after)
     requested_fields = list(prepared["changes"])
     changed_fields = [field for field in requested_fields if before.get(field) != after.get(field)]
+    nullable_clear_fields = [field for field in changed_fields if after.get(field) is None]
     protected_fields = [
         "title",
         "description",
@@ -555,6 +558,7 @@ def build_update_plan(current: dict[str, Any], prepared: dict[str, Any]) -> dict
         "after": after,
         "requested_fields": requested_fields,
         "changed_fields": changed_fields,
+        "nullable_clear_fields": nullable_clear_fields,
         "preserved_fields": preserved_fields,
         "payload": payload,
         "endpoint": f"/v1/transactions/{internal_id or prepared['id']}",
@@ -575,10 +579,26 @@ def validate_update_result(plan: dict[str, Any], actual: dict[str, Any]) -> dict
         received = compact_actual.get(field)
         if expected != received:
             mismatches.append({"field": field, "expected": expected, "received": received})
+    persisted_fields = [
+        field for field in plan["changed_fields"] if compact_actual.get(field) == plan["after"].get(field)
+    ]
+    failed_fields = [field for field in plan["changed_fields"] if field not in persisted_fields]
+    null_clear_failed_fields = [field for field in failed_fields if plan["after"].get(field) is None]
+    api_changed_fields = [
+        field
+        for field in plan["changed_fields"] + plan["preserved_fields"]
+        if compact_actual.get(field) != plan["before"].get(field)
+    ]
+    unexpectedly_changed_fields = [field for field in plan["preserved_fields"] if field in api_changed_fields]
     return {
         "ok": not mismatches,
         "checked_changed_fields": plan["changed_fields"],
         "checked_preserved_fields": plan["preserved_fields"],
+        "persisted_fields": persisted_fields,
+        "failed_fields": failed_fields,
+        "null_clear_failed_fields": null_clear_failed_fields,
+        "api_changed_fields": api_changed_fields,
+        "unexpectedly_changed_fields": unexpectedly_changed_fields,
         "mismatches": mismatches,
     }
 

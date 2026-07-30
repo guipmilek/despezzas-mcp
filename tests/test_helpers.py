@@ -110,6 +110,14 @@ def test_explicit_null_clears_subcategory_but_omission_preserves_it():
     assert cleared["payload"]["subcategory_id"] is None
     assert cleared["after"].get("subcategory_id") is None
     assert cleared["changed_fields"] == ["subcategory_id"]
+    assert cleared["nullable_clear_fields"] == ["subcategory_id"]
+
+
+def test_empty_description_is_normalized_to_explicit_null():
+    prepared = prepare_update_transaction({"id": "transaction", "description": "   "})
+
+    assert prepared["changes"]["description"] is None
+    assert prepared["api_changes"]["description"] is None
 
 
 def test_changed_relation_id_removes_stale_derived_name_from_after():
@@ -324,3 +332,30 @@ def test_post_update_validation_detects_silent_field_loss():
 
     assert validation["ok"] is False
     assert validation["mismatches"] == [{"field": "subcategory_id", "expected": "subcategory", "received": None}]
+    assert validation["persisted_fields"] == ["description"]
+    assert validation["failed_fields"] == []
+    assert validation["null_clear_failed_fields"] == []
+    assert validation["api_changed_fields"] == ["description", "subcategory_id"]
+    assert validation["unexpectedly_changed_fields"] == ["subcategory_id"]
+
+
+def test_post_update_validation_identifies_partial_requested_changes():
+    plan = build_update_plan(
+        current_transaction(),
+        prepare_update_transaction(
+            {
+                "id": "transaction",
+                "title": "Novo título",
+                "description": None,
+            }
+        ),
+    )
+    actual = {**current_transaction(), "title": "Novo título"}
+    validation = validate_update_result(plan, actual)
+
+    assert validation["ok"] is False
+    assert validation["persisted_fields"] == ["title"]
+    assert validation["failed_fields"] == ["description"]
+    assert validation["null_clear_failed_fields"] == ["description"]
+    assert validation["api_changed_fields"] == ["title"]
+    assert validation["unexpectedly_changed_fields"] == []

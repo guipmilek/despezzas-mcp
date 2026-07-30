@@ -99,13 +99,20 @@ Atualizações idempotentes repetem HTTP 429 até três vezes, respeitando
 `Retry-After`, e enviam `Idempotency-Key`. O suporte efetivo à chave e a
 atomicidade de `scope: ALL` dependem do backend do Despezzas.
 
-O cliente HTTP serializa valores Python `None` como JSON `null` e não remove
-campos anuláveis. Descrições vazias ou compostas apenas por espaços são
-normalizadas para `description: null`; descrição ausente continua preservando o
-valor atual. Em teste real, a API aceitou um `PUT` de transação importada, mas
-ignorou `description: null` enquanto persistia outro campo do mesmo payload.
-Esse comportamento não pode ser tornado atômico pelo MCP, pois a transação do
-banco pertence ao backend Despezzas.
+O cliente HTTP bruto serializa valores Python `None` como JSON `null` e não
+remove campos anuláveis. A API, porém, ignora `description: null` e
+`description: ""`, mas persiste exatamente um espaço. Por isso, descrições
+vazias ou compostas apenas por espaços continuam representadas logicamente como
+`description: null`, enquanto o plano de atualização envia internamente
+`description: " "` para efetivar a limpeza. A releitura estruturada normaliza
+esse sentinela novamente para ausência de descrição; `despezzas_raw_api`
+permanece transparente e retorna o valor bruto. Descrição omitida continua
+preservando o valor atual.
+
+Esse workaround foi confirmado com criação, atualização, releitura pela
+listagem e exclusão de uma transação temporária de R$ 0,01. O endpoint direto
+`GET /v1/transactions/{id}` continuou retornando 404. A atomicidade do banco
+permanece responsabilidade do backend Despezzas.
 
 Quando a releitura comprova que somente parte do payload foi persistida, o MCP
 retorna `status: partially_updated`, `updated: true`, `persisted_fields`,

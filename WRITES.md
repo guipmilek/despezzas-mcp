@@ -19,6 +19,9 @@ Uma escrita confirmada não tem rollback automático.
 
 - Campo ausente preserva o valor atual.
 - `null` explícito limpa somente campos anuláveis.
+- Como a API ignora `description: null` e `description: ""`, o MCP codifica a
+  limpeza de descrição como um único espaço no `PUT` e o normaliza de volta para
+  vazio nas leituras estruturadas. A API bruta permanece transparente.
 - Antes do `PUT`, o MCP relê a transação e envia um payload completo mesclado.
 - A localização por ID usa a data conhecida da busca, consulta conta e cartão nesse
   dia; não fica restrita ao mês atual.
@@ -28,13 +31,16 @@ Uma escrita confirmada não tem rollback automático.
 - O argumento público `edition_date` é apenas uma dica para localizar uma
   transação histórica quando ela ainda não foi observada em uma busca.
 - Depois da escrita, o MCP relê e confere campos alterados e preservados.
-- `updated: true` só é retornado depois de `validation.ok: true`; uma resposta HTTP
-  aceita sem persistência produz `failed_validation`, `updated: false` e
-  `api_accepted: true`.
+- `updated: true` representa alguma persistência confirmada. Uma gravação
+  completa usa `status: success`; uma gravação parcial usa
+  `status: partially_updated` e lista campos persistidos e rejeitados. Uma
+  resposta HTTP aceita sem qualquer persistência produz `failed_validation`,
+  `updated: false` e `api_accepted: true`.
 - Se `changed_fields` estiver vazio, a operação retorna `status: unchanged` sem
   chamar a API nem incrementar os contadores de atualização.
 - Lotes são sequenciais, respeitam `Retry-After`, usam chave de idempotência e
-  retornam `success`, `unchanged`, `failed` e `not_attempted`.
+  retornam `success`, `partially_updated`, `unchanged`, `failed_request`,
+  `failed_validation` e `not_attempted`.
 
 O MCP envia uma única chamada para edições de série. A atomicidade e o rollback
 das parcelas dentro dessa chamada dependem da implementação da API Despezzas;

@@ -120,6 +120,24 @@ def test_empty_description_is_normalized_to_explicit_null():
     assert prepared["api_changes"]["description"] is None
 
 
+def test_description_clear_uses_api_space_sentinel_but_keeps_null_contract():
+    for description in (None, "", "   "):
+        plan = build_update_plan(
+            current_transaction(),
+            prepare_update_transaction({"id": "transaction", "description": description}),
+        )
+
+        assert plan["after"].get("description") is None
+        assert plan["nullable_clear_fields"] == ["description"]
+        assert plan["payload"]["description"] == " "
+
+
+def test_compact_transaction_normalizes_api_space_sentinel_to_absent_description():
+    compacted = compact_transaction({**current_transaction(), "description": " "})
+
+    assert compacted.get("description") is None
+
+
 def test_changed_relation_id_removes_stale_derived_name_from_after():
     current = {
         **current_transaction(),

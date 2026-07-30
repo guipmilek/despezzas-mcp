@@ -52,6 +52,7 @@ UPDATE_FIELD_MAP = {
     "subcategory_id": "subcategory_id",
     "paid": "paid",
 }
+DESCRIPTION_CLEAR_SENTINEL = " "
 
 
 def redact(value: Any) -> Any:
@@ -301,7 +302,7 @@ def compact_transaction(item: Any) -> dict[str, Any]:
                 ),
                 "date": raw_date[:10] if isinstance(raw_date, str) else None,
                 "title": string_value(item.get("title")),
-                "description": string_value(item.get("description")),
+                "description": description_value(item.get("description")),
                 "amount_cents": int(number_value(item.get("amount"))),
                 "kind": "expense" if item.get("is_expense") is True else "income",
                 "paid": item.get("paid") if isinstance(item.get("paid"), bool) else None,
@@ -528,6 +529,8 @@ def build_update_plan(current: dict[str, Any], prepared: dict[str, Any]) -> dict
     requested_fields = list(prepared["changes"])
     changed_fields = [field for field in requested_fields if before.get(field) != after.get(field)]
     nullable_clear_fields = [field for field in changed_fields if after.get(field) is None]
+    if "description" in nullable_clear_fields:
+        payload["description"] = DESCRIPTION_CLEAR_SENTINEL
     protected_fields = [
         "title",
         "description",
@@ -755,6 +758,11 @@ def number_value(value: Any) -> int | float:
 
 def string_value(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def description_value(value: Any) -> str | None:
+    description = string_value(value)
+    return description if description is not None and description.strip() else None
 
 
 def normalize_profile_type(value: Any, *, personal: bool = False) -> str | None:

@@ -280,8 +280,36 @@ async def test_partial_transaction_update_reports_persisted_and_failed_fields(no
     assert result.data["retry"]["remaining_fields"] == ["description"]
     payload = no_api.update_transaction.await_args.args[1]
     assert "description" in payload
-    assert payload["description"] is None
+    assert payload["description"] == " "
     assert no_api.update_transaction.await_count == 1
+
+
+async def test_description_clear_space_sentinel_is_validated_as_logical_null(no_api):
+    before = transaction()
+    cleared = transaction(description=" ")
+    no_api.get_transactions.side_effect = [[before], [cleared]]
+    no_api.update_transaction.return_value = cleared
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_transaction",
+            {
+                "id": "transaction",
+                "description": None,
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "success"
+    assert result.data["ok"] is True
+    assert result.data["updated"] is True
+    assert result.data["partially_updated"] is False
+    assert result.data["persisted_fields"] == ["description"]
+    assert result.data["failed_fields"] == []
+    assert result.data["null_clear_failed_fields"] == []
+    assert result.data["transaction"].get("description") is None
+    payload = no_api.update_transaction.await_args.args[1]
+    assert payload["description"] == " "
 
 
 async def test_unpersisted_null_clear_is_reported_without_claiming_update(no_api):

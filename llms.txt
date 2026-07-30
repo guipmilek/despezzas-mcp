@@ -18,8 +18,13 @@ one Despezzas account.
 - Dates: `YYYY-MM-DD`
 - Transaction updates: read/merge/write/re-read, with explicit missing-vs-null semantics
 - Transaction search: stable local pagination with offset and opaque cursors
-- Transaction lookup: current results, bounded date/account hints, then direct ID fallback
+- Transaction lookup: current results, then bounded date/account hints
+- Series date updates: original occurrence in `date`, desired date in `edition_date`
 - No-op transaction updates: return `unchanged` without an API write
+- Account updates: read/merge/full PUT/re-read with sanitized API diagnostics
+- Credit-card available limit: read-only, backend-calculated field
+- Transfer deletes: resolve and delete both connected transaction IDs, then validate
+- Profile outputs: minimized; legacy extra `pf` types normalize to `family`
 - Tool metadata: complete input/output schemas and explicit MCP behavior annotations
 
 ## Important files

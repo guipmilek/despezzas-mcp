@@ -56,6 +56,7 @@ def test_summary_uses_integer_cents():
 def test_personal_profile_and_compact_transaction_keep_nullable_ids():
     context = profile_context({"current_profile_access_id": None}, {})
     assert context["active_profile"]["id"] is None
+    assert context["active_profile"]["type"] == "personal"
     assert compact_transaction({"amount": 100})["profile_id"] is None
 
 
@@ -137,7 +138,7 @@ def test_scope_all_uses_original_date_as_edition_anchor():
     assert "date" in plan["preserved_fields"]
 
 
-def test_changed_date_does_not_replace_original_edition_anchor():
+def test_series_date_update_matches_official_frontend_field_direction():
     plan = build_update_plan(
         current_transaction(),
         prepare_update_transaction(
@@ -149,13 +150,48 @@ def test_changed_date_does_not_replace_original_edition_anchor():
         ),
     )
 
+    assert plan["payload"]["date"] == "2026-07-10"
+    assert plan["payload"]["edition_date"] == "2026-08-10"
+
+
+def test_unique_date_update_omits_series_edition_fields():
+    current = {**current_transaction(), "type": "FIXED", "installments": 1}
+    plan = build_update_plan(
+        current,
+        prepare_update_transaction({"id": "transaction", "date": "2026-08-10"}),
+    )
+
     assert plan["payload"]["date"] == "2026-08-10"
-    assert plan["payload"]["edition_date"] == "2026-07-10"
+    assert "edition_date" not in plan["payload"]
+    assert "edition_type" not in plan["payload"]
+
+
+def test_legacy_extra_pf_profile_is_normalized_to_family():
+    context = profile_context(
+        {"current_profile_access_id": "legacy-family"},
+        {
+            "owner_profiles": [
+                {
+                    "id": "legacy-family",
+                    "name": "Perfil familiar",
+                    "type": "pf",
+                }
+            ]
+        },
+    )
+
+    assert context["active_profile"]["type"] == "family"
+    assert context["active_profile"]["role"] == "owner"
 
 
 def test_category_pair_rejects_incompatible_subcategory():
     catalog = [{"id": "subcategory", "category_id": "other-category"}]
     assert "não pertence" in category_pair_issue("category", "subcategory", catalog)
+
+
+def test_category_pair_rejects_subcategory_without_parent_metadata():
+    catalog = [{"id": "subcategory", "name": "Sem categoria-pai"}]
+    assert "não possui uma categoria associada" in category_pair_issue("category", "subcategory", catalog)
 
 
 def test_external_id_is_not_mistaken_for_editable_internal_id():

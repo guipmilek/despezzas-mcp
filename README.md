@@ -91,6 +91,8 @@ Valores monetários usam centavos inteiros (`12345` = `R$123,45`) e datas usam
 Edições de transação leem o estado atual, fazem merge antes do `PUT` e validam o
 resultado depois da escrita. Campo omitido é preservado; `null` explícito limpa
 campos anuláveis. A busca oferece `offset`, cursor opaco e ordenação estável.
+Exclusões de transferência tratam as duas pontas conectadas; limites disponíveis
+de cartão são somente leitura.
 Consulte o [contrato de escritas](WRITES.md) antes de habilitar mutações.
 
 ## Deploy no Prefect Horizon

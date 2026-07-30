@@ -93,6 +93,13 @@ async def test_search_schema_exposes_cursor_and_offset():
     assert properties["offset"]["anyOf"][0] == {"minimum": 0, "type": "integer"}
 
 
+async def test_credit_card_write_schemas_do_not_accept_calculated_available_limit():
+    async with Client(mcp) as client:
+        listed = {tool.name: tool for tool in await client.list_tools()}
+    for name in ("despezzas_create_credit_card", "despezzas_update_credit_card"):
+        assert "available_limit_cents" not in listed[name].inputSchema["properties"]
+
+
 def test_public_errors_do_not_expose_exception_details():
     assert "secret-token" not in public_error(RuntimeError("secret-token"))
     assert public_error(RuntimeError("secret-token")) == "A operação falhou sem expor detalhes internos."
@@ -216,8 +223,81 @@ async def test_update_transaction_merges_and_validates_preserved_fields(no_api):
     payload = no_api.update_transaction.await_args.args[1]
     assert payload["subcategory_id"] == "subcategory"
     assert payload["date"] == "2026-07-10"
-    assert payload["edition_date"] == "2026-07-10"
-    assert payload["edition_type"] == "THIS"
+    assert "edition_date" not in payload
+    assert "edition_type" not in payload
+
+
+async def test_failed_transaction_validation_does_not_claim_persisted_update(no_api):
+    before = transaction(date="2025-01-15T00:00:00.000Z")
+    no_api.get_transactions.side_effect = [[before], [before]]
+    no_api.update_transaction.return_value = before
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_transaction",
+            {
+                "id": "transaction",
+                "date": "2025-01-16",
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "failed_validation"
+    assert result.data["ok"] is False
+    assert result.data["updated"] is False
+    assert result.data["api_called"] is True
+    assert result.data["api_accepted"] is True
+
+
+async def test_prepare_create_rejects_incompatible_category_pair(no_api):
+    no_api.get_subcategories.return_value = [
+        {
+            "id": "supermarket",
+            "category_id": "food",
+        }
+    ]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_prepare_create_transaction",
+            {
+                "title": "Mercado",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "housing",
+                "subcategory_id": "supermarket",
+            },
+        )
+
+    assert result.data["ready"] is False
+    assert result.data["issues"] == ["A subcategoria informada não pertence à categoria selecionada."]
+
+
+async def test_create_blocks_incompatible_category_pair_before_write(no_api):
+    no_api.get_subcategories.return_value = [
+        {
+            "id": "supermarket",
+            "category_id": "food",
+        }
+    ]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Mercado",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "housing",
+                "subcategory_id": "supermarket",
+                "confirm": True,
+            },
+        )
+
+    assert "não pertence" in result.data["error"]
+    no_api.create_transaction.assert_not_awaited()
 
 
 async def test_prepare_update_distinguishes_omitted_and_explicit_null(no_api):
@@ -345,6 +425,327 @@ async def test_unchanged_batch_reports_without_writes(no_api):
     assert result.data["unchanged_count"] == 2
     assert [item["status"] for item in result.data["results"]] == ["unchanged", "unchanged"]
     no_api.update_transaction.assert_not_awaited()
+
+
+async def test_manual_account_update_merges_full_current_payload_and_validates(no_api):
+    before = {
+        "id": "account",
+        "name": "Conta teste",
+        "logo": "wallet.svg",
+        "balance": 100,
+        "include_total_balance": True,
+        "type": "OTHER",
+    }
+    after = {**before, "name": "Conta atualizada"}
+    no_api.get_accounts.side_effect = [[before], [after]]
+    no_api.update_account.return_value = after
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_account",
+            {
+                "id": "account",
+                "name": "Conta atualizada",
+                "confirm": True,
+            },
+        )
+
+    payload = no_api.update_account.await_args.args[1]
+    assert payload["logo"] == "wallet.svg"
+    assert payload["balance"] == 100
+    assert payload["include_total_balance"] is True
+    assert result.data["status"] == "success"
+    assert result.data["updated"] is True
+    assert result.data["validation"]["ok"] is True
+
+
+async def test_account_update_returns_sanitized_api_diagnostic(no_api):
+    no_api.get_accounts.return_value = [
+        {
+            "id": "account",
+            "name": "Conta teste",
+            "logo": "wallet.svg",
+            "balance": 100,
+            "include_total_balance": True,
+        }
+    ]
+    no_api.update_account.side_effect = DespezzasApiError(
+        "secret-token",
+        400,
+        {
+            "code": "VALIDATION_ERROR",
+            "message": "logo required token=secret-token",
+            "authorization": "Bearer secret-token",
+        },
+        request_id="request-123",
+    )
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_account",
+            {
+                "id": "account",
+                "name": "Conta atualizada",
+                "confirm": True,
+            },
+        )
+
+    assert result.data["updated"] is False
+    assert result.data["diagnostic"]["endpoint"] == "/v1/accounts/account"
+    assert result.data["diagnostic"]["method"] == "PUT"
+    assert result.data["diagnostic"]["status"] == 400
+    assert result.data["diagnostic"]["api"]["code"] == "VALIDATION_ERROR"
+    assert result.data["diagnostic"]["api"]["request_id"] == "request-123"
+    assert "secret-token" not in str(result.data)
+
+
+async def test_credit_card_update_uses_writable_fields_and_validates(no_api):
+    before = {
+        "id": "card",
+        "name": "Cartão teste",
+        "logo": "card.svg",
+        "account_id": "account",
+        "limit": 10000,
+        "available_limit": 9000,
+        "is_unlimited": False,
+        "closing_date": "5",
+        "expiring_date": "10",
+    }
+    after = {**before, "limit": 12000, "available_limit": 11000}
+    no_api.get_credit_cards.side_effect = [[before], [after]]
+    no_api.update_credit_card.return_value = after
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_credit_card",
+            {
+                "id": "card",
+                "limit_cents": 12000,
+                "confirm": True,
+            },
+        )
+
+    payload = no_api.update_credit_card.await_args.args[1]
+    assert payload["name"] == "Cartão teste"
+    assert payload["account_id"] == "account"
+    assert payload["limit"] == 12000
+    assert "available_limit" not in payload
+    assert result.data["status"] == "success"
+    assert result.data["validation"]["ok"] is True
+
+
+async def test_credit_card_create_reloads_and_validates_writable_fields(no_api):
+    created = {
+        "id": "card",
+        "name": "Cartão teste",
+        "logo": "card.svg",
+        "account_id": "account",
+        "limit": 10000,
+        "available_limit": 10000,
+        "is_unlimited": False,
+        "closing_date": "5",
+        "expiring_date": "10",
+    }
+    no_api.create_credit_card.return_value = created
+    no_api.get_credit_cards.return_value = [created]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_credit_card",
+            {
+                "name": "Cartão teste",
+                "logo": "card.svg",
+                "account_id": "account",
+                "limit_cents": 10000,
+                "is_unlimited": False,
+                "closing_date": "5",
+                "expiring_date": "10",
+                "confirm": True,
+            },
+        )
+
+    payload = no_api.create_credit_card.await_args.args[0]
+    assert "available_limit" not in payload
+    assert result.data["status"] == "success"
+    assert result.data["created"] is True
+    assert result.data["validation"]["ok"] is True
+
+
+async def test_switch_profile_returns_only_minimal_normalized_context(no_api):
+    no_api.change_profile.return_value = {
+        "email": "private@example.com",
+        "subscription_token": "secret-token",
+    }
+    no_api.get_profile.return_value = {
+        "current_profile_access_id": "legacy-family",
+        "current_profile_role": "owner",
+    }
+    no_api.list_profile_access.return_value = {
+        "owner_profiles": [
+            {
+                "id": "legacy-family",
+                "name": "Perfil familiar",
+                "type": "pf",
+                "email": "private@example.com",
+            }
+        ]
+    }
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_switch_profile",
+            {"profile_id": "legacy-family", "confirm": True},
+        )
+
+    assert result.data["switched"] is True
+    assert result.data["active_profile"] == {
+        "id": "legacy-family",
+        "name": "Perfil familiar",
+        "type": "family",
+        "role": "owner",
+        "is_active": True,
+        "is_personal_profile": False,
+    }
+    assert "result" not in result.data
+    assert "private@example.com" not in str(result.data)
+    assert "secret-token" not in str(result.data)
+
+
+async def test_list_profiles_returns_compact_normalized_profiles(no_api):
+    no_api.get_profile.return_value = {
+        "current_profile_access_id": "legacy-family",
+        "email": "private@example.com",
+    }
+    no_api.list_profile_access.return_value = {
+        "owner_profiles": [
+            {
+                "id": "legacy-family",
+                "name": "Perfil familiar",
+                "type": "pf",
+                "email": "private@example.com",
+                "subscription": {"status": "active"},
+            }
+        ],
+        "authentication": {"token": "secret-token"},
+    }
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("despezzas_list_profiles", {})
+
+    assert result.data["active_profile"]["type"] == "family"
+    assert result.data["profiles"] == [
+        {
+            "id": "legacy-family",
+            "name": "Perfil familiar",
+            "type": "family",
+            "role": "owner",
+            "is_active": True,
+        }
+    ]
+    assert "private@example.com" not in str(result.data)
+    assert "secret-token" not in str(result.data)
+
+
+async def test_update_and_batch_block_incompatible_category_pair(no_api):
+    no_api.get_transactions.return_value = [transaction()]
+    no_api.get_subcategories.return_value = [
+        {
+            "id": "supermarket",
+            "category_id": "food",
+        }
+    ]
+    incompatible = {
+        "id": "transaction",
+        "category_id": "housing",
+        "subcategory_id": "supermarket",
+    }
+
+    async with Client(mcp) as client:
+        preview = await client.call_tool("despezzas_prepare_update_transaction", incompatible)
+        update = await client.call_tool(
+            "despezzas_update_transaction",
+            {**incompatible, "confirm": True},
+        )
+        batch_preview = await client.call_tool(
+            "despezzas_prepare_batch_update_transactions",
+            {"updates": [incompatible]},
+        )
+        batch = await client.call_tool(
+            "despezzas_batch_update_transactions",
+            {"updates": [incompatible], "confirm": True},
+        )
+
+    assert preview.data["ready"] is False
+    assert preview.data["issues"] == ["A subcategoria informada não pertence à categoria selecionada."]
+    assert update.data["mode"] == "blocked"
+    assert update.data["updated"] is False
+    assert batch_preview.data["all_ready"] is False
+    assert batch.data["mode"] == "blocked"
+    assert batch.data["updated_count"] == 0
+    no_api.update_transaction.assert_not_awaited()
+
+
+async def test_transfer_delete_previews_and_removes_both_sides(no_api):
+    sent = transaction(
+        id="sent",
+        type="TRANSFER",
+        connected_transaction_id="received",
+        date="2026-07-30T00:00:00.000Z",
+    )
+    received = transaction(
+        id="received",
+        type="TRANSFER",
+        connected_transaction_id="sent",
+        date="2026-07-30T00:00:00.000Z",
+    )
+    no_api.get_transactions.side_effect = [[sent, received], [sent, received], [], [], []]
+    no_api.delete_transaction.return_value = {}
+
+    async with Client(mcp) as client:
+        preview = await client.call_tool(
+            "despezzas_prepare_delete_transaction",
+            {"id": "sent"},
+        )
+        result = await client.call_tool(
+            "despezzas_delete_transaction",
+            {"id": "sent", "confirm": True},
+        )
+
+    assert preview.data["transaction_type"] == "TRANSFER"
+    assert preview.data["affected_transactions"] == ["sent", "received"]
+    assert [call.args[:2] for call in no_api.delete_transaction.await_args_list] == [
+        ("sent", "THIS"),
+        ("received", "THIS"),
+    ]
+    assert result.data["status"] == "success"
+    assert result.data["deleted"] is True
+    assert result.data["validation"]["remaining_transaction_ids"] == []
+
+
+async def test_transfer_delete_blocks_nonreciprocal_counterpart(no_api):
+    sent = transaction(
+        id="sent",
+        type="TRANSFER",
+        connected_transaction_id="unrelated",
+        date="2026-07-30T00:00:00.000Z",
+    )
+    unrelated = transaction(
+        id="unrelated",
+        type="FIXED",
+        date="2026-07-30T00:00:00.000Z",
+    )
+    no_api.get_transactions.return_value = [sent, unrelated]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_delete_transaction",
+            {"id": "sent", "confirm": True},
+        )
+
+    assert result.data["status"] == "blocked"
+    assert result.data["deleted"] is False
+    assert "não é uma contraparte recíproca" in result.data["error"]
+    no_api.delete_transaction.assert_not_awaited()
 
 
 async def test_batch_reports_failed_and_not_attempted_items(no_api):

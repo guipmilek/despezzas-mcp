@@ -21,10 +21,16 @@ Uma escrita confirmada não tem rollback automático.
 - `null` explícito limpa somente campos anuláveis.
 - Antes do `PUT`, o MCP relê a transação e envia um payload completo mesclado.
 - A localização por ID usa a data conhecida da busca, consulta conta e cartão nesse
-  dia e tenta leitura direta por ID; não fica restrita ao mês atual.
-- `edition_date` usa a data original quando não é informada, inclusive com
-  `scope: ALL`; uma nova `date` não vira a âncora da série.
+  dia; não fica restrita ao mês atual.
+- Em transações únicas, a nova data vai em `date` e os campos `edition_*` não são
+  enviados. Em séries, `date` identifica a ocorrência original e `edition_date`
+  recebe a nova data, conforme o contrato usado pela interface oficial.
+- O argumento público `edition_date` é apenas uma dica para localizar uma
+  transação histórica quando ela ainda não foi observada em uma busca.
 - Depois da escrita, o MCP relê e confere campos alterados e preservados.
+- `updated: true` só é retornado depois de `validation.ok: true`; uma resposta HTTP
+  aceita sem persistência produz `failed_validation`, `updated: false` e
+  `api_accepted: true`.
 - Se `changed_fields` estiver vazio, a operação retorna `status: unchanged` sem
   chamar a API nem incrementar os contadores de atualização.
 - Lotes são sequenciais, respeitam `Retry-After`, usam chave de idempotência e
@@ -34,6 +40,17 @@ O MCP envia uma única chamada para edições de série. A atomicidade e o rollb
 das parcelas dentro dessa chamada dependem da implementação da API Despezzas;
 o MCP detecta divergências posteriores, mas não tenta uma reversão compensatória
 que poderia agravar uma série parcialmente alterada.
+
+Criações e edições com subcategoria consultam o catálogo e bloqueiam pares de
+categoria/subcategoria incompatíveis antes da escrita. Contas manuais são
+relidas e mescladas antes do `PUT`, pois a interface oficial envia o objeto
+completo. O limite disponível de cartão é calculado pelo backend e não faz parte
+dos schemas de escrita.
+
+Ao excluir uma transação `TRANSFER`, o preview localiza
+`connected_transaction_id`. A execução exclui as duas pontas sequencialmente e
+relê ambas; falhas parciais são expostas individualmente, pois a API não oferece
+um endpoint atômico conjunto.
 
 ## Semântica MCP
 

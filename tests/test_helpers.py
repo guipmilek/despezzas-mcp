@@ -292,6 +292,15 @@ def test_external_id_is_not_mistaken_for_editable_internal_id():
     assert located["editable"] is False
     assert located["id_type"] == "external_id"
     assert located["internal_id"] == "internal"
+    assert located["code"] == "TRANSACTION_ID_MAPPING_ERROR"
+
+
+def test_missing_transaction_has_specific_lookup_error_code():
+    located = locate_transaction([], "missing")
+
+    assert located["found"] is False
+    assert located["editable"] is False
+    assert located["code"] == "TRANSACTION_NOT_FOUND"
 
 
 def test_cursor_round_trip_and_filter_mismatch():

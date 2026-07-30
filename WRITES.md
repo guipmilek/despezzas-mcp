@@ -36,14 +36,19 @@ não puder ser lido, a criação é bloqueada antes do `POST`.
 
 O backend materializa recorrências com 12 ocorrências. O preview e a execução
 usam `installments: 12` e retornam `series_preview` com todas as datas, o valor
-por ocorrência e o total projetado. Recorrências mensais iniciadas nos dias 29,
-30 ou 31 são bloqueadas antes do `POST`: a API pode fazer overflow de fevereiro
-para março, pulando fevereiro e criando duas ocorrências em março.
+por ocorrência, o total projetado e o estado `paid` de cada ocorrência.
+Parcelamentos também retornam esse preview por ocorrência. Recorrências mensais
+iniciadas nos dias 29, 30 ou 31 são bloqueadas antes do `POST`: a API pode fazer
+overflow de fevereiro para março, pulando fevereiro e criando duas ocorrências
+em março.
 
 O MCP não substitui uma série por 12 transações independentes, pois isso
-eliminaria a relação usada por operações com `scope: ALL`. Compras no cartão são
-sempre enviadas com `paid: true`; quando o chamador informa `paid: false`, o
-preview e a execução retornam um aviso explícito sobre a normalização.
+eliminaria a relação usada por operações com `scope: ALL`. Em parcelamentos e
+recorrências, `paid: true` representa o estado inicial: somente a primeira
+ocorrência é criada paga e as seguintes ficam pendentes. A validação usa esse
+vetor esperado e não trata as ocorrências futuras como falha. Em compras no
+cartão, `paid: false` é normalizado para `true` nesse estado inicial; preview e
+execução retornam avisos explícitos para as duas regras.
 
 ## Atualização segura de transações
 

@@ -73,10 +73,12 @@ e no payload, usando projeção de calendário com limite no último dia do mês
 Enquanto o cálculo do backend não for corrigido, recorrências mensais iniciadas
 nos dias 29, 30 ou 31 são bloqueadas antes da escrita.
 
-Transações vinculadas a cartão sempre são persistidas com `paid: true`, mesmo
-quando o chamador informa `false`. O schema público mantém o campo para contas
-bancárias, mas documenta a normalização e retorna um aviso para compras no
-cartão.
+Em transações únicas vinculadas a cartão, o estado inicial é persistido como
+`paid: true`, mesmo quando o chamador informa `false`. Em séries bancárias ou de
+cartão, esse estado vale somente para a primeira ocorrência; as ocorrências
+seguintes são materializadas com `paid: false`. O preview expõe o vetor por
+ocorrência e a validação posterior espera essa semântica. O schema público
+documenta ambas as normalizações.
 
 ## Semântica defensiva adotada pelo MCP
 

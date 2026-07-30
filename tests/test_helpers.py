@@ -110,6 +110,21 @@ def test_explicit_null_clears_subcategory_but_omission_preserves_it():
     assert cleared["changed_fields"] == ["subcategory_id"]
 
 
+def test_changed_relation_id_removes_stale_derived_name_from_after():
+    current = {
+        **current_transaction(),
+        "subcategory": {"id": "subcategory", "name": "iptu, ir ou ipva"},
+    }
+    plan = build_update_plan(
+        current,
+        prepare_update_transaction({"id": "transaction", "subcategory_id": None}),
+    )
+
+    assert plan["before"]["subcategory_name"] == "iptu, ir ou ipva"
+    assert plan["after"].get("subcategory_id") is None
+    assert plan["after"].get("subcategory_name") is None
+
+
 def test_scope_all_uses_original_date_as_edition_anchor():
     plan = build_update_plan(
         current_transaction(),

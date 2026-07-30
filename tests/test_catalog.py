@@ -60,6 +60,7 @@ NONDESTRUCTIVE_WRITES = {
 
 @pytest.fixture
 def no_api(monkeypatch):
+    tools_module.TRANSACTION_LOOKUP_HINTS.clear()
     fake = AsyncMock()
     monkeypatch.setattr(tools_module, "client", fake)
     return fake
@@ -82,6 +83,14 @@ async def test_catalog_exposes_complete_and_accurate_metadata():
         if tool.annotations.readOnlyHint is False:
             assert "confirm" in tool.inputSchema["properties"], tool.name
             assert tool.annotations.destructiveHint is (tool.name not in NONDESTRUCTIVE_WRITES), tool.name
+
+
+async def test_search_schema_exposes_cursor_and_offset():
+    async with Client(mcp) as client:
+        listed = {tool.name: tool for tool in await client.list_tools()}
+    properties = listed["despezzas_search_transactions"].inputSchema["properties"]
+    assert properties["cursor"]["anyOf"][-1] == {"type": "null"}
+    assert properties["offset"]["anyOf"][0] == {"minimum": 0, "type": "integer"}
 
 
 def test_public_errors_do_not_expose_exception_details():
@@ -229,6 +238,112 @@ async def test_prepare_update_distinguishes_omitted_and_explicit_null(no_api):
     assert "subcategory_id" not in omitted.data["changed_fields"]
     assert cleared.data["after"].get("subcategory_id") is None
     assert cleared.data["changed_fields"] == ["subcategory_id"]
+    no_api.update_transaction.assert_not_awaited()
+
+
+async def test_prepare_update_finds_historical_transaction_by_date_and_account_type(no_api):
+    historical = transaction(id="historical", date="2025-07-10T00:00:00.000Z")
+    no_api.get_transactions.side_effect = [[], [], [historical]]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_prepare_update_transaction",
+            {
+                "id": "historical",
+                "title": "Celesc | Energia elétrica",
+                "edition_date": "2025-07-10",
+            },
+        )
+
+    assert result.data["ready"] is True
+    assert result.data["before"]["id"] == "historical"
+    assert no_api.get_transactions.await_args_list[1].args == (
+        {
+            "account_type": "bank_account",
+            "date_start": "2025-07-10",
+            "date_end": "2025-07-10",
+        },
+    )
+    assert no_api.get_transactions.await_args_list[2].args == (
+        {
+            "account_type": "credit_card",
+            "date_start": "2025-07-10",
+            "date_end": "2025-07-10",
+        },
+    )
+
+
+async def test_search_hint_finds_historical_transaction_without_repeating_date(no_api):
+    historical = transaction(id="historical", date="2025-07-10T00:00:00.000Z")
+    no_api.get_transactions.side_effect = [[historical], [], [historical]]
+    no_api.get_profile.return_value = {"current_profile_access_id": None}
+    no_api.list_profile_access.return_value = {}
+
+    async with Client(mcp) as client:
+        search = await client.call_tool(
+            "despezzas_search_transactions",
+            {
+                "date_start": "2025-07-10",
+                "date_end": "2025-07-10",
+            },
+        )
+        result = await client.call_tool(
+            "despezzas_prepare_update_transaction",
+            {
+                "id": search.data["transactions"][0]["id"],
+                "title": "Celesc | Energia elétrica",
+            },
+        )
+
+    assert result.data["ready"] is True
+    assert result.data["before"]["date"] == "2025-07-10"
+    assert no_api.get_transactions.await_args_list[2].args == (
+        {
+            "account_type": "bank_account",
+            "date_start": "2025-07-10",
+            "date_end": "2025-07-10",
+        },
+    )
+    assert no_api.get_transactions.await_count == 3
+
+
+async def test_unchanged_update_does_not_call_write_api(no_api):
+    no_api.get_transactions.return_value = [transaction()]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_update_transaction",
+            {"id": "transaction", "title": "Conta de luz", "confirm": True},
+        )
+
+    assert result.data["status"] == "unchanged"
+    assert result.data["updated"] is False
+    assert result.data["api_called"] is False
+    no_api.update_transaction.assert_not_awaited()
+
+
+async def test_unchanged_batch_reports_without_writes(no_api):
+    no_api.get_transactions.return_value = [
+        transaction(id="one"),
+        transaction(id="two"),
+    ]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_batch_update_transactions",
+            {
+                "updates": [
+                    {"id": "one", "title": "Conta de luz"},
+                    {"id": "two", "title": "Conta de luz"},
+                ],
+                "confirm": True,
+            },
+        )
+
+    assert result.data["updated_count"] == 0
+    assert result.data["api_updated_count"] == 0
+    assert result.data["unchanged_count"] == 2
+    assert [item["status"] for item in result.data["results"]] == ["unchanged", "unchanged"]
     no_api.update_transaction.assert_not_awaited()
 
 

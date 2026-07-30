@@ -217,7 +217,13 @@ def compact_transaction(item: Any) -> dict[str, Any]:
 
     def nested(key: str) -> str | None:
         value = item.get(key)
-        return value.get("name") if isinstance(value, dict) and isinstance(value.get("name"), str) else None
+        if not isinstance(value, dict) or not isinstance(value.get("name"), str):
+            return None
+        selected_id = item.get(f"{key}_id")
+        nested_id = value.get("id")
+        if f"{key}_id" in item and (selected_id is None or (nested_id is not None and selected_id != nested_id)):
+            return None
+        return value["name"]
 
     raw_date = item.get("date")
     internal_id = transaction_internal_id(item)
@@ -376,7 +382,13 @@ def build_update_plan(current: dict[str, Any], prepared: dict[str, Any]) -> dict
     }
     internal_id = transaction_internal_id(current)
     before = compact_transaction(current)
-    after = compact_transaction({**current, **after_api, "id": internal_id})
+    merged_after = {**current, **after_api, "id": internal_id}
+    for relation in ("account", "credit_card", "category", "subcategory"):
+        id_field = f"{relation}_id"
+        if id_field in prepared["api_changes"] and before_api.get(id_field) != after_api.get(id_field):
+            merged_after.pop(relation, None)
+            merged_after.pop(f"{relation}_name", None)
+    after = compact_transaction(merged_after)
     requested_fields = list(prepared["changes"])
     changed_fields = [field for field in requested_fields if before.get(field) != after.get(field)]
     protected_fields = [

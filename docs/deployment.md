@@ -32,6 +32,17 @@ O endpoint publicado tem formato semelhante a:
 https://seu-servidor.fastmcp.app/mcp
 ```
 
+## Atualização do schema das ferramentas
+
+Quando uma versão adiciona parâmetros MCP, faça novo deploy do commit e reconecte
+o servidor no cliente. O Horizon ou o cliente podem manter o catálogo anterior em
+cache; sem essa atualização, a resposta pode conter um `next_cursor` que o schema
+local antigo ainda não aceita como entrada.
+
+Na versão `0.1.1`, `despezzas_search_transactions` expõe publicamente `cursor` e
+`offset`. Confirme no Horizon Inspector que ambos aparecem antes de retomar uma
+busca paginada.
+
 Não coloque secrets no repositório, nos logs de build ou em screenshots. A primeira
 versão aceita a URL `fastmcp.app`; domínio personalizado não é mantido.
 

@@ -20,11 +20,15 @@ Uma escrita confirmada não tem rollback automático.
 - Campo ausente preserva o valor atual.
 - `null` explícito limpa somente campos anuláveis.
 - Antes do `PUT`, o MCP relê a transação e envia um payload completo mesclado.
+- A localização por ID usa a data conhecida da busca, consulta conta e cartão nesse
+  dia e tenta leitura direta por ID; não fica restrita ao mês atual.
 - `edition_date` usa a data original quando não é informada, inclusive com
   `scope: ALL`; uma nova `date` não vira a âncora da série.
 - Depois da escrita, o MCP relê e confere campos alterados e preservados.
+- Se `changed_fields` estiver vazio, a operação retorna `status: unchanged` sem
+  chamar a API nem incrementar os contadores de atualização.
 - Lotes são sequenciais, respeitam `Retry-After`, usam chave de idempotência e
-  retornam `success`, `failed` e `not_attempted`.
+  retornam `success`, `unchanged`, `failed` e `not_attempted`.
 
 O MCP envia uma única chamada para edições de série. A atomicidade e o rollback
 das parcelas dentro dessa chamada dependem da implementação da API Despezzas;

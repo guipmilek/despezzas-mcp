@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import AsyncMock
 
 import pytest
@@ -342,14 +343,14 @@ async def test_prepare_update_finds_historical_transaction_by_date_and_account_t
         {
             "account_type": "bank_account",
             "date_start": "2025-07-10",
-            "date_end": "2025-07-10",
+            "date_end": "2025-07-11",
         },
     )
     assert no_api.get_transactions.await_args_list[2].args == (
         {
             "account_type": "credit_card",
             "date_start": "2025-07-10",
-            "date_end": "2025-07-10",
+            "date_end": "2025-07-11",
         },
     )
 
@@ -382,10 +383,80 @@ async def test_search_hint_finds_historical_transaction_without_repeating_date(n
         {
             "account_type": "bank_account",
             "date_start": "2025-07-10",
-            "date_end": "2025-07-10",
+            "date_end": "2025-07-11",
         },
     )
     assert no_api.get_transactions.await_count == 3
+
+
+async def test_prepare_update_finds_imported_transaction_without_process_hint(no_api):
+    current_year = date.today().year
+    imported = transaction(
+        id="imported",
+        external_id="imported",
+        is_remote=True,
+        date=f"{current_year}-06-10T03:00:00.000Z",
+    )
+    no_api.get_transactions.side_effect = [[], [imported]]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_prepare_update_transaction",
+            {
+                "id": "imported",
+                "title": "iFood | Pedido via delivery",
+            },
+        )
+
+    assert result.data["ready"] is True
+    assert result.data["before"]["id"] == "imported"
+    assert result.data["before"]["editable"] is True
+    assert no_api.get_transactions.await_args_list[1].args == (
+        {
+            "account_type": "bank_account",
+            "date_start": f"{current_year}-01-01",
+            "date_end": f"{current_year + 1}-01-01",
+        },
+    )
+
+
+async def test_batch_preview_resolves_manual_and_imported_transactions_together(no_api):
+    current_year = date.today().year
+    manual = transaction(id="manual")
+    imported_expense = transaction(
+        id="imported-expense",
+        external_id="imported-expense",
+        is_remote=True,
+        date=f"{current_year}-06-10T03:00:00.000Z",
+    )
+    imported_income = transaction(
+        id="imported-income",
+        external_id="imported-income",
+        is_remote=True,
+        is_expense=False,
+        date=f"{current_year}-05-02T03:00:00.000Z",
+    )
+    no_api.get_transactions.side_effect = [[manual], [imported_expense, imported_income]]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_prepare_batch_update_transactions",
+            {
+                "updates": [
+                    {"id": "manual", "title": "Manual atualizado"},
+                    {"id": "imported-expense", "title": "Despesa importada atualizada"},
+                    {"id": "imported-income", "title": "Entrada importada atualizada"},
+                ]
+            },
+        )
+
+    assert result.data["all_ready"] is True
+    assert result.data["ready_count"] == 3
+    assert [item["before"]["id"] for item in result.data["preview"]] == [
+        "manual",
+        "imported-expense",
+        "imported-income",
+    ]
 
 
 async def test_unchanged_update_does_not_call_write_api(no_api):
@@ -758,14 +829,14 @@ async def test_transfer_preview_fetches_counterpart_by_date_and_uses_internal_id
         {
             "account_type": "bank_account",
             "date_start": "2026-07-30",
-            "date_end": "2026-07-30",
+            "date_end": "2026-07-31",
         },
     )
     assert no_api.get_transactions.await_args_list[2].args == (
         {
             "account_type": "credit_card",
             "date_start": "2026-07-30",
-            "date_end": "2026-07-30",
+            "date_end": "2026-07-31",
         },
     )
 

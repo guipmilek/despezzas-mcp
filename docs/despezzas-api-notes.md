@@ -81,10 +81,19 @@ interpretados como `null`, o MCP não envia patches parciais diretamente:
 
 O `GET /v1/transactions` sem período pode ficar restrito ao mês atual. Para
 localizar com segurança uma transação histórica ou futura, o MCP guarda
-temporariamente a data e o tipo de conta observados na busca, consulta essa data
-em `bank_account` e `credit_card`. O endpoint direto
-`GET /v1/transactions/{id}` retornou 404 para IDs válidos e não é usado no
-lookup interno.
+temporariamente a data e o tipo de conta observados na busca. A API trata
+`date_end` como limite exclusivo, então o lookup de uma ocorrência em
+`YYYY-MM-DD` consulta o intervalo desse dia até o dia seguinte. Quando a dica
+não está disponível — por exemplo, porque outra instância do Horizon atendeu a
+chamada seguinte — o MCP pesquisa janelas históricas limitadas em
+`bank_account` e `credit_card` até resolver o ID público.
+
+Transações importadas podem retornar o mesmo UUID em `id`, `external_id` e
+`connected_transaction_id`, junto de `is_remote: true`; esse UUID continua
+sendo o identificador usado nas escritas. O endpoint direto
+`GET /v1/transactions/{id}` retornou 404 para IDs válidos, inclusive importados,
+e não é usado no lookup interno. Preview, update, batch, delete e validação
+posterior compartilham a resolução baseada em `GET /v1/transactions`.
 
 Atualizações idempotentes repetem HTTP 429 até três vezes, respeitando
 `Retry-After`, e enviam `Idempotency-Key`. O suporte efetivo à chave e a

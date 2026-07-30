@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated, Any, Literal
 
 from fastmcp import FastMCP
@@ -99,6 +99,9 @@ ADVANCED_WRITE = ToolAnnotations(
 TODAY = date.today().isoformat()
 MAX_TRANSACTION_LOOKUP_HINTS = 5000
 TRANSACTION_LOOKUP_HINTS: dict[str, dict[str, str]] = {}
+TRANSACTION_LOOKUP_EARLIEST_YEAR = 1970
+TRANSACTION_LOOKUP_RECENT_YEARS = 5
+TRANSACTION_LOOKUP_FUTURE_YEARS = 20
 
 
 class ProfileInvite(BaseModel):
@@ -1325,13 +1328,16 @@ async def prepare_delete_transaction_plan(
         counterpart = resolve_transfer_counterpart(items, transaction)
         if not counterpart["found"] and lookup_date:
             try:
+                lookup_window = transaction_lookup_window(lookup_date)
                 for account_type in ("bank_account", "credit_card"):
+                    if lookup_window is None:
+                        break
                     additions = transaction_items(
                         await client.get_transactions(
                             {
                                 "account_type": account_type,
-                                "date_start": lookup_date,
-                                "date_end": lookup_date,
+                                "date_start": lookup_window[0],
+                                "date_end": lookup_window[1],
                             }
                         )
                     )
@@ -1387,7 +1393,7 @@ async def execute_delete_transaction_plan(plan: dict[str, Any]) -> dict[str, Any
             {"id": target["id"], "ready": True, "edition_date": target["edition_date"]} for target in plan["targets"]
         ]
         items = transaction_items(await client.get_transactions())
-        items = await expand_transaction_lookup(items, prepared)
+        items = await expand_transaction_lookup(items, prepared, allow_historical_scan=False)
         remaining = [target["id"] for target in plan["targets"] if locate_transaction(items, target["id"])["found"]]
     except Exception as error:
         validation_error = public_error(error)
@@ -1518,6 +1524,7 @@ async def read_updated_transaction(
                     "edition_date": lookup_date,
                 }
             ],
+            allow_historical_scan=False,
         )
         lookup = locate_transaction(items, transaction_id)
         if lookup["found"] and lookup["editable"]:
@@ -1537,6 +1544,8 @@ async def read_updated_transaction(
 async def expand_transaction_lookup(
     items: list[dict[str, Any]],
     prepared_items: list[dict[str, Any]],
+    *,
+    allow_historical_scan: bool = True,
 ) -> list[dict[str, Any]]:
     remember_transaction_lookup_hints(items)
     queries: list[dict[str, str]] = []
@@ -1547,6 +1556,9 @@ async def expand_transaction_lookup(
         lookup_date = prepared.get("edition_date") or hint.get("date")
         if not lookup_date:
             continue
+        lookup_window = transaction_lookup_window(lookup_date)
+        if lookup_window is None:
+            continue
         preferred_type = hint.get("account_type")
         account_types = ["bank_account", "credit_card"]
         if preferred_type == "credit_card":
@@ -1554,8 +1566,8 @@ async def expand_transaction_lookup(
         for account_type in account_types:
             query = {
                 "account_type": account_type,
-                "date_start": lookup_date,
-                "date_end": lookup_date,
+                "date_start": lookup_window[0],
+                "date_end": lookup_window[1],
             }
             if query not in queries:
                 queries.append(query)
@@ -1576,8 +1588,62 @@ async def expand_transaction_lookup(
         except Exception:
             continue
 
+    if allow_historical_scan:
+        for date_start, date_end in transaction_lookup_ranges():
+            for account_type in ("bank_account", "credit_card"):
+                if not unresolved_transaction_ids(items, prepared_items):
+                    break
+                query = {
+                    "account_type": account_type,
+                    "date_start": date_start,
+                    "date_end": date_end,
+                }
+                if query in queries:
+                    continue
+                try:
+                    add_transaction_items(items, transaction_items(await client.get_transactions(query)))
+                except Exception:
+                    continue
+            if not unresolved_transaction_ids(items, prepared_items):
+                break
+
     remember_transaction_lookup_hints(items)
     return items
+
+
+def transaction_lookup_window(value: str) -> tuple[str, str] | None:
+    try:
+        start = date.fromisoformat(value)
+        end = start + timedelta(days=1)
+    except (OverflowError, ValueError):
+        return None
+    return start.isoformat(), end.isoformat()
+
+
+def transaction_lookup_ranges(today: date | None = None) -> list[tuple[str, str]]:
+    current_year = (today or date.today()).year
+    ranges = [(f"{current_year:04d}-01-01", f"{current_year + 1:04d}-01-01")]
+
+    recent_start = max(TRANSACTION_LOOKUP_EARLIEST_YEAR, current_year - TRANSACTION_LOOKUP_RECENT_YEARS)
+    if recent_start < current_year:
+        ranges.append((f"{recent_start:04d}-01-01", f"{current_year:04d}-01-01"))
+    if recent_start > TRANSACTION_LOOKUP_EARLIEST_YEAR:
+        ranges.append((f"{TRANSACTION_LOOKUP_EARLIEST_YEAR:04d}-01-01", f"{recent_start:04d}-01-01"))
+
+    future_end = current_year + TRANSACTION_LOOKUP_FUTURE_YEARS + 1
+    ranges.append((f"{current_year + 1:04d}-01-01", f"{future_end:04d}-01-01"))
+    return ranges
+
+
+def unresolved_transaction_ids(
+    items: list[dict[str, Any]],
+    prepared_items: list[dict[str, Any]],
+) -> set[str]:
+    return {
+        prepared["id"]
+        for prepared in prepared_items
+        if prepared["ready"] and not locate_transaction(items, prepared["id"])["found"]
+    }
 
 
 def add_transaction_items(items: list[dict[str, Any]], additions: list[dict[str, Any]]) -> None:

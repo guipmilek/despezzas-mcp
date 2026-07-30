@@ -437,6 +437,7 @@ def locate_transaction(items: list[dict[str, Any]], requested_id: str) -> dict[s
                     "found": True,
                     "editable": False,
                     "id": requested_id,
+                    "code": "TRANSACTION_NOT_EDITABLE",
                     "reason": (
                         string_value(item.get("editability_reason"))
                         or string_value(item.get("non_editable_reason"))
@@ -447,6 +448,7 @@ def locate_transaction(items: list[dict[str, Any]], requested_id: str) -> dict[s
                 "found": True,
                 "editable": True,
                 "id": requested_id,
+                "code": None,
                 "transaction": item,
             }
     for item in items:
@@ -457,12 +459,14 @@ def locate_transaction(items: list[dict[str, Any]], requested_id: str) -> dict[s
                 "id": requested_id,
                 "id_type": "external_id",
                 "internal_id": transaction_internal_id(item),
+                "code": "TRANSACTION_ID_MAPPING_ERROR",
                 "reason": "Foi enviado um ID externo; use o campo id interno retornado pela busca.",
             }
     return {
         "found": False,
         "editable": False,
         "id": requested_id,
+        "code": "TRANSACTION_NOT_FOUND",
         "reason": "A transação não existe no perfil ativo, foi excluída ou não está disponível para edição.",
     }
 

@@ -1,3 +1,5 @@
+from datetime import date
+
 from despezzas_mcp.helpers import (
     build_update_plan,
     category_pair_issue,
@@ -8,6 +10,7 @@ from despezzas_mcp.helpers import (
     prepare_create_transaction,
     prepare_update_transaction,
     profile_context,
+    project_recurrence_dates,
     redact,
     resolve_transfer_counterpart,
     summarize_transactions,
@@ -36,6 +39,90 @@ def test_prepare_rejects_ambiguous_destination():
     )
     assert prepared["ready"] is False
     assert "não ambos" in prepared["issues"][0]
+
+
+def test_monthly_recurrence_preview_has_twelve_calendar_safe_dates_and_blocks_risky_start():
+    prepared = prepare_create_transaction(
+        {
+            "title": "Recorrência",
+            "amount_cents": 100,
+            "date": "2026-07-30",
+            "account_id": "account",
+            "category_id": "category",
+            "transaction_type": "recurring",
+            "frequency": "MONTHLY",
+        }
+    )
+
+    assert prepared["ready"] is False
+    assert "temporariamente bloqueadas" in prepared["issues"][0]
+    assert prepared["payload"]["installments"] == 12
+    assert prepared["series_preview"]["occurrence_count"] == 12
+    assert prepared["series_preview"]["total_amount_cents"] == 1200
+    assert prepared["series_preview"]["dates"] == [
+        "2026-07-30",
+        "2026-08-30",
+        "2026-09-30",
+        "2026-10-30",
+        "2026-11-30",
+        "2026-12-30",
+        "2027-01-30",
+        "2027-02-28",
+        "2027-03-30",
+        "2027-04-30",
+        "2027-05-30",
+        "2027-06-30",
+    ]
+
+
+def test_monthly_recurrence_starting_on_day_28_remains_ready():
+    prepared = prepare_create_transaction(
+        {
+            "title": "Recorrência",
+            "amount_cents": 100,
+            "date": "2026-07-28",
+            "account_id": "account",
+            "category_id": "category",
+            "transaction_type": "recurring",
+            "frequency": "MONTHLY",
+        }
+    )
+
+    assert prepared["ready"] is True
+    assert prepared["issues"] == []
+    assert prepared["payload"]["installments"] == 12
+
+
+def test_project_recurrence_dates_clamps_leap_year_and_supports_day_steps():
+    assert project_recurrence_dates(date(2024, 2, 29), "YEARLY", 3) == [
+        "2024-02-29",
+        "2025-02-28",
+        "2026-02-28",
+    ]
+    assert project_recurrence_dates(date(2026, 7, 30), "WEEKLY", 3) == [
+        "2026-07-30",
+        "2026-08-06",
+        "2026-08-13",
+    ]
+
+
+def test_credit_card_paid_false_is_normalized_with_explicit_warning():
+    prepared = prepare_create_transaction(
+        {
+            "title": "Compra no cartão",
+            "amount_cents": 100,
+            "date": "2026-07-30",
+            "credit_card_id": "card",
+            "category_id": "category",
+            "paid": False,
+        }
+    )
+
+    assert prepared["ready"] is True
+    assert prepared["payload"]["paid"] is True
+    assert prepared["warnings"] == [
+        "Compras no cartão são criadas com paid:true pelo Despezzas; o valor false foi normalizado."
+    ]
 
 
 def test_summary_uses_integer_cents():

@@ -102,6 +102,10 @@ TRANSACTION_LOOKUP_HINTS: dict[str, dict[str, str]] = {}
 TRANSACTION_LOOKUP_EARLIEST_YEAR = 1970
 TRANSACTION_LOOKUP_RECENT_YEARS = 5
 TRANSACTION_LOOKUP_FUTURE_YEARS = 20
+RAW_CREDIT_CARD_LIMIT_WARNING = (
+    "credit_card.available_limit em transações brutas pode estar desatualizado. "
+    "Use despezzas_list_credit_cards como fonte confiável do limite disponível."
+)
 
 
 class ProfileInvite(BaseModel):
@@ -243,10 +247,64 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
 
     @mcp.tool(name="despezzas_leave_profile", title="Sair de Perfil Compartilhado", annotations=DELETE)
     async def despezzas_leave_profile(profile_id: Identifier, confirm: bool = False) -> JsonResponse:
-        """Sai de um perfil em que a conta é membro. Exige confirm=true."""
+        """Valida o vínculo e sai de um perfil em que a conta é membro. Exige confirm=true."""
         if not confirm:
             return refusal("sair de um perfil compartilhado")
-        return await attempt("sair de perfil compartilhado", client.leave_access_profile(profile_id))
+        try:
+            before = await client.list_profile_access()
+        except Exception as error:
+            return {
+                "status": "failed_lookup",
+                "left": False,
+                "api_called": False,
+                "profile_id": profile_id,
+                "error": public_error(error),
+            }
+        if locate_member_profile(before, profile_id) is None:
+            return {
+                "status": "not_found",
+                "left": False,
+                "api_called": False,
+                "profile_id": profile_id,
+                "error": "O perfil não existe entre os vínculos de membro da conta ativa.",
+            }
+        try:
+            await client.leave_access_profile(profile_id)
+        except Exception as error:
+            return {
+                "status": "failed_request",
+                "left": False,
+                "api_called": True,
+                "api_accepted": False,
+                "profile_id": profile_id,
+                "error": public_error(error),
+            }
+        try:
+            after = await client.list_profile_access()
+        except Exception as error:
+            return {
+                "status": "failed_validation",
+                "left": None,
+                "api_called": True,
+                "api_accepted": True,
+                "profile_id": profile_id,
+                "validation": {
+                    "ok": False,
+                    "reason": f"O vínculo não pôde ser relido: {public_error(error)}",
+                },
+            }
+        still_linked = locate_member_profile(after, profile_id) is not None
+        return {
+            "status": "failed_validation" if still_linked else "success",
+            "left": not still_linked,
+            "api_called": True,
+            "api_accepted": True,
+            "profile_id": profile_id,
+            "validation": {
+                "ok": not still_linked,
+                "still_linked": still_linked,
+            },
+        }
 
     @mcp.tool(name="despezzas_personal_config", title="Obter Configuração Pessoal", annotations=READ_ONLY)
     async def despezzas_personal_config() -> JsonResponse:
@@ -323,7 +381,7 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
 
     @mcp.tool(name="despezzas_list_credit_cards", title="Listar Cartões de Crédito", annotations=READ_ONLY)
     async def despezzas_list_credit_cards() -> dict[str, Any]:
-        """Lista cartões e o contexto do perfil ativo."""
+        """Lista cartões; é a fonte confiável para available_limit_cents."""
         try:
             cards, context = await asyncio.gather(client.get_credit_cards(), safe_profile_context())
             items = cards if isinstance(cards, list) else []
@@ -435,7 +493,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         cursor: str | None = None,
         include_raw: bool = False,
     ) -> dict[str, Any]:
-        """Lista transações com paginação estável; por padrão usa o mês atual e contas bancárias."""
+        """Lista transações; limites de cartão brutos devem ser relidos em list_credit_cards."""
         start, end = current_month_range()
         filters = transaction_filters(
             date_start=date_start or start,
@@ -478,6 +536,11 @@ def register_transaction_tools(mcp: FastMCP) -> None:
                 "diagnostics": search_diagnostics(items, returned, limit, filters),
                 "transactions": redact(returned if include_raw else [compact_transaction(item) for item in returned]),
                 "warning": profile_warning("transactions", len(items), context),
+                "raw_data_warnings": (
+                    [RAW_CREDIT_CARD_LIMIT_WARNING]
+                    if include_raw and any(isinstance(item.get("credit_card"), dict) for item in returned)
+                    else []
+                ),
             }
         except ValueError as error:
             return {"error": str(error), "action": "buscar transações"}
@@ -534,14 +597,17 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         credit_card_id: Identifier | None = None,
         category_id: Identifier | None = None,
         subcategory_id: Identifier | None = None,
-        paid: bool = True,
+        paid: Annotated[
+            bool,
+            Field(description="Em compras no cartão, o Despezzas sempre normaliza este campo para true."),
+        ] = True,
         transaction_type: TransactionType = "unique",
         frequency: Frequency | None = None,
         installments: Annotated[int, Field(ge=1)] | None = None,
         amount_mode: Literal["per_installment", "total"] = "per_installment",
         allow_uncategorized: bool = False,
     ) -> dict[str, Any]:
-        """Monta e valida uma transação sem executar escrita."""
+        """Monta a criação; recorrências mensais nos dias 29-31 são bloqueadas por segurança."""
         return await prepare_create_transaction_plan(locals())
 
     @mcp.tool(name="despezzas_create_transaction", title="Criar Transação", annotations=CREATE)
@@ -555,7 +621,10 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         credit_card_id: Identifier | None = None,
         category_id: Identifier | None = None,
         subcategory_id: Identifier | None = None,
-        paid: bool = True,
+        paid: Annotated[
+            bool,
+            Field(description="Em compras no cartão, o Despezzas sempre normaliza este campo para true."),
+        ] = True,
         transaction_type: TransactionType = "unique",
         frequency: Frequency | None = None,
         installments: Annotated[int, Field(ge=1)] | None = None,
@@ -563,7 +632,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         allow_uncategorized: bool = False,
         confirm: bool = False,
     ) -> JsonResponse:
-        """Cria transação. Exige confirm=true e recomenda prepare primeiro."""
+        """Cria transação; cartão força paid=true e recorrência mensal insegura é bloqueada."""
         if not confirm:
             return refusal("criar uma transação")
         prepared = await prepare_create_transaction_plan(locals())
@@ -573,7 +642,13 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         return (
             transaction
             if isinstance(transaction, dict) and "error" in transaction
-            else {"created": True, "payload": prepared["payload"], "transaction": transaction}
+            else {
+                "created": True,
+                "payload": prepared["payload"],
+                "warnings": prepared["warnings"],
+                "series_preview": prepared["series_preview"],
+                "transaction": transaction,
+            }
         )
 
     @mcp.tool(name="despezzas_prepare_update_transaction", title="Preparar Edição de Transação", annotations=READ_ONLY)
@@ -904,7 +979,7 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         allow_destructive: bool = False,
         confirm: bool = False,
     ) -> JsonResponse:
-        """Executa GET bruto; outros métodos exigem allow_destructive=true e confirm=true."""
+        """Executa API bruta; limites de cartão aninhados podem estar desatualizados."""
         if method != "GET" and (not allow_destructive or not confirm):
             return {
                 "error": (f"Recusando {method} {path} porque allow_destructive e confirm não foram true."),
@@ -1034,6 +1109,11 @@ def entity_items(value: Any, keys: tuple[str, ...]) -> list[dict[str, Any]]:
         if isinstance(child, list):
             return [item for item in child if isinstance(item, dict)]
     return []
+
+
+def locate_member_profile(access: Any, profile_id: str) -> dict[str, Any] | None:
+    members = entity_items(access, ("member_profiles",))
+    return locate_entity(members, profile_id)
 
 
 def locate_entity(items: list[dict[str, Any]], entity_id: str) -> dict[str, Any] | None:

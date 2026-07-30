@@ -5,9 +5,10 @@ import hashlib
 import json
 import math
 import re
+from calendar import monthrange
 from collections import defaultdict
 from collections.abc import Awaitable
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from pydantic.experimental.missing_sentinel import MISSING
@@ -53,6 +54,19 @@ UPDATE_FIELD_MAP = {
     "paid": "paid",
 }
 DESCRIPTION_CLEAR_SENTINEL = " "
+RECURRENCE_OCCURRENCE_COUNT = 12
+RECURRENCE_DAY_STEPS = {
+    "DAILY": 1,
+    "WEEKLY": 7,
+    "BIWEEKLY": 14,
+}
+RECURRENCE_MONTH_STEPS = {
+    "MONTHLY": 1,
+    "BIMONTHLY": 2,
+    "QUARTERLY": 3,
+    "SEMIANNUAL": 6,
+    "YEARLY": 12,
+}
 
 
 def redact(value: Any) -> Any:
@@ -185,6 +199,8 @@ def transaction_filters(**args: Any) -> dict[str, Any]:
 
 def prepare_create_transaction(args: dict[str, Any]) -> dict[str, Any]:
     issues: list[str] = []
+    warnings: list[str] = []
+    series_preview = None
     if not args.get("account_id") and not args.get("credit_card_id"):
         issues.append("account_id ou credit_card_id é obrigatório.")
     if args.get("account_id") and args.get("credit_card_id"):
@@ -195,11 +211,34 @@ def prepare_create_transaction(args: dict[str, Any]) -> dict[str, Any]:
         issues.append("subcategory_id exige category_id.")
     if args.get("transaction_type") == "parcelled" and (args.get("installments") or 0) < 2:
         issues.append("Transações parceladas exigem installments >= 2.")
+    if args.get("credit_card_id") and args.get("paid") is False:
+        warnings.append("Compras no cartão são criadas com paid:true pelo Despezzas; o valor false foi normalizado.")
+    if args.get("transaction_type") == "recurring":
+        frequency = args.get("frequency") or "MONTHLY"
+        try:
+            start = date.fromisoformat(args["date"])
+            projected_dates = project_recurrence_dates(start, frequency)
+            series_preview = {
+                "occurrence_count": RECURRENCE_OCCURRENCE_COUNT,
+                "frequency": frequency,
+                "amount_cents_each": args["amount_cents"],
+                "total_amount_cents": args["amount_cents"] * RECURRENCE_OCCURRENCE_COUNT,
+                "dates": projected_dates,
+            }
+            if frequency == "MONTHLY" and start.day > 28:
+                issues.append(
+                    "Recorrências mensais iniciadas nos dias 29, 30 ou 31 estão temporariamente bloqueadas "
+                    "porque a API Despezzas pode pular fevereiro e duplicar março."
+                )
+        except ValueError:
+            issues.append("A data inicial da recorrência é inválida.")
     payload = build_transaction_payload(args)
     return {
         "ready": not issues,
         "issues": issues,
+        "warnings": warnings,
         "payload": payload,
+        "series_preview": series_preview,
         "endpoint": "/v1/transactions",
         "method": "POST",
         "note": (
@@ -223,7 +262,13 @@ def build_transaction_payload(args: dict[str, Any]) -> dict[str, Any]:
             "is_expense": args.get("kind", "expense") == "expense",
             "type": api_type,
             "frequency": args.get("frequency") or "MONTHLY",
-            "installments": args.get("installments") if api_type == "PARCELLED" else 1,
+            "installments": (
+                args.get("installments")
+                if api_type == "PARCELLED"
+                else RECURRENCE_OCCURRENCE_COUNT
+                if api_type == "RECURRENT"
+                else 1
+            ),
             "is_full_amount": args.get("amount_mode", "per_installment") != "total"
             if api_type == "PARCELLED"
             else True,
@@ -234,6 +279,27 @@ def build_transaction_payload(args: dict[str, Any]) -> dict[str, Any]:
             "paid": True if args.get("credit_card_id") else args.get("paid", True),
         }
     )
+
+
+def project_recurrence_dates(
+    start: date,
+    frequency: str,
+    count: int = RECURRENCE_OCCURRENCE_COUNT,
+) -> list[str]:
+    if frequency in RECURRENCE_DAY_STEPS:
+        step = RECURRENCE_DAY_STEPS[frequency]
+        return [(start + timedelta(days=step * index)).isoformat() for index in range(count)]
+    if frequency in RECURRENCE_MONTH_STEPS:
+        step = RECURRENCE_MONTH_STEPS[frequency]
+        return [add_months_clamped(start, step * index).isoformat() for index in range(count)]
+    raise ValueError(f"Frequência recorrente não suportada: {frequency}")
+
+
+def add_months_clamped(value: date, months: int) -> date:
+    absolute_month = value.year * 12 + value.month - 1 + months
+    year, month_index = divmod(absolute_month, 12)
+    month = month_index + 1
+    return value.replace(year=year, month=month, day=min(value.day, monthrange(year, month)[1]))
 
 
 def prepare_update_transaction(args: dict[str, Any]) -> dict[str, Any]:

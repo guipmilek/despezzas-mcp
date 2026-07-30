@@ -65,6 +65,19 @@ Despezzas ficam nos secrets do deployment e a sessão Firebase permanece em mem�
 - `GET /v1/export-transactions/count`
 - `GET /v1/export-transactions`
 
+Uma recorrência mensal iniciada em `2026-07-30` foi materializada pela API com
+12 ocorrências, mas pulou fevereiro de 2027 e criou `2027-03-02` e
+`2027-03-30`. O frontend/backend também substitui `installments: 1` por 12 em
+transações `RECURRENT`. O MCP passou a representar as 12 ocorrências no preview
+e no payload, usando projeção de calendário com limite no último dia do mês.
+Enquanto o cálculo do backend não for corrigido, recorrências mensais iniciadas
+nos dias 29, 30 ou 31 são bloqueadas antes da escrita.
+
+Transações vinculadas a cartão sempre são persistidas com `paid: true`, mesmo
+quando o chamador informa `false`. O schema público mantém o campo para contas
+bancárias, mas documenta a normalização e retorna um aviso para compras no
+cartão.
+
 ## Semântica defensiva adotada pelo MCP
 
 A API observada usa `PUT /v1/transactions/{id}`. Como campos omitidos podem ser
@@ -122,6 +135,12 @@ automático. Se nenhum campo mudou, permanece `failed_validation` com
 chamadas/aceitas, atualizações completas, parciais, falhas e itens não tentados;
 com `stop_on_error: true`, uma atualização parcial interrompe os itens seguintes.
 
+O limite disponível confiável vem de `GET /v1/credit-card`. Em teste real, o
+mesmo cartão retornou o valor correto nessa rota e `available_limit: 0` quando
+aninhado em `/v1/transactions`. As ferramentas estruturadas não promovem esse
+valor aninhado; buscas com `include_raw: true` e a descrição da API bruta
+alertam que ele pode estar desatualizado.
+
 ## Endpoints de acesso a perfil descobertos no frontend
 
 O Despezzas oferece um perfil pessoal/raiz e até 3 tipos de perfis extras (`pj`, `family`, `investments`). O frontend lista o estado de acesso a perfis e troca o perfil ativo por:
@@ -132,6 +151,10 @@ O Despezzas oferece um perfil pessoal/raiz e até 3 tipos de perfis extras (`pj`
 - `PUT /v1/profile-access/{id}`
 - `DELETE /v1/profile-access/{id}`
 - `PUT /v1/profile-access/leave` com `{ "profileId": "uuid" }`
+
+O endpoint de saída pode responder sucesso para um UUID sem vínculo. Por isso,
+o MCP exige que o ID esteja presente em `member_profiles` antes do `PUT` e
+confirma sua ausência em uma nova listagem antes de retornar `left: true`.
 
 Payloads de criação/edição usam:
 

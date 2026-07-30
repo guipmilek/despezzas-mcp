@@ -15,6 +15,19 @@ Este MCP permite alterar dados financeiros reais. Toda ferramenta de escrita exi
 As pré-visualizações podem fazer leituras para montar o diff, mas não escrevem.
 Uma escrita confirmada não tem rollback automático.
 
+## Criação segura de recorrências
+
+O backend materializa recorrências com 12 ocorrências. O preview e a execução
+usam `installments: 12` e retornam `series_preview` com todas as datas, o valor
+por ocorrência e o total projetado. Recorrências mensais iniciadas nos dias 29,
+30 ou 31 são bloqueadas antes do `POST`: a API pode fazer overflow de fevereiro
+para março, pulando fevereiro e criando duas ocorrências em março.
+
+O MCP não substitui uma série por 12 transações independentes, pois isso
+eliminaria a relação usada por operações com `scope: ALL`. Compras no cartão são
+sempre enviadas com `paid: true`; quando o chamador informa `paid: false`, o
+preview e a execução retornam um aviso explícito sobre a normalização.
+
 ## Atualização segura de transações
 
 - Campo ausente preserva o valor atual.
@@ -54,6 +67,12 @@ completo. O limite disponível de cartão é calculado pelo backend;
 `available_limit_cents` não faz parte dos schemas de entrada de criação ou
 edição, embora continue aparecendo nas respostas de leitura.
 
+`despezzas_list_credit_cards` é a fonte confiável para
+`available_limit_cents`. O objeto `credit_card` aninhado em respostas brutas de
+transações pode retornar `available_limit: 0` mesmo quando o limite disponível
+real é diferente; buscas com `include_raw: true` incluem esse alerta e não
+alteram o dado bruto.
+
 Ao excluir uma transação `TRANSFER`, o preview localiza
 `connected_transaction_id`. Esse identificador pode apontar para o ID bruto da
 API ou ser compartilhado pelas duas pontas; o MCP resolve a relação e converte a
@@ -61,6 +80,10 @@ contraparte para o ID interno editável. A execução exclui as duas pontas
 sequencialmente e relê ambas; relações ausentes ou ambíguas são bloqueadas e
 falhas parciais são expostas individualmente, pois a API não oferece um endpoint
 atômico conjunto.
+
+`despezzas_leave_profile` confirma que o ID existe em `member_profiles` antes
+da escrita e relê os vínculos depois. Uma mensagem de sucesso do backend não é
+suficiente: o MCP só retorna `left: true` quando o vínculo realmente desaparece.
 
 ## Semântica MCP
 

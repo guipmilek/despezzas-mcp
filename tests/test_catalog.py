@@ -102,6 +102,25 @@ async def test_credit_card_write_schemas_do_not_accept_calculated_available_limi
         assert "available_limit_cents é calculado e não é aceito" in listed[name].description
 
 
+async def test_transaction_create_schema_documents_credit_card_paid_normalization_and_recurrence_block():
+    async with Client(mcp) as client:
+        listed = {tool.name: tool for tool in await client.list_tools()}
+
+    for name in ("despezzas_prepare_create_transaction", "despezzas_create_transaction"):
+        paid = listed[name].inputSchema["properties"]["paid"]
+        assert "sempre normaliza este campo para true" in paid["description"]
+    assert "29-31" in listed["despezzas_prepare_create_transaction"].description
+    assert "recorrência mensal insegura é bloqueada" in listed["despezzas_create_transaction"].description
+
+
+async def test_card_and_raw_tool_descriptions_identify_authoritative_available_limit_source():
+    async with Client(mcp) as client:
+        listed = {tool.name: tool for tool in await client.list_tools()}
+
+    assert "fonte confiável" in listed["despezzas_list_credit_cards"].description
+    assert "limites de cartão aninhados podem estar desatualizados" in listed["despezzas_raw_api"].description
+
+
 def test_public_errors_do_not_expose_exception_details():
     assert "secret-token" not in public_error(RuntimeError("secret-token"))
     assert public_error(RuntimeError("secret-token")) == "A operação falhou sem expor detalhes internos."
@@ -182,6 +201,91 @@ async def test_prepare_create_transaction_keeps_integer_cents(no_api):
     assert result.data["ready"] is True
     assert result.data["payload"]["amount"] == 12345
     no_api.assert_not_awaited()
+
+
+async def test_monthly_recurrence_on_day_30_is_blocked_before_create(no_api):
+    async with Client(mcp) as client:
+        preview = await client.call_tool(
+            "despezzas_prepare_create_transaction",
+            {
+                "title": "Recorrência",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "category",
+                "transaction_type": "recurring",
+                "frequency": "MONTHLY",
+            },
+        )
+        execution = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Recorrência",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "category",
+                "transaction_type": "recurring",
+                "frequency": "MONTHLY",
+                "confirm": True,
+            },
+        )
+
+    assert preview.data["ready"] is False
+    assert preview.data["payload"]["installments"] == 12
+    assert len(preview.data["series_preview"]["dates"]) == 12
+    assert "temporariamente bloqueadas" in preview.data["issues"][0]
+    assert "Payload não está pronto" in execution.data["error"]
+    no_api.create_transaction.assert_not_awaited()
+
+
+async def test_safe_recurrence_create_returns_same_twelve_occurrence_preview(no_api):
+    no_api.create_transaction.return_value = {"id": "series", "installments": 12}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Recorrência",
+                "amount_cents": 100,
+                "date": "2026-07-28",
+                "account_id": "account",
+                "category_id": "category",
+                "transaction_type": "recurring",
+                "frequency": "MONTHLY",
+                "confirm": True,
+            },
+        )
+
+    payload = no_api.create_transaction.await_args.args[0]
+    assert payload["installments"] == 12
+    assert result.data["created"] is True
+    assert result.data["series_preview"]["occurrence_count"] == 12
+    assert result.data["series_preview"]["dates"][0] == "2026-07-28"
+    assert result.data["series_preview"]["dates"][-1] == "2027-06-28"
+
+
+async def test_credit_card_paid_false_returns_explicit_normalization_warning(no_api):
+    no_api.create_transaction.return_value = {"id": "card-purchase", "paid": True}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Compra no cartão",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "credit_card_id": "card",
+                "category_id": "category",
+                "paid": False,
+                "confirm": True,
+            },
+        )
+
+    assert no_api.create_transaction.await_args.args[0]["paid"] is True
+    assert result.data["warnings"] == [
+        "Compras no cartão são criadas com paid:true pelo Despezzas; o valor false foi normalizado."
+    ]
 
 
 def transaction(**overrides):
@@ -802,6 +906,65 @@ async def test_list_profiles_returns_compact_normalized_profiles(no_api):
     assert "secret-token" not in str(result.data)
 
 
+async def test_leave_profile_rejects_unknown_member_without_api_write(no_api):
+    no_api.list_profile_access.return_value = {"member_profiles": []}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_leave_profile",
+            {
+                "profile_id": "00000000-0000-4000-8000-000000000000",
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "not_found"
+    assert result.data["left"] is False
+    assert result.data["api_called"] is False
+    no_api.leave_access_profile.assert_not_awaited()
+
+
+async def test_leave_profile_validates_that_member_link_was_removed(no_api):
+    member = {"id": "member-profile", "name": "Compartilhado", "type": "family"}
+    no_api.list_profile_access.side_effect = [
+        {"member_profiles": [member]},
+        {"member_profiles": []},
+    ]
+    no_api.leave_access_profile.return_value = {"message": "Você saiu do perfil com sucesso"}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_leave_profile",
+            {"profile_id": "member-profile", "confirm": True},
+        )
+
+    assert result.data["status"] == "success"
+    assert result.data["left"] is True
+    assert result.data["api_called"] is True
+    assert result.data["api_accepted"] is True
+    assert result.data["validation"] == {"ok": True, "still_linked": False}
+
+
+async def test_leave_profile_does_not_trust_success_message_when_link_remains(no_api):
+    member = {"id": "member-profile", "name": "Compartilhado", "type": "family"}
+    no_api.list_profile_access.side_effect = [
+        {"member_profiles": [member]},
+        {"member_profiles": [member]},
+    ]
+    no_api.leave_access_profile.return_value = {"message": "Você saiu do perfil com sucesso"}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_leave_profile",
+            {"profile_id": "member-profile", "confirm": True},
+        )
+
+    assert result.data["status"] == "failed_validation"
+    assert result.data["left"] is False
+    assert result.data["api_accepted"] is True
+    assert result.data["validation"] == {"ok": False, "still_linked": True}
+
+
 async def test_update_and_batch_block_incompatible_category_pair(no_api):
     no_api.get_transactions.return_value = [transaction()]
     no_api.get_subcategories.return_value = [
@@ -1073,3 +1236,32 @@ async def test_search_transactions_exposes_stable_cursor(no_api):
     assert [item["id"] for item in first.data["transactions"]] == ["b", "a"]
     assert [item["id"] for item in second.data["transactions"]] == ["c"]
     assert second.data["next_cursor"] is None
+
+
+async def test_raw_transaction_search_warns_about_nested_credit_card_limit(no_api):
+    no_api.get_transactions.return_value = [
+        transaction(
+            account_id=None,
+            credit_card_id="card",
+            credit_card={"id": "card", "name": "Cartão", "available_limit": 0},
+        )
+    ]
+    no_api.get_profile.return_value = {"current_profile_access_id": None}
+    no_api.list_profile_access.return_value = {}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_search_transactions",
+            {
+                "date_start": "2026-07-01",
+                "date_end": "2026-07-31",
+                "account_type": "credit_card",
+                "include_raw": True,
+            },
+        )
+
+    assert result.data["transactions"][0]["credit_card"]["available_limit"] == 0
+    assert result.data["raw_data_warnings"] == [
+        "credit_card.available_limit em transações brutas pode estar desatualizado. "
+        "Use despezzas_list_credit_cards como fonte confiável do limite disponível."
+    ]

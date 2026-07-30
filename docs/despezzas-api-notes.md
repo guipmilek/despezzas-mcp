@@ -107,6 +107,15 @@ sendo o identificador usado nas escritas. O endpoint direto
 `GET /v1/transactions/{id}` retornou 404 para IDs válidos, inclusive importados,
 e não é usado no lookup interno. Preview, update, batch, delete e validação
 posterior compartilham a resolução baseada em `GET /v1/transactions`.
+Essa mesma resolução é exposta por `despezzas_get_transaction`, que recebe o ID
+interno e uma `date_hint` opcional, sem depender do endpoint direto por ID.
+
+Criações usam um snapshot anterior e uma releitura posterior do mesmo destino e
+intervalo. Os IDs novos são validados contra quantidade, datas, parcelas e
+campos esperados. A resposta HTTP do `POST` representa apenas `api_accepted`;
+`created: true` exige que ao menos uma persistência nova seja encontrada. Uma
+criação divergente retorna `partially_created`, e a impossibilidade de obter o
+snapshot anterior bloqueia a escrita.
 
 Atualizações idempotentes repetem HTTP 429 até três vezes, respeitando
 `Retry-After`, e enviam `Idempotency-Key`. O suporte efetivo à chave e a

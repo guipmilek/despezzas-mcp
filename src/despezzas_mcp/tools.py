@@ -29,6 +29,7 @@ from .helpers import (
     prepare_update_transaction,
     profile_context,
     profile_warning,
+    project_recurrence_dates,
     public_error,
     public_update_plan,
     redact,
@@ -473,6 +474,50 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
 
 
 def register_transaction_tools(mcp: FastMCP) -> None:
+    @mcp.tool(name="despezzas_get_transaction", title="Obter Transação por ID", annotations=READ_ONLY)
+    async def despezzas_get_transaction(
+        id: Identifier,
+        date_hint: DateString | None = None,
+        include_raw: bool = False,
+    ) -> dict[str, Any]:
+        """Localiza uma transação pelo ID interno, inclusive fora do mês atual."""
+        try:
+            lookup = await lookup_transaction_by_id(id, date_hint=date_hint)
+            if not lookup["found"]:
+                return {
+                    "status": "not_found",
+                    "found": False,
+                    "id": id,
+                    "lookup": {key: value for key, value in lookup.items() if key != "transaction"},
+                }
+            transaction = lookup.get("transaction")
+            if not isinstance(transaction, dict):
+                return {
+                    "status": "invalid_id",
+                    "found": True,
+                    "id": id,
+                    "lookup": {key: value for key, value in lookup.items() if key != "transaction"},
+                }
+            return {
+                "status": "success",
+                "found": True,
+                "id": id,
+                "editable": lookup["editable"],
+                "transaction": redact(transaction if include_raw else compact_transaction(transaction)),
+                "raw_data_warnings": (
+                    [RAW_CREDIT_CARD_LIMIT_WARNING]
+                    if include_raw and isinstance(transaction.get("credit_card"), dict)
+                    else []
+                ),
+            }
+        except Exception as error:
+            return {
+                "status": "failed_lookup",
+                "found": False,
+                "id": id,
+                "error": public_error(error),
+            }
+
     @mcp.tool(name="despezzas_search_transactions", title="Buscar Transações", annotations=READ_ONLY)
     async def despezzas_search_transactions(
         date_start: DateString | None = None,
@@ -632,24 +677,13 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         allow_uncategorized: bool = False,
         confirm: bool = False,
     ) -> JsonResponse:
-        """Cria transação; cartão força paid=true e recorrência mensal insegura é bloqueada."""
+        """Cria e relê a transação; cartão força paid=true e recorrência mensal insegura é bloqueada."""
         if not confirm:
             return refusal("criar uma transação")
         prepared = await prepare_create_transaction_plan(locals())
         if not prepared["ready"]:
             return {"error": f"Payload não está pronto: {' '.join(prepared['issues'])}", "action": "criar transação"}
-        transaction = await attempt("criar transação", client.create_transaction(prepared["payload"]))
-        return (
-            transaction
-            if isinstance(transaction, dict) and "error" in transaction
-            else {
-                "created": True,
-                "payload": prepared["payload"],
-                "warnings": prepared["warnings"],
-                "series_preview": prepared["series_preview"],
-                "transaction": transaction,
-            }
-        )
+        return await execute_create_transaction(prepared)
 
     @mcp.tool(name="despezzas_prepare_update_transaction", title="Preparar Edição de Transação", annotations=READ_ONLY)
     async def despezzas_prepare_update_transaction(
@@ -1097,6 +1131,228 @@ async def prepare_create_transaction_plan(arguments: dict[str, Any]) -> dict[str
         prepared["issues"].append(issue)
         prepared["ready"] = False
     return prepared
+
+
+async def execute_create_transaction(prepared: dict[str, Any]) -> dict[str, Any]:
+    payload = prepared["payload"]
+    validation_filters = create_transaction_validation_filters(prepared)
+    try:
+        before_items = transaction_items(await client.get_transactions(validation_filters))
+    except Exception as error:
+        return {
+            "status": "blocked_validation_setup",
+            "ok": False,
+            "created": False,
+            "api_called": False,
+            "api_accepted": False,
+            "payload": payload,
+            "warnings": prepared["warnings"],
+            "series_preview": prepared["series_preview"],
+            "error": (
+                "A transação não foi criada porque o estado anterior não pôde ser lido "
+                f"para validação segura: {public_error(error)}"
+            ),
+        }
+
+    try:
+        response = await client.create_transaction(payload)
+    except Exception as error:
+        return {
+            "status": "failed_request",
+            "ok": False,
+            "created": False,
+            "api_called": True,
+            "api_accepted": False,
+            "payload": payload,
+            "warnings": prepared["warnings"],
+            "series_preview": prepared["series_preview"],
+            "error": public_error(error),
+        }
+
+    base_result = {
+        "status": "failed_validation",
+        "ok": False,
+        "created": None,
+        "api_called": True,
+        "api_accepted": True,
+        "payload": payload,
+        "warnings": prepared["warnings"],
+        "series_preview": prepared["series_preview"],
+        "transaction": redact(response),
+    }
+    try:
+        after_items = transaction_items(await client.get_transactions(validation_filters))
+    except Exception as error:
+        return {
+            **base_result,
+            "validation": {
+                "ok": False,
+                "reason": f"A API aceitou a criação, mas o resultado não pôde ser relido: {public_error(error)}",
+            },
+        }
+
+    created_items = select_created_transactions(before_items, after_items)
+    remember_transaction_lookup_hints(created_items)
+    validation = validate_created_transactions(prepared, created_items)
+    partially_created = bool(created_items) and not validation["ok"]
+    persistence_confirmed = bool(created_items)
+    return {
+        **base_result,
+        "status": "success" if validation["ok"] else "partially_created" if partially_created else "failed_validation",
+        "ok": validation["ok"],
+        "created": persistence_confirmed if persistence_confirmed else None,
+        "fully_created": validation["ok"],
+        "partially_created": partially_created,
+        "has_persisted_changes": persistence_confirmed if persistence_confirmed else None,
+        "created_count": len(created_items),
+        "created_transactions": [compact_transaction(item) for item in created_items],
+        "validation": validation,
+    }
+
+
+def create_transaction_validation_filters(prepared: dict[str, Any]) -> dict[str, Any]:
+    payload = prepared["payload"]
+    expected_dates = expected_created_transaction_dates(prepared)
+    first_date = date.fromisoformat(min(expected_dates))
+    last_date = date.fromisoformat(max(expected_dates))
+    series_margin = 7 if len(expected_dates) > 1 else 1
+    return transaction_filters(
+        account_type="credit_card" if payload.get("credit_card_id") else "bank_account",
+        account_ids=[payload["account_id"]] if payload.get("account_id") else None,
+        credit_card_ids=[payload["credit_card_id"]] if payload.get("credit_card_id") else None,
+        date_start=first_date.isoformat(),
+        date_end=(last_date + timedelta(days=series_margin)).isoformat(),
+        order_by="date",
+        order="asc",
+    )
+
+
+def expected_created_transaction_dates(prepared: dict[str, Any]) -> list[str]:
+    payload = prepared["payload"]
+    series_preview = prepared.get("series_preview")
+    if isinstance(series_preview, dict) and isinstance(series_preview.get("dates"), list):
+        return [value for value in series_preview["dates"] if isinstance(value, str)]
+    if payload.get("type") == "PARCELLED":
+        return project_recurrence_dates(
+            date.fromisoformat(payload["date"]),
+            "MONTHLY",
+            int(payload["installments"]),
+        )
+    return [payload["date"]]
+
+
+def select_created_transactions(
+    before_items: list[dict[str, Any]],
+    after_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    before_ids = {transaction_internal_id(item) for item in before_items}
+    created = []
+    for item in after_items:
+        transaction_id = transaction_internal_id(item)
+        if not transaction_id or transaction_id in before_ids:
+            continue
+        created.append(item)
+    return stable_sort_transactions(created, "date", "asc")
+
+
+def validate_created_transactions(
+    prepared: dict[str, Any],
+    created_items: list[dict[str, Any]],
+) -> dict[str, Any]:
+    payload = prepared["payload"]
+    expected_dates = expected_created_transaction_dates(prepared)
+    expected = compact_transaction(payload)
+    actual = [compact_transaction(item) for item in created_items]
+    mismatches: list[dict[str, Any]] = []
+
+    if len(actual) != len(expected_dates):
+        mismatches.append(
+            {
+                "field": "occurrence_count",
+                "expected": len(expected_dates),
+                "received": len(actual),
+            }
+        )
+
+    received_dates = [item.get("date") for item in actual]
+    if received_dates != expected_dates:
+        mismatches.append(
+            {
+                "field": "dates",
+                "expected": expected_dates,
+                "received": received_dates,
+            }
+        )
+
+    common_fields = [
+        "title",
+        "description",
+        "kind",
+        "account_id",
+        "credit_card_id",
+        "category_id",
+        "subcategory_id",
+        "paid",
+        "type",
+    ]
+    if payload["type"] != "FIXED":
+        common_fields.extend(["frequency", "installments"])
+    for index, item in enumerate(actual):
+        for field in common_fields:
+            if item.get(field) != expected.get(field):
+                mismatches.append(
+                    {
+                        "transaction_id": item.get("id"),
+                        "occurrence_index": index,
+                        "field": field,
+                        "expected": expected.get(field),
+                        "received": item.get(field),
+                    }
+                )
+
+    if payload["type"] == "PARCELLED" and payload.get("is_full_amount") is False:
+        received_total = sum(int(item.get("amount_cents") or 0) for item in actual)
+        if received_total != payload["amount"]:
+            mismatches.append(
+                {
+                    "field": "total_amount_cents",
+                    "expected": payload["amount"],
+                    "received": received_total,
+                }
+            )
+    else:
+        for index, item in enumerate(actual):
+            if item.get("amount_cents") != payload["amount"]:
+                mismatches.append(
+                    {
+                        "transaction_id": item.get("id"),
+                        "occurrence_index": index,
+                        "field": "amount_cents",
+                        "expected": payload["amount"],
+                        "received": item.get("amount_cents"),
+                    }
+                )
+
+    if payload["type"] != "FIXED":
+        received_installment_numbers = [item.get("installment_number") for item in actual]
+        expected_installment_numbers = list(range(1, int(payload["installments"]) + 1))
+        if received_installment_numbers != expected_installment_numbers:
+            mismatches.append(
+                {
+                    "field": "installment_numbers",
+                    "expected": expected_installment_numbers,
+                    "received": received_installment_numbers,
+                }
+            )
+
+    return {
+        "ok": not mismatches,
+        "expected_count": len(expected_dates),
+        "persisted_count": len(actual),
+        "expected_dates": expected_dates,
+        "received_dates": received_dates,
+        "mismatches": mismatches,
+    }
 
 
 def entity_items(value: Any, keys: tuple[str, ...]) -> list[dict[str, Any]]:
@@ -1640,19 +1896,11 @@ async def read_updated_transaction(
     lookup_date: str | None = None,
 ) -> dict[str, Any] | None:
     try:
-        items = transaction_items(await client.get_transactions())
-        items = await expand_transaction_lookup(
-            items,
-            [
-                {
-                    "id": transaction_id,
-                    "ready": True,
-                    "edition_date": lookup_date,
-                }
-            ],
+        lookup = await lookup_transaction_by_id(
+            transaction_id,
+            date_hint=lookup_date,
             allow_historical_scan=False,
         )
-        lookup = locate_transaction(items, transaction_id)
         if lookup["found"] and lookup["editable"]:
             return lookup["transaction"]
     except Exception:
@@ -1665,6 +1913,27 @@ async def read_updated_transaction(
             if isinstance(child, dict):
                 return child
     return None
+
+
+async def lookup_transaction_by_id(
+    transaction_id: str,
+    *,
+    date_hint: str | None = None,
+    allow_historical_scan: bool = True,
+) -> dict[str, Any]:
+    items = transaction_items(await client.get_transactions())
+    items = await expand_transaction_lookup(
+        items,
+        [
+            {
+                "id": transaction_id,
+                "ready": True,
+                "edition_date": date_hint,
+            }
+        ],
+        allow_historical_scan=allow_historical_scan,
+    )
+    return locate_transaction(items, transaction_id)
 
 
 async def expand_transaction_lookup(

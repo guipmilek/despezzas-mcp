@@ -30,6 +30,7 @@ EXPECTED_TOOLS = {
     "despezzas_delete_credit_card",
     "despezzas_list_categories",
     "despezzas_list_subcategories",
+    "despezzas_get_transaction",
     "despezzas_search_transactions",
     "despezzas_transaction_overview",
     "despezzas_finance_summary",
@@ -67,7 +68,7 @@ def no_api(monkeypatch):
     return fake
 
 
-async def test_catalog_has_exactly_36_tools():
+async def test_catalog_has_exactly_37_tools():
     async with Client(mcp) as client:
         listed = await client.list_tools()
     assert {tool.name for tool in listed} == EXPECTED_TOOLS
@@ -92,6 +93,59 @@ async def test_search_schema_exposes_cursor_and_offset():
     properties = listed["despezzas_search_transactions"].inputSchema["properties"]
     assert properties["cursor"]["anyOf"][-1] == {"type": "null"}
     assert properties["offset"]["anyOf"][0] == {"minimum": 0, "type": "integer"}
+
+
+async def test_get_transaction_by_id_uses_date_hint_outside_current_month(no_api):
+    historical = {
+        "id": "historical",
+        "title": "Celesc",
+        "description": "Energia",
+        "amount": 6682,
+        "date": "2025-07-10T00:00:00.000Z",
+        "is_expense": True,
+        "type": "FIXED",
+        "frequency": "MONTHLY",
+        "installments": 1,
+        "installment_number": 1,
+        "is_full_amount": True,
+        "account_id": "account",
+        "credit_card_id": None,
+        "category_id": "category",
+        "subcategory_id": "subcategory",
+        "paid": True,
+    }
+    no_api.get_transactions.side_effect = [[], [historical]]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_get_transaction",
+            {
+                "id": "historical",
+                "date_hint": "2025-07-10",
+            },
+        )
+
+    assert result.data["status"] == "success"
+    assert result.data["found"] is True
+    assert result.data["editable"] is True
+    assert result.data["transaction"]["id"] == "historical"
+    assert result.data["transaction"]["date"] == "2025-07-10"
+    targeted_filters = no_api.get_transactions.await_args_list[1].args[0]
+    assert targeted_filters["date_start"] == "2025-07-10"
+    assert targeted_filters["date_end"] == "2025-07-11"
+
+
+async def test_get_transaction_returns_readable_noneditable_record(no_api):
+    record = created_transaction(id="readonly", editable=False)
+    no_api.get_transactions.return_value = [record]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("despezzas_get_transaction", {"id": "readonly"})
+
+    assert result.data["status"] == "success"
+    assert result.data["found"] is True
+    assert result.data["editable"] is False
+    assert result.data["transaction"]["id"] == "readonly"
 
 
 async def test_credit_card_write_schemas_do_not_accept_calculated_available_limit():
@@ -240,7 +294,37 @@ async def test_monthly_recurrence_on_day_30_is_blocked_before_create(no_api):
 
 
 async def test_safe_recurrence_create_returns_same_twelve_occurrence_preview(no_api):
+    created = [
+        created_transaction(
+            id=f"series-{index}",
+            title="Recorrência",
+            description="Recorrência",
+            date=value,
+            type="RECURRENT",
+            installments=12,
+            installment_number=index,
+            subcategory_id=None,
+        )
+        for index, value in enumerate(
+            [
+                "2026-07-28",
+                "2026-08-28",
+                "2026-09-28",
+                "2026-10-28",
+                "2026-11-28",
+                "2026-12-28",
+                "2027-01-28",
+                "2027-02-28",
+                "2027-03-28",
+                "2027-04-28",
+                "2027-05-28",
+                "2027-06-28",
+            ],
+            start=1,
+        )
+    ]
     no_api.create_transaction.return_value = {"id": "series", "installments": 12}
+    no_api.get_transactions.side_effect = [[], created]
 
     async with Client(mcp) as client:
         result = await client.call_tool(
@@ -260,6 +344,9 @@ async def test_safe_recurrence_create_returns_same_twelve_occurrence_preview(no_
     payload = no_api.create_transaction.await_args.args[0]
     assert payload["installments"] == 12
     assert result.data["created"] is True
+    assert result.data["status"] == "success"
+    assert result.data["created_count"] == 12
+    assert result.data["validation"]["ok"] is True
     assert result.data["series_preview"]["occurrence_count"] == 12
     assert result.data["series_preview"]["dates"][0] == "2026-07-28"
     assert result.data["series_preview"]["dates"][-1] == "2027-06-28"
@@ -267,6 +354,20 @@ async def test_safe_recurrence_create_returns_same_twelve_occurrence_preview(no_
 
 async def test_credit_card_paid_false_returns_explicit_normalization_warning(no_api):
     no_api.create_transaction.return_value = {"id": "card-purchase", "paid": True}
+    no_api.get_transactions.side_effect = [
+        [],
+        [
+            created_transaction(
+                id="card-purchase",
+                title="Compra no cartão",
+                description="Compra no cartão",
+                date="2026-07-30",
+                account_id=None,
+                credit_card_id="card",
+                subcategory_id=None,
+            )
+        ],
+    ]
 
     async with Client(mcp) as client:
         result = await client.call_tool(
@@ -286,6 +387,187 @@ async def test_credit_card_paid_false_returns_explicit_normalization_warning(no_
     assert result.data["warnings"] == [
         "Compras no cartão são criadas com paid:true pelo Despezzas; o valor false foi normalizado."
     ]
+
+
+async def test_fixed_creation_is_reread_and_validated(no_api):
+    persisted = created_transaction(
+        id="created",
+        title="Compra",
+        description="Compra",
+        date="2026-07-30",
+        amount=100,
+        subcategory_id=None,
+    )
+    no_api.get_transactions.side_effect = [[], [persisted]]
+    no_api.create_transaction.return_value = {"id": "created"}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Compra",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "category",
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "success"
+    assert result.data["created"] is True
+    assert result.data["fully_created"] is True
+    assert result.data["created_count"] == 1
+    assert result.data["validation"]["mismatches"] == []
+
+
+async def test_parcelled_creation_validates_all_occurrences(no_api):
+    dates = ["2026-07-28", "2026-08-28", "2026-09-28"]
+    persisted = [
+        created_transaction(
+            id=f"installment-{index}",
+            title="Compra parcelada",
+            description="Compra parcelada",
+            date=value,
+            amount=101,
+            type="PARCELLED",
+            installments=3,
+            installment_number=index,
+            subcategory_id=None,
+        )
+        for index, value in enumerate(dates, start=1)
+    ]
+    no_api.get_transactions.side_effect = [[], persisted]
+    no_api.create_transaction.return_value = {"id": "installment-1", "installments": 3}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Compra parcelada",
+                "amount_cents": 101,
+                "date": "2026-07-28",
+                "account_id": "account",
+                "category_id": "category",
+                "transaction_type": "parcelled",
+                "installments": 3,
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "success"
+    assert result.data["created_count"] == 3
+    assert result.data["validation"]["expected_dates"] == dates
+    assert result.data["validation"]["received_dates"] == dates
+
+
+async def test_creation_reports_persisted_but_divergent_record_as_partial(no_api):
+    persisted = created_transaction(
+        id="created",
+        title="Compra",
+        description="Compra",
+        date="2026-07-30",
+        amount=99,
+        subcategory_id=None,
+    )
+    no_api.get_transactions.side_effect = [[], [persisted]]
+    no_api.create_transaction.return_value = {"id": "created"}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Compra",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "category",
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "partially_created"
+    assert result.data["created"] is True
+    assert result.data["fully_created"] is False
+    assert result.data["partially_created"] is True
+    assert result.data["has_persisted_changes"] is True
+    assert result.data["validation"]["mismatches"] == [
+        {
+            "transaction_id": "created",
+            "occurrence_index": 0,
+            "field": "amount_cents",
+            "expected": 100,
+            "received": 99,
+        }
+    ]
+
+
+async def test_accepted_creation_without_readback_does_not_claim_false_or_true(no_api):
+    no_api.get_transactions.side_effect = [[], []]
+    no_api.create_transaction.return_value = {"id": "created"}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Compra",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "category",
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "failed_validation"
+    assert result.data["api_accepted"] is True
+    assert result.data["created"] is None
+    assert result.data["has_persisted_changes"] is None
+    assert result.data["created_count"] == 0
+
+
+async def test_creation_is_blocked_when_prewrite_snapshot_cannot_be_read(no_api):
+    no_api.get_transactions.side_effect = RuntimeError("offline")
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Compra",
+                "amount_cents": 100,
+                "date": "2026-07-30",
+                "account_id": "account",
+                "category_id": "category",
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "blocked_validation_setup"
+    assert result.data["created"] is False
+    assert result.data["api_called"] is False
+    no_api.create_transaction.assert_not_awaited()
+
+
+def created_transaction(**overrides):
+    value = {
+        "id": "created",
+        "title": "Compra",
+        "description": "Compra",
+        "amount": 100,
+        "date": "2026-07-30T00:00:00.000Z",
+        "is_expense": True,
+        "type": "FIXED",
+        "frequency": "MONTHLY",
+        "installments": 1,
+        "installment_number": 1,
+        "is_full_amount": True,
+        "account_id": "account",
+        "credit_card_id": None,
+        "category_id": "category",
+        "subcategory_id": "subcategory",
+        "paid": True,
+    }
+    return {**value, **overrides}
 
 
 def transaction(**overrides):

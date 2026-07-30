@@ -507,6 +507,7 @@ def locate_transaction(items: list[dict[str, Any]], requested_id: str) -> dict[s
                     "editable": False,
                     "id": requested_id,
                     "code": "TRANSACTION_NOT_EDITABLE",
+                    "transaction": item,
                     "reason": (
                         string_value(item.get("editability_reason"))
                         or string_value(item.get("non_editable_reason"))

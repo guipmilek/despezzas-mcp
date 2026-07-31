@@ -317,12 +317,13 @@ wheels = [
 
 [[package]]
 name = "despezzas-mcp"
-version = "0.1.8"
+version = "0.1.9"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "httpx" },
     { name = "pydantic" },
+    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -340,6 +341,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12" },
+    { name = "typing-extensions", specifier = ">=4.12,<5" },
 ]
 provides-extras = ["dev"]
 

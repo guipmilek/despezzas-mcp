@@ -10,7 +10,9 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.experimental.missing_sentinel import MISSING
+from typing_extensions import TypedDict
 
+from . import __version__
 from .client import DespezzasClient, client
 from .helpers import (
     MAX_EXTRA_PROFILES,
@@ -30,6 +32,7 @@ from .helpers import (
     profile_context,
     profile_warning,
     project_recurrence_dates,
+    project_series_paid_values,
     public_error,
     public_update_plan,
     redact,
@@ -114,6 +117,15 @@ class ProfileInvite(BaseModel):
     role: Literal["editor", "viewer"] = "viewer"
 
 
+class StatusResponse(TypedDict):
+    server_version: Literal["0.1.9"]
+    configured: bool
+    auth: dict[str, Any]
+    profile_context: dict[str, Any] | None
+    login_url: str | None
+    note: str
+
+
 class TransactionUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -137,12 +149,13 @@ def register_tools(mcp: FastMCP, api: DespezzasClient = client) -> None:
     client = api
 
     @mcp.tool(name="despezzas_status", title="Status do Despezzas MCP", annotations=READ_ONLY)
-    async def despezzas_status() -> dict[str, Any]:
-        """Verifica se o servidor tem credenciais ou token do Despezzas."""
+    async def despezzas_status() -> StatusResponse:
+        """Informa a versão pública e verifica a autenticação do Despezzas."""
         status = await client.auth_status()
         configured = bool(status["hasManualToken"] or status["hasEnvCredentials"] or status["hasSession"])
         context = await safe_profile_context() if configured else None
         return {
+            "server_version": __version__,
             "configured": configured,
             "auth": status,
             "profile_context": context,
@@ -644,7 +657,12 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         subcategory_id: Identifier | None = None,
         paid: Annotated[
             bool,
-            Field(description="Em compras no cartão, o Despezzas sempre normaliza este campo para true."),
+            Field(
+                description=(
+                    "No cartão, o Despezzas normaliza o estado inicial para true. "
+                    "Em séries, somente a primeira ocorrência pode iniciar paga."
+                )
+            ),
         ] = True,
         transaction_type: TransactionType = "unique",
         frequency: Frequency | None = None,
@@ -668,7 +686,12 @@ def register_transaction_tools(mcp: FastMCP) -> None:
         subcategory_id: Identifier | None = None,
         paid: Annotated[
             bool,
-            Field(description="Em compras no cartão, o Despezzas sempre normaliza este campo para true."),
+            Field(
+                description=(
+                    "No cartão, o Despezzas normaliza o estado inicial para true. "
+                    "Em séries, somente a primeira ocorrência pode iniciar paga."
+                )
+            ),
         ] = True,
         transaction_type: TransactionType = "unique",
         frequency: Frequency | None = None,
@@ -1235,7 +1258,7 @@ def expected_created_transaction_dates(prepared: dict[str, Any]) -> list[str]:
     if payload.get("type") == "PARCELLED":
         return project_recurrence_dates(
             date.fromisoformat(payload["date"]),
-            "MONTHLY",
+            payload.get("frequency") or "MONTHLY",
             int(payload["installments"]),
         )
     return [payload["date"]]
@@ -1292,7 +1315,6 @@ def validate_created_transactions(
         "credit_card_id",
         "category_id",
         "subcategory_id",
-        "paid",
         "type",
     ]
     if payload["type"] != "FIXED":
@@ -1309,6 +1331,25 @@ def validate_created_transactions(
                         "received": item.get(field),
                     }
                 )
+
+    expected_paid = (
+        [bool(payload.get("paid"))]
+        if payload["type"] == "FIXED"
+        else project_series_paid_values(bool(payload.get("paid")), len(expected_dates))
+    )
+    received_paid = [item.get("paid") for item in actual]
+    for index, item in enumerate(actual):
+        expected_value = expected_paid[index] if index < len(expected_paid) else None
+        if item.get("paid") != expected_value:
+            mismatches.append(
+                {
+                    "transaction_id": item.get("id"),
+                    "occurrence_index": index,
+                    "field": "paid",
+                    "expected": expected_value,
+                    "received": item.get("paid"),
+                }
+            )
 
     if payload["type"] == "PARCELLED" and payload.get("is_full_amount") is False:
         received_total = sum(int(item.get("amount_cents") or 0) for item in actual)
@@ -1351,6 +1392,8 @@ def validate_created_transactions(
         "persisted_count": len(actual),
         "expected_dates": expected_dates,
         "received_dates": received_dates,
+        "expected_paid": expected_paid,
+        "received_paid": received_paid,
         "mismatches": mismatches,
     }
 

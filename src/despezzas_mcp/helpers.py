@@ -67,6 +67,10 @@ RECURRENCE_MONTH_STEPS = {
     "SEMIANNUAL": 6,
     "YEARLY": 12,
 }
+SERIES_FUTURE_PAID_WARNING = (
+    "Em séries, o estado inicial paid:true se aplica somente à primeira ocorrência; "
+    "as demais são criadas com paid:false pelo Despezzas."
+)
 
 
 def redact(value: Any) -> Any:
@@ -201,6 +205,8 @@ def prepare_create_transaction(args: dict[str, Any]) -> dict[str, Any]:
     issues: list[str] = []
     warnings: list[str] = []
     series_preview = None
+    transaction_type = args.get("transaction_type", "unique")
+    effective_paid = True if args.get("credit_card_id") else args.get("paid", True)
     if not args.get("account_id") and not args.get("credit_card_id"):
         issues.append("account_id ou credit_card_id é obrigatório.")
     if args.get("account_id") and args.get("credit_card_id"):
@@ -209,23 +215,51 @@ def prepare_create_transaction(args: dict[str, Any]) -> dict[str, Any]:
         issues.append("category_id é obrigatório, a menos que allow_uncategorized seja true.")
     if args.get("subcategory_id") and not args.get("category_id"):
         issues.append("subcategory_id exige category_id.")
-    if args.get("transaction_type") == "parcelled" and (args.get("installments") or 0) < 2:
+    if transaction_type == "parcelled" and (args.get("installments") or 0) < 2:
         issues.append("Transações parceladas exigem installments >= 2.")
     if args.get("credit_card_id") and args.get("paid") is False:
-        warnings.append("Compras no cartão são criadas com paid:true pelo Despezzas; o valor false foi normalizado.")
-    if args.get("transaction_type") == "recurring":
+        warnings.append(
+            "Compras no cartão normalizam o estado inicial para paid:true pelo Despezzas; "
+            "o valor false foi normalizado."
+        )
+    if transaction_type in {"recurring", "parcelled"} and not (
+        transaction_type == "parcelled" and (args.get("installments") or 0) < 2
+    ):
         frequency = args.get("frequency") or "MONTHLY"
+        occurrence_count = RECURRENCE_OCCURRENCE_COUNT if transaction_type == "recurring" else int(args["installments"])
         try:
             start = date.fromisoformat(args["date"])
-            projected_dates = project_recurrence_dates(start, frequency)
+            projected_dates = project_recurrence_dates(start, frequency, occurrence_count)
+            paid_values = project_series_paid_values(bool(effective_paid), occurrence_count)
+            amount_mode = (
+                args.get("amount_mode", "per_installment") if transaction_type == "parcelled" else "per_installment"
+            )
             series_preview = {
-                "occurrence_count": RECURRENCE_OCCURRENCE_COUNT,
+                "series_type": "RECURRENT" if transaction_type == "recurring" else "PARCELLED",
+                "occurrence_count": occurrence_count,
                 "frequency": frequency,
-                "amount_cents_each": args["amount_cents"],
-                "total_amount_cents": args["amount_cents"] * RECURRENCE_OCCURRENCE_COUNT,
+                "amount_mode": amount_mode,
+                "amount_cents_each": args["amount_cents"] if amount_mode == "per_installment" else None,
+                "total_amount_cents": (
+                    args["amount_cents"]
+                    if transaction_type == "parcelled" and amount_mode == "total"
+                    else args["amount_cents"] * occurrence_count
+                ),
                 "dates": projected_dates,
+                "paid_occurrence_count": sum(paid_values),
+                "pending_occurrence_count": occurrence_count - sum(paid_values),
+                "occurrences": [
+                    {
+                        "installment_number": index,
+                        "date": occurrence_date,
+                        "paid": paid_values[index - 1],
+                    }
+                    for index, occurrence_date in enumerate(projected_dates, start=1)
+                ],
             }
-            if frequency == "MONTHLY" and start.day > 28:
+            if effective_paid:
+                warnings.append(SERIES_FUTURE_PAID_WARNING)
+            if transaction_type == "recurring" and frequency == "MONTHLY" and start.day > 28:
                 issues.append(
                     "Recorrências mensais iniciadas nos dias 29, 30 ou 31 estão temporariamente bloqueadas "
                     "porque a API Despezzas pode pular fevereiro e duplicar março."
@@ -293,6 +327,12 @@ def project_recurrence_dates(
         step = RECURRENCE_MONTH_STEPS[frequency]
         return [add_months_clamped(start, step * index).isoformat() for index in range(count)]
     raise ValueError(f"Frequência recorrente não suportada: {frequency}")
+
+
+def project_series_paid_values(initial_paid: bool, count: int) -> list[bool]:
+    if count < 1:
+        return []
+    return [initial_paid, *([False] * (count - 1))]
 
 
 def add_months_clamped(value: date, months: int) -> date:

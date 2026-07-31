@@ -13,6 +13,7 @@ one Despezzas account.
 - Horizon entrypoint: `src/despezzas_mcp/server.py:mcp`
 - MCP authentication: Horizon-managed OAuth
 - Despezzas authentication: `DESPEZZAS_TOKEN` or email/password/Firebase key
+- Public version discovery: `despezzas_status.server_version`
 - Session storage: in-memory only; cold starts authenticate again
 - Money: integer cents
 - Dates: `YYYY-MM-DD`
@@ -23,6 +24,7 @@ one Despezzas account.
 - Transaction read by ID: public historical lookup independent of the current month
 - Transaction lookup: current results, half-open date/account hints, then a bounded historical scan independent of worker memory
 - Transaction creates: pre-write snapshot, POST, re-read, and persisted occurrence/field validation
+- Series paid state: `paid:true` applies to the first occurrence; future occurrences validate as pending
 - Series date updates: original occurrence in `date`, desired date in `edition_date`
 - Recurring creates: 12-occurrence preview/payload; monthly starts on days 29-31 are blocked until the backend month overflow is fixed
 - No-op transaction updates: return `unchanged` without an API write

@@ -11,6 +11,7 @@ from despezzas_mcp.helpers import (
     prepare_update_transaction,
     profile_context,
     project_recurrence_dates,
+    project_series_paid_values,
     redact,
     resolve_transfer_counterpart,
     summarize_transactions,
@@ -59,6 +60,9 @@ def test_monthly_recurrence_preview_has_twelve_calendar_safe_dates_and_blocks_ri
     assert prepared["payload"]["installments"] == 12
     assert prepared["series_preview"]["occurrence_count"] == 12
     assert prepared["series_preview"]["total_amount_cents"] == 1200
+    assert prepared["series_preview"]["paid_occurrence_count"] == 1
+    assert prepared["series_preview"]["pending_occurrence_count"] == 11
+    assert [item["paid"] for item in prepared["series_preview"]["occurrences"]] == [True, *([False] * 11)]
     assert prepared["series_preview"]["dates"] == [
         "2026-07-30",
         "2026-08-30",
@@ -106,6 +110,45 @@ def test_project_recurrence_dates_clamps_leap_year_and_supports_day_steps():
     ]
 
 
+def test_parcelled_preview_exposes_dates_and_paid_state_per_occurrence():
+    prepared = prepare_create_transaction(
+        {
+            "title": "Parcelamento",
+            "amount_cents": 100,
+            "date": "2026-07-28",
+            "account_id": "account",
+            "category_id": "category",
+            "transaction_type": "parcelled",
+            "frequency": "WEEKLY",
+            "installments": 3,
+        }
+    )
+
+    assert prepared["ready"] is True
+    assert prepared["series_preview"] == {
+        "series_type": "PARCELLED",
+        "occurrence_count": 3,
+        "frequency": "WEEKLY",
+        "amount_mode": "per_installment",
+        "amount_cents_each": 100,
+        "total_amount_cents": 300,
+        "dates": ["2026-07-28", "2026-08-04", "2026-08-11"],
+        "paid_occurrence_count": 1,
+        "pending_occurrence_count": 2,
+        "occurrences": [
+            {"installment_number": 1, "date": "2026-07-28", "paid": True},
+            {"installment_number": 2, "date": "2026-08-04", "paid": False},
+            {"installment_number": 3, "date": "2026-08-11", "paid": False},
+        ],
+    }
+
+
+def test_series_paid_projection_keeps_only_initial_occurrence_paid():
+    assert project_series_paid_values(True, 3) == [True, False, False]
+    assert project_series_paid_values(False, 3) == [False, False, False]
+    assert project_series_paid_values(True, 0) == []
+
+
 def test_credit_card_paid_false_is_normalized_with_explicit_warning():
     prepared = prepare_create_transaction(
         {
@@ -121,7 +164,7 @@ def test_credit_card_paid_false_is_normalized_with_explicit_warning():
     assert prepared["ready"] is True
     assert prepared["payload"]["paid"] is True
     assert prepared["warnings"] == [
-        "Compras no cartão são criadas com paid:true pelo Despezzas; o valor false foi normalizado."
+        "Compras no cartão normalizam o estado inicial para paid:true pelo Despezzas; o valor false foi normalizado."
     ]
 
 

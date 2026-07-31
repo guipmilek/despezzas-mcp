@@ -93,6 +93,9 @@ compara o snapshot anterior e confirma quantidade, datas, parcelas e campos
 persistidos; a edição faz merge antes do `PUT`. Campo omitido é preservado;
 `null` explícito limpa campos anuláveis. A busca oferece `offset`, cursor opaco e
 ordenação estável, e `despezzas_get_transaction` localiza um ID fora do mês atual.
+`despezzas_status` informa a versão pública do servidor. Em séries, o preview
+mostra o estado de pagamento de cada ocorrência: somente a primeira pode iniciar
+paga, enquanto as futuras permanecem pendentes.
 Exclusões de transferência tratam as duas pontas conectadas, mesmo quando a API
 relaciona o ID bruto em vez do ID interno. `available_limit_cents` é somente
 leitura e não pertence aos schemas de criação ou edição de cartão.

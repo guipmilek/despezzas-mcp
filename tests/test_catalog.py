@@ -74,6 +74,24 @@ async def test_catalog_has_exactly_37_tools():
     assert {tool.name for tool in listed} == EXPECTED_TOOLS
 
 
+async def test_status_exposes_public_server_version(no_api):
+    no_api.auth_status.return_value = {
+        "hasManualToken": False,
+        "hasEnvCredentials": False,
+        "hasSession": False,
+    }
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("despezzas_status", {})
+
+    assert result.structured_content["server_version"] == "0.1.9"
+    assert result.structured_content["configured"] is False
+
+    async with Client(mcp) as client:
+        status_tool = {tool.name: tool for tool in await client.list_tools()}["despezzas_status"]
+    assert status_tool.outputSchema["properties"]["server_version"]["const"] == "0.1.9"
+
+
 async def test_catalog_exposes_complete_and_accurate_metadata():
     async with Client(mcp) as client:
         listed = await client.list_tools()
@@ -162,7 +180,8 @@ async def test_transaction_create_schema_documents_credit_card_paid_normalizatio
 
     for name in ("despezzas_prepare_create_transaction", "despezzas_create_transaction"):
         paid = listed[name].inputSchema["properties"]["paid"]
-        assert "sempre normaliza este campo para true" in paid["description"]
+        assert "normaliza o estado inicial para true" in paid["description"]
+        assert "somente a primeira ocorrência pode iniciar paga" in paid["description"]
     assert "29-31" in listed["despezzas_prepare_create_transaction"].description
     assert "recorrência mensal insegura é bloqueada" in listed["despezzas_create_transaction"].description
 
@@ -304,6 +323,7 @@ async def test_safe_recurrence_create_returns_same_twelve_occurrence_preview(no_
             installments=12,
             installment_number=index,
             subcategory_id=None,
+            paid=index == 1,
         )
         for index, value in enumerate(
             [
@@ -350,6 +370,9 @@ async def test_safe_recurrence_create_returns_same_twelve_occurrence_preview(no_
     assert result.data["series_preview"]["occurrence_count"] == 12
     assert result.data["series_preview"]["dates"][0] == "2026-07-28"
     assert result.data["series_preview"]["dates"][-1] == "2027-06-28"
+    assert result.data["series_preview"]["paid_occurrence_count"] == 1
+    assert result.data["validation"]["expected_paid"] == [True, *([False] * 11)]
+    assert result.data["validation"]["received_paid"] == [True, *([False] * 11)]
 
 
 async def test_credit_card_paid_false_returns_explicit_normalization_warning(no_api):
@@ -385,7 +408,7 @@ async def test_credit_card_paid_false_returns_explicit_normalization_warning(no_
 
     assert no_api.create_transaction.await_args.args[0]["paid"] is True
     assert result.data["warnings"] == [
-        "Compras no cartão são criadas com paid:true pelo Despezzas; o valor false foi normalizado."
+        "Compras no cartão normalizam o estado inicial para paid:true pelo Despezzas; o valor false foi normalizado."
     ]
 
 
@@ -434,6 +457,7 @@ async def test_parcelled_creation_validates_all_occurrences(no_api):
             installments=3,
             installment_number=index,
             subcategory_id=None,
+            paid=index == 1,
         )
         for index, value in enumerate(dates, start=1)
     ]
@@ -459,6 +483,56 @@ async def test_parcelled_creation_validates_all_occurrences(no_api):
     assert result.data["created_count"] == 3
     assert result.data["validation"]["expected_dates"] == dates
     assert result.data["validation"]["received_dates"] == dates
+    assert result.data["validation"]["expected_paid"] == [True, False, False]
+    assert result.data["validation"]["received_paid"] == [True, False, False]
+    assert result.data["series_preview"]["occurrences"][-1]["paid"] is False
+
+
+async def test_credit_card_series_normalizes_initial_paid_and_keeps_future_occurrences_pending(no_api):
+    dates = ["2026-07-28", "2026-08-28", "2026-09-28"]
+    persisted = [
+        created_transaction(
+            id=f"card-installment-{index}",
+            title="Compra parcelada no cartão",
+            description="Compra parcelada no cartão",
+            date=value,
+            type="PARCELLED",
+            installments=3,
+            installment_number=index,
+            account_id=None,
+            credit_card_id="card",
+            subcategory_id=None,
+            paid=index == 1,
+        )
+        for index, value in enumerate(dates, start=1)
+    ]
+    no_api.get_transactions.side_effect = [[], persisted]
+    no_api.create_transaction.return_value = {"id": "card-installment-1", "installments": 3}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "despezzas_create_transaction",
+            {
+                "title": "Compra parcelada no cartão",
+                "amount_cents": 100,
+                "date": "2026-07-28",
+                "credit_card_id": "card",
+                "category_id": "category",
+                "paid": False,
+                "transaction_type": "parcelled",
+                "installments": 3,
+                "confirm": True,
+            },
+        )
+
+    assert result.data["status"] == "success"
+    assert result.data["validation"]["expected_paid"] == [True, False, False]
+    assert result.data["validation"]["received_paid"] == [True, False, False]
+    assert result.data["warnings"] == [
+        "Compras no cartão normalizam o estado inicial para paid:true pelo Despezzas; o valor false foi normalizado.",
+        "Em séries, o estado inicial paid:true se aplica somente à primeira ocorrência; "
+        "as demais são criadas com paid:false pelo Despezzas.",
+    ]
 
 
 async def test_creation_reports_persisted_but_divergent_record_as_partial(no_api):

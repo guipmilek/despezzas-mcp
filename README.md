@@ -24,6 +24,7 @@
 - [Visão geral](#visão-geral)
 - [Início rápido](#início-rápido)
 - [Ferramentas e segurança](#ferramentas-e-segurança)
+- [Conectar ao ChatGPT](#conectar-ao-chatgpt)
 - [Deploy no Prefect Horizon](#deploy-no-prefect-horizon)
 - [Desenvolvimento](#desenvolvimento)
 - [Comparação com o MCP oficial](#comparação-com-o-mcp-oficial)
@@ -100,6 +101,23 @@ Exclusões de transferência tratam as duas pontas conectadas, mesmo quando a AP
 relaciona o ID bruto em vez do ID interno. `available_limit_cents` é somente
 leitura e não pertence aos schemas de criação ou edição de cartão.
 Consulte o [contrato de escritas](WRITES.md) antes de habilitar mutações.
+
+## Conectar ao ChatGPT
+
+Depois de publicar seu fork, use estes metadados ao adicionar o MCP no ChatGPT:
+
+| Campo | Valor |
+| --- | --- |
+| Nome | `Despezzas` |
+| Descrição | `Consulte e gerencie perfis, contas, cartões, transações, transferências e resumos financeiros do Despezzas, com confirmação obrigatória antes de alterações.` |
+| URL | `https://seu-servidor.fastmcp.app/mcp` — substitua pela URL do seu deployment |
+| Autenticação | OAuth |
+| Imagem | [`assets/despezzas-mcp.png`](assets/despezzas-mcp.png) — PNG quadrado, 512 × 512, menor que 100 KB |
+
+Ative o modo de desenvolvedor em **Configurações → Segurança e login**, abra
+**Plugins**, selecione **+**, preencha os campos acima e conclua a autenticação.
+Veja o [guia de conexão com o ChatGPT](docs/chatgpt-app-setup.md) para o passo a
+passo, os testes de validação e a atualização do catálogo.
 
 ## Deploy no Prefect Horizon
 

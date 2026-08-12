@@ -1,4 +1,5 @@
 import re
+import struct
 from pathlib import Path
 
 from tests.test_catalog import EXPECTED_TOOLS
@@ -22,3 +23,13 @@ def test_env_example_contains_no_assigned_secrets():
         if not line or line.startswith("#") or line.startswith("DESPEZZAS_API_BASE_URL="):
             continue
         assert line.endswith("="), line
+
+
+def test_chatgpt_setup_files_and_icon_contract():
+    assert (ROOT / "docs/chatgpt-app-setup.md").is_file()
+    icon = ROOT / "assets/despezzas-mcp.png"
+    data = icon.read_bytes()
+    assert data.startswith(b"\x89PNG\r\n\x1a\n")
+    assert len(data) <= 100 * 1024
+    width, height = struct.unpack(">II", data[16:24])
+    assert (width, height) == (512, 512)

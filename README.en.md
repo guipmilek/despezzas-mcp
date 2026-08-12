@@ -24,6 +24,7 @@
 - [Overview](#overview)
 - [Quick start](#quick-start)
 - [Tools and safety](#tools-and-safety)
+- [Connect to ChatGPT](#connect-to-chatgpt)
 - [Prefect Horizon deployment](#prefect-horizon-deployment)
 - [Development](#development)
 - [Official MCP comparison](#official-mcp-comparison)
@@ -32,7 +33,7 @@
 
 ## Overview
 
-This project exposes 36 MCP tools for Despezzas profiles, accounts, cards,
+This project exposes 37 MCP tools for Despezzas profiles, accounts, cards,
 categories, transactions, transfers, summaries, and diagnostics. It is an
 open-source integration built from observed web app endpoints and is not affiliated
 with Despezzas.
@@ -90,6 +91,23 @@ Transfer deletion handles both connected entries, including raw API ID
 relationships. `available_limit_cents` is read-only and is not part of card
 create or update input schemas.
 Read the [write contract](WRITES.md) before enabling mutations.
+
+## Connect to ChatGPT
+
+After deploying your fork, use these values when adding the MCP to ChatGPT:
+
+| Field | Value |
+| --- | --- |
+| Name | `Despezzas` |
+| Description | `Read and manage Despezzas profiles, accounts, cards, transactions, transfers, and financial summaries, with confirmation required before changes.` |
+| URL | `https://your-server.fastmcp.app/mcp` — replace it with your deployment URL |
+| Authentication | OAuth |
+| Image | [`assets/despezzas-mcp.png`](assets/despezzas-mcp.png) — square PNG, 512 × 512, under 100 KB |
+
+In ChatGPT, enable developer mode under **Settings → Security and login**, open
+**Plugins**, select **+**, enter the values above, and complete authentication.
+See the [ChatGPT connection guide](docs/chatgpt-app-setup.md) for setup,
+validation, and catalog-refresh steps.
 
 ## Prefect Horizon deployment
 

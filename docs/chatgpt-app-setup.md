@@ -1,7 +1,12 @@
 # Conectar o Despezzas MCP ao ChatGPT
 
-Publique primeiro o seu fork no Prefect Horizon. Cada deployment representa uma
-única conta Despezzas. Copie do Horizon a URL terminada em `/mcp`, semelhante a:
+> [!IMPORTANT]
+> Faça fork deste repositório e publique o seu próprio deployment no Prefect
+> Horizon. Cada deployment acessa a conta Despezzas definida nos secrets daquele
+> servidor. Não use a URL publicada pelo mantenedor nem o deployment de outra
+> pessoa.
+
+Copie do seu deployment a URL terminada em `/mcp`, semelhante a:
 
 ```text
 https://seu-servidor.fastmcp.app/mcp
@@ -23,15 +28,16 @@ credenciais do Despezzas permanecem somente nos secrets do servidor.
 
 ## Passo a passo no ChatGPT
 
-1. Abra **Configurações**.
-2. Entre em **Segurança e login** e ative o **Modo de desenvolvedor**.
-3. Abra **Plugins**.
-4. Selecione **+** para adicionar um plugin.
-5. Informe o nome, a descrição e a Server URL da tabela acima.
-6. Quando a interface solicitar uma imagem, envie
+1. Confirme que você publicou o seu fork e copiou a URL do seu deployment.
+2. Abra **Configurações**.
+3. Entre em **Segurança e login** e ative o **Modo de desenvolvedor**.
+4. Abra **Plugins**.
+5. Selecione **+** para adicionar um plugin.
+6. Informe o nome, a descrição e a Server URL da tabela acima.
+7. Quando a interface solicitar uma imagem, envie
    `assets/despezzas-mcp.png`.
-7. Crie a conexão e conclua o OAuth do Horizon.
-8. Revise as ferramentas e os metadados detectados antes de usar o MCP.
+8. Crie a conexão e conclua o OAuth do seu deployment no Horizon.
+9. Revise as ferramentas e os metadados detectados antes de usar o MCP.
 
 A disponibilidade do modo de desenvolvedor e de plugins pode depender do plano e
 das políticas do workspace. Consulte a
@@ -61,3 +67,4 @@ antigo:
 4. repita os testes de validação acima.
 
 Nunca coloque credenciais ou dados financeiros na descrição, na URL ou em prompts.
+Nunca conecte o ChatGPT a um deployment que não seja o seu.

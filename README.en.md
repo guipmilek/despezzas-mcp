@@ -55,6 +55,11 @@ operations so clients such as ChatGPT can plan calls safely.
 > [!IMPORTANT]
 > This server accesses real finances. Never commit `.env`, tokens, passwords,
 > HAR captures, API responses, or financial exports.
+>
+> **Every deployment is bound to one account.** Fork the repository, publish your
+> own Prefect Horizon deployment, and configure only your secrets. Never use or
+> share someone else's deployment: it accesses the financial data configured in
+> that server's secrets.
 
 ## Quick start
 
@@ -94,7 +99,8 @@ Read the [write contract](WRITES.md) before enabling mutations.
 
 ## Connect to ChatGPT
 
-After deploying your fork, use these values when adding the MCP to ChatGPT:
+After publishing your own fork and deployment, use these values when adding the
+MCP to ChatGPT. Never use someone else's URL:
 
 | Field | Value |
 | --- | --- |

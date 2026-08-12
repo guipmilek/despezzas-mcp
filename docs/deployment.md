@@ -1,7 +1,12 @@
 # Deploy no Prefect Horizon
 
-O deploy remoto mantido é o Prefect Horizon. O Horizon clona o fork, instala
-`pyproject.toml`, importa o objeto FastMCP e fornece URL, OAuth, CI/CD e previews.
+O Prefect Horizon clona um fork, instala `pyproject.toml`, importa o objeto
+FastMCP e fornece URL, OAuth, CI/CD e previews.
+
+> [!IMPORTANT]
+> Cada usuário deve fazer fork deste repositório e publicar o próprio deployment.
+> Não use nem compartilhe um deployment de terceiros: ele acessa a conta
+> Despezzas configurada nos secrets daquele servidor.
 
 ## Modelo operacional
 
@@ -31,6 +36,8 @@ O endpoint publicado tem formato semelhante a:
 ```text
 https://seu-servidor.fastmcp.app/mcp
 ```
+
+Use somente essa URL do seu próprio deployment ao conectar clientes MCP.
 
 ## Atualização do schema das ferramentas
 

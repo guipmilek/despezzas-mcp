@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="143" height="32" viewBox="0 0 143 32" role="img" aria-labelledby="title">
+  <title id="title">Back to top</title>
+  <rect width="143" height="32" fill="#20242B"/>
+  <rect width="32" height="32" fill="#FFFFFF"/>
+  <g transform="translate(4 4)" fill="none" stroke="#20242B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m-5 5 5-5 5 5"/></g>
+  <text x="43" y="20.5" font-family="Verdana,Arial,sans-serif" font-size="12" font-weight="600" fill="#FFFFFF">Back to top</text>
+</svg>

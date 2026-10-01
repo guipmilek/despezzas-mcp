@@ -1,0 +1,6 @@
+# Keep this README adaptation aligned with the existing EditorConfig.
+/.gitattributes text eol=lf
+/README.md text eol=lf
+/README.en.md text eol=lf
+/assets/readme/*.svg text eol=lf
+/docs/readme-consistencia-2026-09-30.md text eol=lf

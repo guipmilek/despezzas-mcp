@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="155" height="26" viewBox="0 0 155 26" role="img" aria-labelledby="title">
+  <title id="title">Python &gt;= 3.11</title>
+  <rect width="155" height="26" fill="#12131B"/>
+  <g transform="translate(5 4) scale(0.75)" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 5-5 7 5 7m8-14 5 7-5 7M14 3l-4 18"/></g>
+  <text x="29" y="17" font-family="Verdana,Arial,sans-serif" font-size="13" fill="#FFFFFF">Python &gt;= 3.11</text>
+</svg>

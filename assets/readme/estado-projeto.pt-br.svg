@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="24" viewBox="0 0 180 24" role="img" aria-labelledby="title">
+  <title id="title">Projeto não oficial</title>
+  <rect width="180" height="24" fill="#4B5361"/>
+  <rect width="77" height="24" fill="#12131B"/>
+  <g transform="translate(5 3) scale(0.75)" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.1"/></g>
+  <text x="29" y="16" font-family="Verdana,Arial,sans-serif" font-size="11" fill="#FFFFFF">projeto</text>
+  <text x="86" y="16" font-family="Verdana,Arial,sans-serif" font-size="11" fill="#FFFFFF">não oficial</text>
+</svg>

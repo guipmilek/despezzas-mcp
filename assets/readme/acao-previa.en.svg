@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="155" height="36" viewBox="0 0 155 36" role="img" aria-labelledby="title">
+  <title id="title">View preview</title>
+  <rect width="155" height="32" fill="#20242B"/>
+  <rect width="32" height="32" fill="#4B5361"/>
+  <g transform="translate(4 4)" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16"/><path d="m4 16 5-5 4 4 3-4 4 5"/><circle cx="9" cy="8" r="1"/></g>
+  <text x="43" y="20.5" font-family="Verdana,Arial,sans-serif" font-size="12" font-weight="600" fill="#FFFFFF">View preview</text>
+</svg>

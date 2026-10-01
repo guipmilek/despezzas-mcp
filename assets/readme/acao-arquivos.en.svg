@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="148" height="36" viewBox="0 0 148 36" role="img" aria-labelledby="title">
+  <title id="title">Explore files</title>
+  <rect width="148" height="32" fill="#20242B"/>
+  <rect width="32" height="32" fill="#4B5361"/>
+  <g transform="translate(4 4)" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h7l2 3h9v11H3Z"/></g>
+  <text x="43" y="20.5" font-family="Verdana,Arial,sans-serif" font-size="12" font-weight="600" fill="#FFFFFF">Explore files</text>
+</svg>
